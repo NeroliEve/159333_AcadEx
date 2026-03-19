@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Acadex
 
 Minimal Next.js + Supabase base app for building Acadex.
@@ -23,3 +24,7 @@ npm install
 ```bash
 npm run dev
 ```
+=======
+# 159333_AcadEx
+Peer-to-Peer Boox Exchange Web Application
+>>>>>>> 8b76c10e4ecd66bb0c1dbf744c555f5a3704006b
