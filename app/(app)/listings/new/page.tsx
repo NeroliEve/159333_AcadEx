@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { CreateListingForm } from "@/components/create-listing-form";
 import { EmptyState } from "@/components/empty-state";
-import { Button } from "@/components/ui/button";
+import { PillButton } from "@/components/ui/pill-button";
 import { getCourseOptions, getViewerContext } from "@/lib/marketplace";
 import { hasEnvVars } from "@/lib/utils";
 import { Suspense } from "react";
@@ -30,15 +30,15 @@ async function CreateListingPageContent() {
         </div>
 
         <div className="flex flex-wrap gap-3">
-          <Button asChild>
+          <PillButton asChild>
             <Link href="/auth/login">Sign in</Link>
-          </Button>
-          <Button asChild variant="outline">
+          </PillButton>
+          <PillButton asChild variant="secondary">
             <Link href="/auth/sign-up">Create account</Link>
-          </Button>
-          <Button asChild variant="ghost">
+          </PillButton>
+          <PillButton asChild variant="secondary">
             <Link href="/home">Browse books</Link>
-          </Button>
+          </PillButton>
         </div>
       </section>
     );
@@ -100,3 +100,5 @@ export default function NewListingPage() {
     </Suspense>
   );
 }
+
+

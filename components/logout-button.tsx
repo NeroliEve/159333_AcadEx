@@ -1,7 +1,7 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
+import { PillButton } from "@/components/ui/pill-button";
 import { useRouter } from "next/navigation";
 
 export function LogoutButton() {
@@ -14,5 +14,7 @@ export function LogoutButton() {
     router.refresh();
   };
 
-  return <Button onClick={logout}>Log out</Button>;
+  return <PillButton onClick={logout}>Log out</PillButton>;
 }
+
+

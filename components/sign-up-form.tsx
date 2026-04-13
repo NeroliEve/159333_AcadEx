@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
+import { PillButton } from "@/components/ui/pill-button";
 import {
   Card,
   CardContent,
@@ -102,9 +102,9 @@ export function SignUpForm({
                 />
               </div>
               {error && <p className="text-sm text-red-500">{error}</p>}
-              <Button type="submit" className="w-full" disabled={isLoading}>
+              <PillButton type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? "Creating account..." : "Create account"}
-              </Button>
+              </PillButton>
             </div>
             <div className="mt-4 text-center text-sm">
               Already have an account?{" "}
@@ -118,3 +118,5 @@ export function SignUpForm({
     </div>
   );
 }
+
+

@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
+import { PillButton } from "@/components/ui/pill-button";
 import {
   Card,
   CardContent,
@@ -65,9 +65,9 @@ export function UpdatePasswordForm({
                 />
               </div>
               {error && <p className="text-sm text-red-500">{error}</p>}
-              <Button type="submit" className="w-full" disabled={isLoading}>
+              <PillButton type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? "Saving..." : "Save new password"}
-              </Button>
+              </PillButton>
             </div>
           </form>
         </CardContent>
@@ -75,3 +75,5 @@ export function UpdatePasswordForm({
     </div>
   );
 }
+
+

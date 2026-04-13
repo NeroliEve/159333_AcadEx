@@ -1,14 +1,17 @@
+import { BrandTitle } from "@/components/brand-title";
 import { SiteHeader } from "@/components/site-header";
+import { ThemePicker } from "@/components/theme-picker";
 import Link from "next/link";
 import { Suspense } from "react";
 
 function HeaderFallback() {
   return (
     <header className="border-b border-border bg-background">
-      <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-6 py-4">
-        <Link href="/" className="text-base font-semibold tracking-tight">
-          Acadex
+      <div className="flex w-full items-center justify-between gap-4 px-16 py-4">
+        <Link href="/" className="inline-flex items-center">
+          <BrandTitle priority />
         </Link>
+        <ThemePicker />
       </div>
     </header>
   );

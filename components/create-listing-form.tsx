@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
-import { Button } from "@/components/ui/button";
+import { PillButton } from "@/components/ui/pill-button";
 import {
   Card,
   CardContent,
@@ -121,9 +121,9 @@ export function CreateListingForm({ courses }: CreateListingFormProps) {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <p>{state.message}</p>
               {state.status === "success" ? (
-                <Button asChild size="sm" variant="outline">
+                <PillButton asChild size="sm" variant="secondary">
                   <Link href="/home">Browse listings</Link>
-                </Button>
+                </PillButton>
               ) : null}
             </div>
           </div>
@@ -251,7 +251,7 @@ export function CreateListingForm({ courses }: CreateListingFormProps) {
             <p className="text-sm text-muted-foreground">
               Listings are published as sale listings for this MVP.
             </p>
-            <Button
+            <PillButton
               className="w-full sm:w-auto"
               type="submit"
               disabled={isSubmitting || isRefreshing}
@@ -259,10 +259,12 @@ export function CreateListingForm({ courses }: CreateListingFormProps) {
               {isSubmitting || isRefreshing
                 ? "Creating listing..."
                 : "Publish listing"}
-            </Button>
+            </PillButton>
           </div>
         </form>
       </CardContent>
     </Card>
   );
 }
+
+

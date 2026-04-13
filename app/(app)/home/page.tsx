@@ -3,7 +3,7 @@ import Link from "next/link";
 import { EmptyState } from "@/components/empty-state";
 import { ListingCard } from "@/components/listing-card";
 import { ProfileBanner } from "@/components/profile-banner";
-import { Button } from "@/components/ui/button";
+import { PillButton } from "@/components/ui/pill-button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   getListingsFeed,
@@ -33,7 +33,7 @@ async function HomeContent() {
           university={profile?.university}
         />
       ) : (
-        <Card className="border-border/70 bg-[linear-gradient(135deg,hsl(var(--background)),hsl(var(--secondary)))]">
+        <Card className="border-border/70 bg-white">
           <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-2">
               <p className="text-lg font-semibold">
@@ -45,12 +45,12 @@ async function HomeContent() {
               </p>
             </div>
             <div className="flex gap-3">
-              <Button asChild variant="outline">
+              <PillButton asChild variant="secondary">
                 <Link href="/auth/login">Sign in</Link>
-              </Button>
-              <Button asChild>
+              </PillButton>
+              <PillButton asChild>
                 <Link href="/auth/sign-up">Sign up</Link>
-              </Button>
+              </PillButton>
             </div>
           </CardContent>
         </Card>
@@ -67,9 +67,9 @@ async function HomeContent() {
             </p>
           </div>
 
-          <Button asChild className="sm:self-start">
+          <PillButton asChild className="sm:self-start">
             <Link href={createHref}>{createLabel}</Link>
-          </Button>
+          </PillButton>
         </div>
 
         {error ? (
@@ -166,3 +166,5 @@ export default function HomePage() {
     </section>
   );
 }
+
+

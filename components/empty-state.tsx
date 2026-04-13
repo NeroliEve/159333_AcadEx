@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { Button } from "@/components/ui/button";
+import { PillButton } from "@/components/ui/pill-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 type EmptyStateProps = {
@@ -31,11 +31,13 @@ export function EmptyState({
       <CardContent className="space-y-4">
         <p className="max-w-xl text-sm text-muted-foreground">{description}</p>
         {actionHref && actionLabel ? (
-          <Button asChild>
+          <PillButton asChild>
             <Link href={actionHref}>{actionLabel}</Link>
-          </Button>
+          </PillButton>
         ) : null}
       </CardContent>
     </Card>
   );
 }
+
+
