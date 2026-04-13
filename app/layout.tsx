@@ -16,6 +16,9 @@ export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
   title: "Acadex",
   description: "Buy and sell used university books with other students",
+  icons: {
+    icon: "/acadex-icon.svg",
+  },
 };
 
 export default function RootLayout({

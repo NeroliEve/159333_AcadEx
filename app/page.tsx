@@ -47,7 +47,7 @@ function LandingContent() {
         </h1>
 
         <p className="max-w-3xl text-base leading-7 text-foreground/80 sm:text-lg">
-          Find affordable uni books, list the ones you no longer need, and exchange with students in your area.
+          Find affordable uni books, list the ones you no longer need, and exchange with students near you.
         </p>
 
         <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-base text-foreground/90">

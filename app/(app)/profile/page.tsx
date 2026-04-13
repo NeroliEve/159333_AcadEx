@@ -1,10 +1,12 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
+
+import { getMyListings, getViewerContext } from "@/lib/marketplace";
 
 import { EditProfileForm } from "@/components/edit-profile-form";
 import { ListingCard } from "@/components/listing-card";
-import { getMyListings, getViewerContext } from "@/lib/marketplace";
 
-export default async function ProfilePage() {
+async function ProfileContent() {
   const { user, profile } = await getViewerContext();
 
   if (!user) redirect("/auth/login");
@@ -52,5 +54,42 @@ export default async function ProfilePage() {
         )}
       </div>
     </section>
+  );
+}
+
+function ProfileContentFallback() {
+  return (
+    <section className="flex flex-col gap-10">
+      <div className="space-y-2">
+        <div className="h-4 w-24 animate-pulse rounded bg-muted" />
+        <div className="h-8 w-48 animate-pulse rounded bg-muted" />
+      </div>
+
+      <div className="h-64 animate-pulse rounded-2xl border border-border/70 bg-muted/40" />
+
+      <div className="space-y-6">
+        <div className="space-y-2">
+          <div className="h-7 w-40 animate-pulse rounded bg-muted" />
+          <div className="h-4 w-56 animate-pulse rounded bg-muted" />
+        </div>
+
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div
+              key={index}
+              className="h-64 animate-pulse rounded-2xl border border-border/70 bg-muted/40"
+            />
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export default function ProfilePage() {
+  return (
+    <Suspense fallback={<ProfileContentFallback />}>
+      <ProfileContent />
+    </Suspense>
   );
 }

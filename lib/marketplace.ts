@@ -10,7 +10,7 @@ import type {
 
 type ProfileSummary = Pick<
   TableRow<"profiles">,
-  "id" | "email" | "first_name" | "is_verified" | "last_name" | "role" | "university" | "username"
+  "bio" | "id" | "email" | "first_name" | "is_verified" | "last_name" | "role" | "university" | "username"
 >;
 
 type CourseSummary = Pick<
@@ -66,7 +66,7 @@ export async function getViewerContext(): Promise<{
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, email, first_name, is_verified, last_name, role, university, username")
+    .select("bio, id, email, first_name, is_verified, last_name, role, university, username")
     .eq("id", user.id)
     .maybeSingle();
 

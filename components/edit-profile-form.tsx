@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-import { Button } from "@/components/ui/button";
+import { PillButton } from "@/components/ui/pill-button";
 import {
   Card,
   CardContent,
@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type { ViewerProfile } from "@/lib/marketplace";
 
 type EditProfileFormProps = {
-  profile: ViewerProfile | null;
+  profile: (ViewerProfile & { bio?: string | null }) | null;
 };
 
 export function EditProfileForm({ profile }: EditProfileFormProps) {
@@ -25,6 +25,47 @@ export function EditProfileForm({ profile }: EditProfileFormProps) {
     text: string;
     type: "success" | "error";
   } | null>(null);
+  const successTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        setMessage(null);
+      }
+    };
+
+    window.addEventListener("pageshow", handlePageShow);
+
+    return () => {
+      window.removeEventListener("pageshow", handlePageShow);
+
+      if (successTimeoutRef.current) {
+        window.clearTimeout(successTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (message?.type !== "success") {
+      return;
+    }
+
+    if (successTimeoutRef.current) {
+      window.clearTimeout(successTimeoutRef.current);
+    }
+
+    successTimeoutRef.current = window.setTimeout(() => {
+      setMessage(null);
+      successTimeoutRef.current = null;
+    }, 5000);
+
+    return () => {
+      if (successTimeoutRef.current) {
+        window.clearTimeout(successTimeoutRef.current);
+        successTimeoutRef.current = null;
+      }
+    };
+  }, [message]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -130,9 +171,9 @@ export function EditProfileForm({ profile }: EditProfileFormProps) {
           </div>
 
           <div className="flex justify-end border-t border-border/70 pt-6">
-            <Button type="submit" disabled={isSubmitting}>
+            <PillButton type="submit" disabled={isSubmitting}>
               {isSubmitting ? "Saving..." : "Save changes"}
-            </Button>
+            </PillButton>
           </div>
         </form>
       </CardContent>

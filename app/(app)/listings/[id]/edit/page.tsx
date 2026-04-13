@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 
 import { EditListingForm } from "@/components/edit-listing-form";
 import {
@@ -8,6 +9,18 @@ import {
 } from "@/lib/marketplace";
 
 export default async function EditListingPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  return (
+    <Suspense fallback={<EditListingPageFallback />}>
+      <EditListingPageContent params={params} />
+    </Suspense>
+  );
+}
+
+async function EditListingPageContent({
   params,
 }: {
   params: Promise<{ id: string }>;
@@ -40,6 +53,18 @@ export default async function EditListingPage({
         </h1>
       </div>
       <EditListingForm listing={listing} courses={courses} />
+    </section>
+  );
+}
+
+function EditListingPageFallback() {
+  return (
+    <section className="flex flex-col gap-10">
+      <div className="space-y-2">
+        <div className="h-4 w-28 animate-pulse rounded bg-muted" />
+        <div className="h-8 w-56 animate-pulse rounded bg-muted" />
+      </div>
+      <div className="h-[640px] animate-pulse rounded-2xl border border-border/70 bg-muted/40" />
     </section>
   );
 }
