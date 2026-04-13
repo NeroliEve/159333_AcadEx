@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AcadEx Progress Report</title>
+<style>
+  body { font-family: sans-serif; max-width: 900px; margin: 40px auto; padding: 0 20px; color: #111; }
+  h1 { border-bottom: 2px solid #111; padding-bottom: 10px; }
+  h2 { margin-top: 40px; border-bottom: 1px solid #ccc; padding-bottom: 6px; }
+  h3 { margin-top: 24px; color: #333; }
+  pre { background: #f4f4f4; padding: 12px; border-radius: 6px; overflow-x: auto; font-size: 13px; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+  th, td { border: 1px solid #ccc; padding: 8px 12px; text-align: left; }
+  th { background: #f0f0f0; }
+  .tag { display: inline-block; background: #e8f5e9; color: #2e7d32; border-radius: 4px; padding: 2px 8px; font-size: 12px; margin-right: 4px; }
+  .file { font-family: monospace; background: #eef; padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+  .todo { background: #fff8e1; border-left: 4px solid #f9a825; padding: 10px 16px; margin: 8px 0; }
+</style>
+</head>
+<body>
+
+<h1>AcadEx — Development Progress Report</h1>
+<p><strong>Date:</strong> April 11, 2026 &nbsp;|&nbsp; <strong>Phase:</strong> Weeks 5–8 (Core Features)</p>
+
+<h2>Timeline</h2>
+<table>
+  <tr><th>Phase</th><th>Activities</th><th>Weeks</th></tr>
+  <tr><td>Planning</td><td>Requirements, wireframes, schema, GitHub setup</td><td>1–2</td></tr>
+  <tr><td>Foundation</td><td>Supabase config, auth, RBAC, routing</td><td>3–4</td></tr>
+  <tr><td>Core Features ← <strong>NOW</strong></td><td>Listings CRUD, status, image upload, search, profiles, transactions, ratings</td><td>5–8</td></tr>
+  <tr><td>Advanced Features</td><td>Real-time chat, admin panel, reporting, UI polish</td><td>9–10</td></tr>
+  <tr><td>Testing & Submission</td><td>E2E testing, bug fixes, docs, deployment</td><td>11–12</td></tr>
+</table>
+
+<h2>What Was Already Built (Before This Session)</h2>
+<ul>
+  <li>Create listing</li>
+  <li>Browse listings feed</li>
+  <li>Auth — login, signup, password reset</li>
+  <li>Basic profile display</li>
+</ul>
+
+<h2>Changes Made This Session</h2>
+
+<!-- 1 -->
+<h3>1. Admin-Only Course Management</h3>
+<p>Courses can no longer be created by regular users. Only admins can add/edit/delete courses. Users select from the admin-managed list when creating a listing.</p>
+
+<p><span class="tag">new</span> <span class="file">supabase/migrations/20260410_admin_only_course_management.sql</span></p>
+<pre>create policy "courses_insert_admin_only" on public.courses for insert to authenticated
+with check (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));
+
+create policy "courses_update_admin_only" on public.courses for update to authenticated
+using (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));
+
+create policy "courses_delete_admin_only" on public.courses for delete to authenticated
+using (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));</pre>
+
+<p><span class="tag">modified</span> <span class="file">app/api/listings/route.ts</span> — removed course auto-creation logic, removed "course" from FieldName type.</p>
+<p><span class="tag">modified</span> <span class="file">components/create-listing-form.tsx</span> — removed free-text course input, always shows dropdown. If no courses exist: shows "No courses have been added yet. An admin will add courses soon."</p>
+
+<!-- 2 -->
+<h3>2. Username + Profile Auto-Creation on Sign-Up</h3>
+<p>Sign-up form now collects first name, last name, and username. A database trigger auto-creates the profile row on registration.</p>
+
+<p><span class="tag">new</span> <span class="file">supabase/migrations/20260410_create_profile_on_signup.sql</span></p>
+<pre>create or replace function public.handle_new_user()
+returns trigger as $$
+begin
+  insert into public.profiles (id, email, username, first_name, last_name)
+  values (
+    new.id, new.email,
+    new.raw_user_meta_data->>'username',
+    coalesce(new.raw_user_meta_data->>'first_name', ''),
+    coalesce(new.raw_user_meta_data->>'last_name', '')
+  );
+  return new;
+end;
+$$ language plpgsql security definer;
+
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.handle_new_user();</pre>
+
+<p><span class="tag">modified</span> <span class="file">components/sign-up-form.tsx</span> — added first name, last name, username fields. Username auto-lowercased. All passed as options.data to Supabase signUp.</p>
+
+<!-- 3 -->
+<h3>3. Edit Listing</h3>
+<p>Users can edit their own listings. Admins can edit any listing. Edit link appears on listing cards only for the owner or an admin.</p>
+
+<p><span class="tag">new</span> <span class="file">supabase/migrations/20260411_listings_update_own.sql</span></p>
+<pre>create policy "listings_update_own" on public.listings for update to authenticated
+using (
+  seller_id = auth.uid()
+  or exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+);</pre>
+
+<p><span class="tag">new</span> <span class="file">app/api/listings/[id]/route.ts</span> — PATCH handler. Checks user is owner or admin, validates fields, updates listing.</p>
+<p><span class="tag">new</span> <span class="file">app/(app)/listings/[id]/edit/page.tsx</span> — server page, fetches listing, checks ownership, renders edit form.</p>
+<p><span class="tag">new</span> <span class="file">components/edit-listing-form.tsx</span> — pre-filled form, submits PATCH, redirects to /home on success.</p>
+<p><span class="tag">modified</span> <span class="file">lib/marketplace.ts</span> — added getListingById(), added "role" to ProfileSummary type and select query.</p>
+<p><span class="tag">modified</span> <span class="file">components/listing-card.tsx</span> — added viewerId and viewerRole props, shows Edit link for owner/admin.</p>
+<p><span class="tag">modified</span> <span class="file">app/(app)/home/page.tsx</span> — passes profile?.id and profile?.role to each ListingCard.</p>
+
+<!-- 4 -->
+<h3>4. Delete Listing</h3>
+<p>Users can delete their own listings. Admins can delete any listing. Delete button appears next to Edit for owner/admin with a confirmation dialog.</p>
+
+<p><span class="tag">new</span> <span class="file">supabase/migrations/20260411_listings_delete_own.sql</span></p>
+<pre>create policy "listings_delete_own" on public.listings for delete to authenticated
+using (
+  seller_id = auth.uid()
+  or exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+);</pre>
+
+<p><span class="tag">modified</span> <span class="file">app/api/listings/[id]/route.ts</span> — added DELETE handler with same owner/admin permission check.</p>
+<p><span class="tag">new</span> <span class="file">components/delete-listing-button.tsx</span> — "use client" component, confirmation dialog, calls DELETE endpoint, refreshes feed.</p>
+<p><span class="tag">modified</span> <span class="file">components/listing-card.tsx</span> — imports and renders DeleteListingButton next to Edit link.</p>
+
+<!-- 5 -->
+<h3>5. Bug Fixes</h3>
+<table>
+  <tr><th>Bug</th><th>Cause</th><th>Fix</th></tr>
+  <tr><td>Success message shown before submitting</td><td>Next.js reused component state on back-navigation</td><td>Clear state on mount + auto-clear after 5 seconds</td></tr>
+  <tr><td>params.id error in Next.js 15</td><td>params is now a Promise in Next.js 15</td><td>Changed type to Promise&lt;{id: string}&gt; and awaited it</td></tr>
+  <tr><td>"use client" / next/headers conflict</td><td>Adding "use client" to listing-card.tsx broke the server import chain</td><td>Moved DeleteListingButton to its own separate client file</td></tr>
+  <tr><td>profile.role TypeScript error</td><td>role was missing from ProfileSummary type</td><td>Added "role" to ProfileSummary Pick and select query</td></tr>
+</table>
+
+<h2>Still To Do</h2>
+
+<h3>Weeks 5–8 (Core Features)</h3>
+<div class="todo">1. <strong>Listing status management</strong> — toggle available → pending → sold</div>
+<div class="todo">2. <strong>User profile page</strong> — view and edit your own profile</div>
+<div class="todo">3. <strong>Search &amp; filter</strong> — by course, condition, price range, keyword</div>
+<div class="todo">4. <strong>Image upload</strong> — actual file upload to Supabase Storage</div>
+<div class="todo">5. <strong>Transaction history</strong> — view past transactions on profile</div>
+<div class="todo">6. <strong>Ratings</strong> — mutual rating after a transaction</div>
+
+<h3>Weeks 9–10 (Advanced Features)</h3>
+<div class="todo">1. <strong>Real-time chat</strong> — Supabase Realtime messaging between buyer and seller</div>
+<div class="todo">2. <strong>Admin moderation panel</strong> — manage courses, users, listings, reports</div>
+<div class="todo">3. <strong>Reporting functionality</strong> — report listings or users</div>
+<div class="todo">4. <strong>UI polish</strong> — responsive design, loading states, empty states</div>
+
+</body>
+</html>

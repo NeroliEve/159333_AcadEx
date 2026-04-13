@@ -1,6 +1,10 @@
 /* eslint-disable @next/next/no-img-element */
 
+import Link from "next/link";
+
 import { Card, CardContent } from "@/components/ui/card";
+import { DeleteListingButton } from "@/components/delete-listing-button";
+import { ListingStatusButton } from "@/components/listing-status-button";
 import {
   formatListingCondition,
   formatPrice,
@@ -10,6 +14,8 @@ import {
 
 type ListingCardProps = {
   listing: ListingCardData;
+  viewerId?: string;
+  viewerRole?: string;
 };
 
 function formatRelativeDate(dateString: string) {
@@ -30,7 +36,7 @@ function formatRelativeDate(dateString: string) {
   );
 }
 
-export function ListingCard({ listing }: ListingCardProps) {
+export function ListingCard({ listing, viewerId, viewerRole }: ListingCardProps) {
   const sellerName = getProfileDisplayName(listing.seller, listing.seller?.email);
 
   return (
@@ -89,6 +95,17 @@ export function ListingCard({ listing }: ListingCardProps) {
                   {listing.seller.university}
                 </span>
               ) : null}
+              {listing.status !== "available" ? (
+                <span className={`rounded-full px-2.5 py-1 font-medium ${
+                  listing.status === "pending"
+                    ? "bg-yellow-100 text-yellow-800"
+                    : listing.status === "sold"
+                    ? "bg-red-100 text-red-800"
+                    : "bg-gray-100 text-gray-600"
+                }`}>
+                  {listing.status.charAt(0).toUpperCase() + listing.status.slice(1)}
+                </span>
+              ) : null}
             </div>
 
             {listing.description ? (
@@ -110,7 +127,24 @@ export function ListingCard({ listing }: ListingCardProps) {
                     : "Student seller"}
                 </p>
               </div>
-              <p className="text-xs">{formatRelativeDate(listing.created_at)}</p>
+              <div className="flex items-center gap-3">
+                <p className="text-xs">{formatRelativeDate(listing.created_at)}</p>
+                {(viewerId === listing.seller?.id || viewerRole === "admin") && (
+                  <div className="flex items-center gap-3">
+                    <Link
+                      href={`/listings/${listing.id}/edit`}
+                      className="text-xs underline underline-offset-4 hover:text-foreground"
+                    >
+                      Edit
+                    </Link>
+                    <DeleteListingButton listingId={listing.id} />
+                    <ListingStatusButton
+                      listingId={listing.id}
+                      currentStatus={listing.status}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>

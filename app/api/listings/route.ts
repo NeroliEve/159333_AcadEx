@@ -7,7 +7,6 @@ import { hasEnvVars } from "@/lib/utils";
 type FieldName =
   | "author"
   | "condition"
-  | "course"
   | "description"
   | "imageUrl"
   | "price"
@@ -49,8 +48,6 @@ export async function POST(request: Request) {
       typeof body.courseId === "string" || typeof body.courseId === "number"
         ? String(body.courseId).trim()
         : "";
-    const courseValue =
-      typeof body.course === "string" ? body.course.trim() : "";
     const imageUrl =
       typeof body.imageUrl === "string" ? body.imageUrl.trim() : "";
 
@@ -109,7 +106,7 @@ export async function POST(request: Request) {
 
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("id, university")
+      .select("id")
       .eq("id", user.id)
       .maybeSingle();
 
@@ -130,51 +127,6 @@ export async function POST(request: Request) {
       const parsedCourseId = Number(courseIdValue);
       if (!Number.isNaN(parsedCourseId)) {
         courseId = parsedCourseId;
-      }
-    } else if (courseValue) {
-      const normalizedCourse = courseValue.toUpperCase();
-      const {
-        data: existingCourse,
-      }: {
-        data: { id: number } | null;
-      } = await supabase
-        .from("courses")
-        .select("id")
-        .eq("course_code", normalizedCourse)
-        .maybeSingle();
-
-      if (existingCourse) {
-        courseId = existingCourse.id;
-      } else {
-        const {
-          data: createdCourse,
-          error: courseInsertError,
-        }: {
-          data: { id: number } | null;
-          error: Error | null;
-        } = await supabase
-          .from("courses")
-          .insert({
-            course_code: normalizedCourse,
-            course_name: normalizedCourse,
-            created_by: user.id,
-            university: profile.university ?? "",
-          })
-          .select("id")
-          .single();
-
-        if (courseInsertError || !createdCourse) {
-          return NextResponse.json<CreateListingResponse>(
-            {
-              message:
-                "Acadex could not save the course for this listing. You can remove the course and try again.",
-              status: "error",
-            },
-            { status: 400 },
-          );
-        }
-
-        courseId = createdCourse.id;
       }
     }
 

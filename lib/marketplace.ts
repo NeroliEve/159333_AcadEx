@@ -10,7 +10,7 @@ import type {
 
 type ProfileSummary = Pick<
   TableRow<"profiles">,
-  "id" | "email" | "first_name" | "is_verified" | "last_name" | "university" | "username"
+  "id" | "email" | "first_name" | "is_verified" | "last_name" | "role" | "university" | "username"
 >;
 
 type CourseSummary = Pick<
@@ -27,6 +27,7 @@ export type ListingCardData = Pick<
   | "id"
   | "price"
   | "primary_image_url"
+  | "status"
   | "title"
 > & {
   course: CourseSummary | null;
@@ -65,7 +66,7 @@ export async function getViewerContext(): Promise<{
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, email, first_name, is_verified, last_name, university, username")
+    .select("id, email, first_name, is_verified, last_name, role, university, username")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -99,6 +100,7 @@ export async function getListingsFeed(
         description,
         price,
         condition,
+        status,
         primary_image_url,
         created_at,
         course:courses!listings_course_id_fkey(id, course_code, course_name, university),
@@ -111,6 +113,7 @@ export async function getListingsFeed(
         description,
         price,
         condition,
+        status,
         primary_image_url,
         created_at,
         course:courses!listings_course_id_fkey(id, course_code, course_name, university)
@@ -119,7 +122,7 @@ export async function getListingsFeed(
   const { data, error } = await supabase
     .from("listings")
     .select(selectClause)
-    .eq("status", "available")
+    .in("status", ["available", "pending", "sold"])
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -135,6 +138,73 @@ export async function getListingsFeed(
     error: null,
     listings: (data ?? []) as unknown as ListingCardData[],
   };
+}
+
+export async function getMyListings(userId: string): Promise<ListingCardData[]> {
+  if (!hasEnvVars) return [];
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("listings")
+    .select(`
+      id,
+      title,
+      author,
+      description,
+      price,
+      condition,
+      status,
+      primary_image_url,
+      created_at,
+      course:courses!listings_course_id_fkey(id, course_code, course_name, university),
+      seller:profiles!listings_seller_id_fkey(id, email, first_name, is_verified, last_name, university, username)
+    `)
+    .eq("seller_id", userId)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false });
+
+  return (data ?? []) as unknown as ListingCardData[];
+}
+
+export async function getListingById(id: string): Promise<{
+  listing:
+    | (ListingCardData &
+        Pick<TableRow<"listings">, "seller_id" | "course_id">)
+    | null;
+  error: string | null;
+}> {
+  if (!hasEnvVars) {
+    return {
+      listing: null,
+      error: "Supabase environment variables are missing.",
+    };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("listings")
+    .select(
+      `
+      id,
+      title,
+      author,
+      description,
+      price,
+      condition,
+      status,
+      primary_image_url,
+      created_at,
+      seller_id,
+      course_id,
+      course:courses!listings_course_id_fkey(id, course_code, course_name, university),
+      seller:profiles!listings_seller_id_fkey(id, email, first_name, is_verified, last_name, university, username)
+    `,
+    )
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) return { listing: null, error: error.message };
+  return { listing: data as unknown as ListingCardData & Pick<TableRow<"listings">, "seller_id" | "course_id">, error: null };
 }
 
 export async function getCourseOptions(limit = 100): Promise<CourseOption[]> {

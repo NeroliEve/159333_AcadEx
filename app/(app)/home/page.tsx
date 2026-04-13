@@ -91,7 +91,12 @@ async function HomeContent() {
         ) : (
           <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
             {listings.map((listing) => (
-              <ListingCard key={listing.id} listing={listing} />
+              <ListingCard
+                key={listing.id}
+                listing={listing}
+                viewerId={profile?.id}
+                viewerRole={profile?.role}
+              />
             ))}
           </div>
         )}
