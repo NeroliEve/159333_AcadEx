@@ -24,7 +24,6 @@ type CreateListingFormProps = {
 type FieldName =
   | "author"
   | "condition"
-  | "course"
   | "description"
   | "imageUrl"
   | "price"
@@ -52,11 +51,17 @@ export function CreateListingForm({ courses }: CreateListingFormProps) {
   const [state, setState] = useState<CreateListingResponse | null>(null);
 
   useEffect(() => {
+    setState(null);
+  }, []);
+
+  useEffect(() => {
     if (state?.status === "success") {
       formRef.current?.reset();
       startTransition(() => {
         router.refresh();
       });
+      const timer = setTimeout(() => setState(null), 5000);
+      return () => clearTimeout(timer);
     }
   }, [router, state]);
 
@@ -184,42 +189,27 @@ export function CreateListingForm({ courses }: CreateListingFormProps) {
               <FieldError message={state?.fieldErrors?.condition} />
             </div>
 
-            {courses.length > 0 ? (
-              <div className="grid gap-2">
-                <Label htmlFor="courseId">Course</Label>
-                <select
-                  id="courseId"
-                  name="courseId"
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  defaultValue=""
-                >
-                  <option value="">No specific course</option>
-                  {courses.map((course) => (
-                    <option key={course.id} value={course.id}>
-                      {course.course_code} · {course.course_name}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-sm text-muted-foreground">
-                  Choose the course this book is most relevant to.
-                </p>
-                <FieldError message={state?.fieldErrors?.course} />
-              </div>
-            ) : (
-              <div className="grid gap-2">
-                <Label htmlFor="course">Course code or paper</Label>
-                <Input
-                  id="course"
-                  name="course"
-                  placeholder="BIOSCI 107"
-                />
-                <p className="text-sm text-muted-foreground">
-                  Acadex will create a basic course entry from this code if one
-                  does not exist yet.
-                </p>
-                <FieldError message={state?.fieldErrors?.course} />
-              </div>
-            )}
+            <div className="grid gap-2">
+              <Label htmlFor="courseId">Course</Label>
+              <select
+                id="courseId"
+                name="courseId"
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                defaultValue=""
+              >
+                <option value="">No specific course</option>
+                {courses.map((course) => (
+                  <option key={course.id} value={course.id}>
+                    {course.course_code} · {course.course_name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-sm text-muted-foreground">
+                {courses.length > 0
+                  ? "Choose the course this book is most relevant to."
+                  : "No courses have been added yet. An admin will add courses soon."}
+              </p>
+            </div>
 
             <div className="grid gap-2 md:col-span-2">
               <Label htmlFor="imageUrl">Cover image URL</Label>

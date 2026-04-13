@@ -35,6 +35,12 @@ export async function SiteHeader() {
               >
                 Create listing
               </Link>
+              <Link
+                href="/profile"
+                className="transition-colors hover:text-foreground"
+              >
+                Profile
+              </Link>
             </nav>
           ) : null}
         </div>
