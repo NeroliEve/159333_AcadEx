@@ -65,8 +65,13 @@
   html,
   body {
     min-height: 100%;
+    transition: background-color 150ms ease;
   }
   body {
     @apply bg-background text-foreground;
+    transition: background-color 150ms ease;
+  }
+  .bg-background {
+    transition: background-color 150ms ease;
   }
 }

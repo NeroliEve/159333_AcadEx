@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 
 import { PillButton } from "@/components/ui/pill-button";
 import {
@@ -20,6 +21,7 @@ type EditProfileFormProps = {
 };
 
 export function EditProfileForm({ profile }: EditProfileFormProps) {
+  const pathname = usePathname();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<{
     text: string;
@@ -28,22 +30,97 @@ export function EditProfileForm({ profile }: EditProfileFormProps) {
   const successTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
+    const clearMessage = () => {
+      setMessage(null);
+    };
+
     const handlePageShow = (event: PageTransitionEvent) => {
       if (event.persisted) {
-        setMessage(null);
+        clearMessage();
       }
     };
 
+    const handlePageHide = () => {
+      clearMessage();
+    };
+
     window.addEventListener("pageshow", handlePageShow);
+    window.addEventListener("pagehide", handlePageHide);
 
     return () => {
       window.removeEventListener("pageshow", handlePageShow);
+      window.removeEventListener("pagehide", handlePageHide);
 
       if (successTimeoutRef.current) {
         window.clearTimeout(successTimeoutRef.current);
       }
     };
   }, []);
+
+  useEffect(() => {
+    const clearMessage = () => {
+      setMessage(null);
+    };
+
+    const handleDocumentClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      const anchor = target?.closest("a[href]") as HTMLAnchorElement | null;
+
+      if (!anchor) {
+        return;
+      }
+
+      if (
+        anchor.target === "_blank" ||
+        anchor.hasAttribute("download") ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      ) {
+        return;
+      }
+
+      let nextUrl: URL;
+      try {
+        nextUrl = new URL(anchor.href, window.location.href);
+      } catch {
+        return;
+      }
+
+      if (nextUrl.origin !== window.location.origin) {
+        return;
+      }
+
+      const current = window.location;
+      const isSameLocation =
+        nextUrl.pathname === current.pathname &&
+        nextUrl.search === current.search &&
+        nextUrl.hash === current.hash;
+
+      if (!isSameLocation) {
+        clearMessage();
+      }
+    };
+
+    const handlePopState = () => {
+      clearMessage();
+    };
+
+    document.addEventListener("click", handleDocumentClick, true);
+    window.addEventListener("popstate", handlePopState);
+
+    return () => {
+      document.removeEventListener("click", handleDocumentClick, true);
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (pathname !== "/profile") {
+      setMessage(null);
+    }
+  }, [pathname]);
 
   useEffect(() => {
     if (message?.type !== "success") {
@@ -101,7 +178,7 @@ export function EditProfileForm({ profile }: EditProfileFormProps) {
       <CardHeader className="space-y-3">
         <CardTitle className="text-2xl">Your details</CardTitle>
         <CardDescription>
-          Update your name, username, and university.
+          Update your profile details.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">

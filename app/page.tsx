@@ -2,6 +2,8 @@ import { SiteHeader } from "@/components/site-header";
 import { PillButton } from "@/components/ui/pill-button";
 import Link from "next/link";
 import { Suspense } from "react";
+import { createClient } from "@/lib/supabase/server";
+import { hasEnvVars } from "@/lib/utils";
 
 const featureItems = [
   "Secure student marketplace",
@@ -38,7 +40,15 @@ function CheckBadge() {
   );
 }
 
-function LandingContent() {
+async function LandingContent() {
+  let isSignedIn = false;
+
+  if (hasEnvVars) {
+    const supabase = await createClient();
+    const { data } = await supabase.auth.getUser();
+    isSignedIn = !!data.user;
+  }
+
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-6 py-10 sm:py-14">
       <section className="mx-auto flex w-full max-w-4xl flex-col items-center gap-6 text-center">
@@ -60,16 +70,24 @@ function LandingContent() {
         </div>
 
         <div className="flex flex-col items-center gap-2">
-          <PillButton asChild size="sm" className="px-5 text-base font-semibold">
-            <Link href="/auth/sign-up">Join for free →</Link>
-          </PillButton>
-          <p className="text-sm text-muted-foreground">
-            Already a member?{" "}
-            <Link href="/auth/login" className="font-semibold text-[#1F5EE4]">
-              Sign in
-            </Link>{" "}
-            instead.
-          </p>
+          {isSignedIn ? (
+            <PillButton asChild size="sm" className="px-5 text-base font-semibold">
+              <Link href="/home">Continue to Acadex →</Link>
+            </PillButton>
+          ) : (
+            <>
+              <PillButton asChild size="sm" className="px-5 text-base font-semibold">
+                <Link href="/auth/sign-up">Join for free →</Link>
+              </PillButton>
+              <p className="text-sm text-muted-foreground">
+                Already a member?{" "}
+                <Link href="/auth/login" className="font-semibold text-[#1F5EE4]">
+                  Sign in
+                </Link>{" "}
+                instead.
+              </p>
+            </>
+          )}
         </div>
       </section>
 
@@ -84,14 +102,16 @@ function LandingContent() {
   );
 }
 
-export default function Home() {
+export default async function Home() {
   return (
     <div className="min-h-screen bg-background">
       <Suspense fallback={<HeaderFallback />}>
         <SiteHeader />
       </Suspense>
 
-      <LandingContent />
+      <Suspense fallback={<div className="mx-auto w-full max-w-6xl px-6 py-10 animate-pulse" />}>
+        <LandingContent />
+      </Suspense>
     </div>
   );
 }

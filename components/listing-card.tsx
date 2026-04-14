@@ -40,9 +40,14 @@ export function ListingCard({ listing, viewerId, viewerRole }: ListingCardProps)
   const sellerName = getProfileDisplayName(listing.seller, listing.seller?.email);
 
   return (
-    <Card className="overflow-hidden border-border/70">
+    <Card className="overflow-hidden border-border/70 transition-all duration-200 hover:-translate-y-0.5 hover:scale-[1.01] hover:shadow-lg">
       <CardContent className="p-0">
-        <div className="flex h-full flex-col">
+        <div className="relative flex h-full flex-col">
+          <Link
+            aria-label={`View details for ${listing.title}`}
+            className="absolute inset-0 z-0"
+            href={`/listings/${listing.id}`}
+          />
           <div className="aspect-[4/3] w-full bg-muted">
             {listing.primary_image_url ? (
               <img
@@ -64,11 +69,16 @@ export function ListingCard({ listing, viewerId, viewerRole }: ListingCardProps)
             )}
           </div>
 
-          <div className="flex flex-1 flex-col gap-4 p-5">
+          <div className="relative z-10 flex flex-1 flex-col gap-4 p-5">
             <div className="flex items-start justify-between gap-4">
               <div className="space-y-1">
                 <h3 className="text-lg font-semibold leading-tight">
-                  {listing.title}
+                  <Link
+                    href={`/listings/${listing.id}`}
+                    className="transition-colors hover:text-[#1F5EE4]"
+                  >
+                    {listing.title}
+                  </Link>
                 </h3>
                 {listing.author ? (
                   <p className="text-sm text-muted-foreground">
@@ -129,8 +139,14 @@ export function ListingCard({ listing, viewerId, viewerRole }: ListingCardProps)
               </div>
               <div className="flex items-center gap-3">
                 <p className="text-xs">{formatRelativeDate(listing.created_at)}</p>
+                <Link
+                  href={`/listings/${listing.id}`}
+                  className="text-xs underline underline-offset-4 hover:text-foreground"
+                >
+                  View details
+                </Link>
                 {(viewerId === listing.seller?.id || viewerRole === "admin") && (
-                  <div className="flex items-center gap-3">
+                  <div className="relative z-10 flex items-center gap-3">
                     <Link
                       href={`/listings/${listing.id}/edit`}
                       className="text-xs underline underline-offset-4 hover:text-foreground"

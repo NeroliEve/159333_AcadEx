@@ -18,7 +18,7 @@ export async function SiteHeader() {
 
   return (
     <header className="border-b border-border bg-background">
-      <div className="flex w-full items-center justify-between gap-4 px-16 py-4">
+      <div className="flex h-16 w-full items-center justify-between gap-4 px-16">
         <div className="flex items-center gap-6">
           <Link href="/" className="inline-flex items-center">
             <BrandTitle priority />

@@ -150,9 +150,10 @@ export function SignUpForm({
             </div>
             <div className="mt-4 text-center text-sm">
               Already have an account?{" "}
-              <Link href="/auth/login" className="underline underline-offset-4">
-                Sign in
-              </Link>
+            <Link href="/auth/login" className="font-semibold text-[#1F5EE4]">
+              Sign in
+            </Link>{" "}
+            instead.
             </div>
           </form>
         </CardContent>

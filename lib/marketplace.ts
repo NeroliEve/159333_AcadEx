@@ -34,6 +34,9 @@ export type ListingCardData = Pick<
   seller: ProfileSummary | null;
 };
 
+export type ListingDetailData = ListingCardData &
+  Pick<TableRow<"listings">, "course_id" | "seller_id">;
+
 export type ViewerProfile = ProfileSummary;
 export type CourseOption = CourseSummary;
 export type ListingCondition = PublicEnum<"listing_condition">;
@@ -167,10 +170,7 @@ export async function getMyListings(userId: string): Promise<ListingCardData[]> 
 }
 
 export async function getListingById(id: string): Promise<{
-  listing:
-    | (ListingCardData &
-        Pick<TableRow<"listings">, "seller_id" | "course_id">)
-    | null;
+  listing: ListingDetailData | null;
   error: string | null;
 }> {
   if (!hasEnvVars) {
@@ -204,7 +204,7 @@ export async function getListingById(id: string): Promise<{
     .maybeSingle();
 
   if (error) return { listing: null, error: error.message };
-  return { listing: data as unknown as ListingCardData & Pick<TableRow<"listings">, "seller_id" | "course_id">, error: null };
+  return { listing: data as unknown as ListingDetailData, error: null };
 }
 
 export async function getCourseOptions(limit = 100): Promise<CourseOption[]> {

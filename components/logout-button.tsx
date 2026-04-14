@@ -14,7 +14,15 @@ export function LogoutButton() {
     router.refresh();
   };
 
-  return <PillButton onClick={logout}>Log out</PillButton>;
+  return (
+    <PillButton
+      size="sm"
+      onClick={logout}
+      style={{ paddingLeft: "1rem", paddingRight: "1rem" }}
+    >
+      Log out
+    </PillButton>
+  );
 }
 
 
