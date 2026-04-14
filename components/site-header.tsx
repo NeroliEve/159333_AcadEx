@@ -4,16 +4,17 @@ import { BrandTitle } from "@/components/brand-title";
 import { LogoutButton } from "@/components/logout-button";
 import { ThemePicker } from "@/components/theme-picker";
 import { PillButton } from "@/components/ui/pill-button";
-import { createClient } from "@/lib/supabase/server";
+import { getViewerContext } from "@/lib/marketplace";
 import { hasEnvVars } from "@/lib/utils";
 
 export async function SiteHeader() {
+  let isAdmin = false;
   let userEmail: string | undefined;
 
   if (hasEnvVars) {
-    const supabase = await createClient();
-    const { data } = await supabase.auth.getClaims();
-    userEmail = data?.claims.email;
+    const { profile, user } = await getViewerContext();
+    isAdmin = profile?.role === "admin";
+    userEmail = user?.email ?? profile?.email ?? undefined;
   }
 
   return (
@@ -53,6 +54,11 @@ export async function SiteHeader() {
           </p>
         ) : userEmail ? (
           <div className="flex items-center gap-3">
+            {isAdmin ? (
+              <PillButton asChild size="sm" variant="secondary">
+                <Link href="/admin">Admin dashboard</Link>
+              </PillButton>
+            ) : null}
             <ThemePicker />
             <span className="hidden text-sm text-muted-foreground sm:inline">
               {userEmail}

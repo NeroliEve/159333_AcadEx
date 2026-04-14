@@ -24,8 +24,20 @@ export async function PATCH(request: Request) {
     const firstName = typeof body.firstName === "string" ? body.firstName.trim() : "";
     const lastName = typeof body.lastName === "string" ? body.lastName.trim() : "";
     const username = typeof body.username === "string" ? body.username.trim().toLowerCase() : "";
-    const university = typeof body.university === "string" ? body.university.trim() : "";
     const bio = typeof body.bio === "string" ? body.bio.trim() : "";
+    const roleValue = body.role;
+    const role =
+      roleValue === "admin" || roleValue === "user" ? roleValue : null;
+    const universityIdValue =
+      typeof body.universityId === "string" || typeof body.universityId === "number"
+        ? String(body.universityId).trim()
+        : "";
+    const universityId =
+      universityIdValue === ""
+        ? null
+        : Number.isNaN(Number(universityIdValue))
+          ? null
+          : Number(universityIdValue);
 
     if (!firstName) {
       return NextResponse.json<ProfileResponse>(
@@ -48,14 +60,30 @@ export async function PATCH(request: Request) {
       );
     }
 
+    if (role === null) {
+      return NextResponse.json<ProfileResponse>(
+        { message: "Choose a valid account role.", status: "error" },
+        { status: 400 },
+      );
+    }
+
+    if (universityIdValue !== "" && universityId === null) {
+      return NextResponse.json<ProfileResponse>(
+        { message: "Choose a valid university.", status: "error" },
+        { status: 400 },
+      );
+    }
+
     const { error } = await supabase
       .from("profiles")
       .update({
         first_name: firstName,
         last_name: lastName,
         username,
-        university: university || null,
+        university: null,
+        university_id: universityId,
         bio: bio || null,
+        role,
       })
       .eq("id", user.id);
 

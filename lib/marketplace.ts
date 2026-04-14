@@ -10,12 +10,26 @@ import type {
 
 type ProfileSummary = Pick<
   TableRow<"profiles">,
-  "bio" | "id" | "email" | "first_name" | "is_verified" | "last_name" | "role" | "university" | "username"
+  | "bio"
+  | "id"
+  | "email"
+  | "first_name"
+  | "is_verified"
+  | "last_name"
+  | "role"
+  | "university"
+  | "university_id"
+  | "username"
 >;
 
 type CourseSummary = Pick<
   TableRow<"courses">,
-  "course_code" | "course_name" | "id" | "university"
+  "course_code" | "course_name" | "id" | "university" | "university_id"
+>;
+
+type UniversitySummary = Pick<
+  TableRow<"universities">,
+  "id" | "is_active" | "name" | "slug"
 >;
 
 export type ListingCardData = Pick<
@@ -39,8 +53,10 @@ export type ListingDetailData = ListingCardData &
 
 export type ViewerProfile = ProfileSummary;
 export type CourseOption = CourseSummary;
+export type UniversityOption = UniversitySummary;
 export type ListingCondition = PublicEnum<"listing_condition">;
 export type ListingInsert = TableInsert<"listings">;
+export type AdminCourse = CourseSummary;
 
 type ListingsFeedAudience = "anonymous" | "authenticated";
 
@@ -69,7 +85,9 @@ export async function getViewerContext(): Promise<{
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("bio, id, email, first_name, is_verified, last_name, role, university, username")
+    .select(
+      "bio, id, email, first_name, is_verified, last_name, role, university, university_id, username",
+    )
     .eq("id", user.id)
     .maybeSingle();
 
@@ -106,8 +124,8 @@ export async function getListingsFeed(
         status,
         primary_image_url,
         created_at,
-        course:courses!listings_course_id_fkey(id, course_code, course_name, university),
-        seller:profiles!listings_seller_id_fkey(id, email, first_name, is_verified, last_name, university, username)
+        course:courses!listings_course_id_fkey(id, course_code, course_name, university, university_id),
+        seller:profiles!listings_seller_id_fkey(id, email, first_name, is_verified, last_name, university, university_id, username)
       `
       : `
         id,
@@ -119,7 +137,7 @@ export async function getListingsFeed(
         status,
         primary_image_url,
         created_at,
-        course:courses!listings_course_id_fkey(id, course_code, course_name, university)
+        course:courses!listings_course_id_fkey(id, course_code, course_name, university, university_id)
       `;
 
   const { data, error } = await supabase
@@ -159,8 +177,8 @@ export async function getMyListings(userId: string): Promise<ListingCardData[]> 
       status,
       primary_image_url,
       created_at,
-      course:courses!listings_course_id_fkey(id, course_code, course_name, university),
-      seller:profiles!listings_seller_id_fkey(id, email, first_name, is_verified, last_name, university, username)
+      course:courses!listings_course_id_fkey(id, course_code, course_name, university, university_id),
+      seller:profiles!listings_seller_id_fkey(id, email, first_name, is_verified, last_name, university, university_id, username)
     `)
     .eq("seller_id", userId)
     .is("deleted_at", null)
@@ -196,8 +214,8 @@ export async function getListingById(id: string): Promise<{
       created_at,
       seller_id,
       course_id,
-      course:courses!listings_course_id_fkey(id, course_code, course_name, university),
-      seller:profiles!listings_seller_id_fkey(id, email, first_name, is_verified, last_name, university, username)
+      course:courses!listings_course_id_fkey(id, course_code, course_name, university, university_id),
+      seller:profiles!listings_seller_id_fkey(id, email, first_name, is_verified, last_name, university, university_id, username)
     `,
     )
     .eq("id", id)
@@ -215,10 +233,48 @@ export async function getCourseOptions(limit = 100): Promise<CourseOption[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("courses")
-    .select("id, course_code, course_name, university")
+    .select("id, course_code, course_name, university, university_id")
     .order("course_code", { ascending: true })
     .limit(limit);
 
+  return data ?? [];
+}
+
+export async function getAdminCourses(limit = 200): Promise<AdminCourse[]> {
+  if (!hasEnvVars) {
+    return [];
+  }
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("courses")
+    .select("id, course_code, course_name, university, university_id")
+    .order("course_code", { ascending: true })
+    .limit(limit);
+
+  return data ?? [];
+}
+
+export async function getUniversityOptions(
+  includeInactive = false,
+  limit = 100,
+): Promise<UniversityOption[]> {
+  if (!hasEnvVars) {
+    return [];
+  }
+
+  const supabase = await createClient();
+  let query = supabase
+    .from("universities")
+    .select("id, is_active, name, slug")
+    .order("name", { ascending: true })
+    .limit(limit);
+
+  if (!includeInactive) {
+    query = query.eq("is_active", true);
+  }
+
+  const { data } = await query;
   return data ?? [];
 }
 

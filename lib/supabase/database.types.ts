@@ -12,6 +12,7 @@ export type Database = {
           created_by: string | null;
           id: number;
           university: string;
+          university_id: number | null;
           updated_at: string;
         };
         Insert: {
@@ -21,6 +22,7 @@ export type Database = {
           created_by?: string | null;
           id?: never;
           university: string;
+          university_id?: number | null;
           updated_at?: string;
         };
         Update: {
@@ -30,6 +32,7 @@ export type Database = {
           created_by?: string | null;
           id?: never;
           university?: string;
+          university_id?: number | null;
           updated_at?: string;
         };
         Relationships: [
@@ -38,6 +41,13 @@ export type Database = {
             columns: ["created_by"];
             isOneToOne: false;
             referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "courses_university_id_fkey";
+            columns: ["university_id"];
+            isOneToOne: false;
+            referencedRelation: "universities";
             referencedColumns: ["id"];
           },
         ];
@@ -135,6 +145,7 @@ export type Database = {
           last_name: string;
           role: Database["public"]["Enums"]["profile_role"];
           university: string | null;
+          university_id: number | null;
           updated_at: string;
           username: string;
         };
@@ -149,6 +160,7 @@ export type Database = {
           last_name: string;
           role?: Database["public"]["Enums"]["profile_role"];
           university?: string | null;
+          university_id?: number | null;
           updated_at?: string;
           username: string;
         };
@@ -163,10 +175,57 @@ export type Database = {
           last_name?: string;
           role?: Database["public"]["Enums"]["profile_role"];
           university?: string | null;
+          university_id?: number | null;
           updated_at?: string;
           username?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "profiles_university_id_fkey";
+            columns: ["university_id"];
+            isOneToOne: false;
+            referencedRelation: "universities";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      universities: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          id: number;
+          is_active: boolean;
+          name: string;
+          slug: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          id?: never;
+          is_active?: boolean;
+          name: string;
+          slug: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          id?: never;
+          is_active?: boolean;
+          name?: string;
+          slug?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "universities_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
       };
     };
     Views: {

@@ -33,7 +33,7 @@ async function HomeContent() {
           university={profile?.university}
         />
       ) : (
-        <Card className="border-border/70 bg-white">
+        <Card className="border-border/70 bg-[linear-gradient(135deg,hsl(var(--background)),hsl(var(--secondary)))]">
           <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-2">
               <p className="text-lg font-semibold">

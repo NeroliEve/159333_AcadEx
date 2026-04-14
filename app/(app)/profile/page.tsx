@@ -1,8 +1,13 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 
-import { getMyListings, getViewerContext } from "@/lib/marketplace";
+import {
+  getMyListings,
+  getUniversityOptions,
+  getViewerContext,
+} from "@/lib/marketplace";
 
+import { AccountSecurityForm } from "@/components/account-security-form";
 import { EditProfileForm } from "@/components/edit-profile-form";
 import { ListingCard } from "@/components/listing-card";
 
@@ -11,7 +16,10 @@ async function ProfileContent() {
 
   if (!user) redirect("/auth/login");
 
-  const listings = await getMyListings(user.id);
+  const [listings, universities] = await Promise.all([
+    getMyListings(user.id),
+    getUniversityOptions(true),
+  ]);
 
   return (
     <section className="flex flex-col gap-10">
@@ -24,7 +32,8 @@ async function ProfileContent() {
         </h1>
       </div>
 
-      <EditProfileForm profile={profile} />
+      <EditProfileForm profile={profile} universities={universities} />
+      <AccountSecurityForm email={user.email ?? profile?.email ?? ""} />
 
       <div className="space-y-6">
         <div className="space-y-2">
@@ -66,6 +75,7 @@ function ProfileContentFallback() {
       </div>
 
       <div className="h-64 animate-pulse rounded-2xl border border-border/70 bg-muted/40" />
+      <div className="h-80 animate-pulse rounded-2xl border border-border/70 bg-muted/40" />
 
       <div className="space-y-6">
         <div className="space-y-2">
