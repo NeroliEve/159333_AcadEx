@@ -59,22 +59,25 @@ export async function PATCH(
     }
 
     const body = (await request.json()) as Record<string, unknown>;
-    const title = typeof body.title === "string" ? body.title.trim() : "";
-    const author = typeof body.author === "string" ? body.author.trim() : "";
-    const description =
-      typeof body.description === "string" ? body.description.trim() : "";
-    const priceValue =
-      typeof body.price === "string" || typeof body.price === "number"
-        ? String(body.price).trim()
-        : "";
-    const condition =
-      typeof body.condition === "string" ? body.condition.trim() : "";
-    const courseIdValue =
-      typeof body.courseId === "string" || typeof body.courseId === "number"
-        ? String(body.courseId).trim()
-        : "";
-    const imageUrl =
-      typeof body.imageUrl === "string" ? body.imageUrl.trim() : "";
+
+    function str(value: unknown) {
+      return typeof value === "string" ? value.trim() : "";
+    }
+
+    const title           = str(body.title);
+    const author          = str(body.author);
+    const edition         = str(body.edition);
+    const isbn            = str(body.isbn);
+    const publisher       = str(body.publisher);
+    const description     = str(body.description);
+    const condition       = str(body.condition);
+    const listingType     = str(body.listingType) || "sale_only";
+    const wantedTradeText = str(body.wantedTradeText);
+    const imageUrl        = str(body.imageUrl);
+    const priceValue      = typeof body.price === "string" || typeof body.price === "number"
+      ? String(body.price).trim() : "";
+    const courseIdValue   = typeof body.courseId === "string" || typeof body.courseId === "number"
+      ? String(body.courseId).trim() : "";
 
     if (!title) {
       return NextResponse.json<UpdateListingResponse>(
@@ -91,30 +94,33 @@ export async function PATCH(
       );
     }
 
-    if (
-      !validConditions.includes(condition as (typeof validConditions)[number])
-    ) {
+    if (!validConditions.includes(condition as (typeof validConditions)[number])) {
       return NextResponse.json<UpdateListingResponse>(
         { message: "Choose a valid book condition.", status: "error" },
         { status: 400 },
       );
     }
 
-    const courseId =
-      courseIdValue && !Number.isNaN(Number(courseIdValue))
-        ? Number(courseIdValue)
-        : null;
+    const courseId = courseIdValue && !Number.isNaN(Number(courseIdValue))
+      ? Number(courseIdValue)
+      : null;
 
     const { error } = await supabase
       .from("listings")
       .update({
         title,
-        author: author || null,
-        description: description || null,
+        author:            author || null,
+        edition:           edition || null,
+        isbn:              isbn || null,
+        publisher:         publisher || null,
+        description:       description || null,
         price,
-        condition: condition as (typeof validConditions)[number],
-        course_id: courseId,
+        condition:         condition as (typeof validConditions)[number],
+        listing_type:      listingType as "sale_only" | "trade_only" | "sale_or_trade",
+        course_id:         courseId,
         primary_image_url: imageUrl || null,
+        // clear wanted_trade_text if listing type is switched back to sale only
+        wanted_trade_text: listingType !== "sale_only" ? wantedTradeText || null : null,
       })
       .eq("id", id);
 

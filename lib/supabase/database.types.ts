@@ -72,6 +72,7 @@ export type Database = {
           status: Database["public"]["Enums"]["listing_status"];
           title: string;
           updated_at: string;
+          study_area_id: number | null;
           wanted_trade_text: string | null;
         };
         Insert: {
@@ -93,6 +94,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["listing_status"];
           title: string;
           updated_at?: string;
+          study_area_id?: number | null;
           wanted_trade_text?: string | null;
         };
         Update: {
@@ -114,6 +116,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["listing_status"];
           title?: string;
           updated_at?: string;
+          study_area_id?: number | null;
           wanted_trade_text?: string | null;
         };
         Relationships: [
@@ -129,6 +132,13 @@ export type Database = {
             columns: ["seller_id"];
             isOneToOne: false;
             referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "listings_study_area_id_fkey";
+            columns: ["study_area_id"];
+            isOneToOne: false;
+            referencedRelation: "study_areas";
             referencedColumns: ["id"];
           },
         ];
@@ -188,6 +198,33 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
+      };
+      study_areas: {
+        Row: {
+          created_at: string;
+          id: number;
+          is_active: boolean;
+          name: string;
+          slug: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: never;
+          is_active?: boolean;
+          name: string;
+          slug: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: never;
+          is_active?: boolean;
+          name?: string;
+          slug?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
       };
       universities: {
         Row: {

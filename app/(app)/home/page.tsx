@@ -1,38 +1,40 @@
 import Link from "next/link";
+import { Suspense } from "react";
 
 import { EmptyState } from "@/components/empty-state";
 import { ListingCard } from "@/components/listing-card";
-import { ProfileBanner } from "@/components/profile-banner";
+import { SearchFilterBar } from "@/components/search-filter-bar";
 import { PillButton } from "@/components/ui/pill-button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
+  getCourseOptions,
   getListingsFeed,
-  getProfileDisplayName,
+  getStudyAreaOptions,
+  getUniversityOptions,
   getViewerContext,
+  type ListingsFeedFilters,
 } from "@/lib/marketplace";
 import { hasEnvVars } from "@/lib/utils";
-import { Suspense } from "react";
 
-async function HomeContent() {
+type HomeContentProps = {
+  filters: ListingsFeedFilters;
+};
+
+async function HomeContent({ filters }: HomeContentProps) {
   const { profile, user } = await getViewerContext();
-  const { listings, error } = await getListingsFeed(
-    user ? "authenticated" : "anonymous",
-  );
+  const [{ listings, error }, courses, universities, studyAreas] = await Promise.all([
+    getListingsFeed(user ? "authenticated" : "anonymous", filters),
+    getCourseOptions(),
+    getUniversityOptions(true),
+    getStudyAreaOptions(),
+  ]);
 
   const createHref = user ? "/listings/new" : "/auth/login";
   const createLabel = user ? "Create listing" : "Sign in to create";
-  const displayName = getProfileDisplayName(profile, user?.email);
 
   return (
     <>
-      {user ? (
-        <ProfileBanner
-          email={profile?.email ?? user.email}
-          isVerified={profile?.is_verified}
-          name={displayName}
-          university={profile?.university}
-        />
-      ) : (
+      {!user && (
         <Card className="border-border/70 bg-[linear-gradient(135deg,hsl(var(--background)),hsl(var(--secondary)))]">
           <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-2">
@@ -55,6 +57,8 @@ async function HomeContent() {
           </CardContent>
         </Card>
       )}
+
+      <SearchFilterBar courses={courses} universities={universities} studyAreas={studyAreas} />
 
       <div className="space-y-6">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
@@ -84,9 +88,9 @@ async function HomeContent() {
           <EmptyState
             actionHref={createHref}
             actionLabel={createLabel}
-            description="There are no books listed yet. Be the first student to post a textbook and get the marketplace started."
+            description="No listings match your search. Try adjusting your filters."
             eyebrow="Books"
-            title="No listings yet"
+            title="No results found"
           />
         ) : (
           <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
@@ -109,6 +113,7 @@ function HomeContentFallback() {
   return (
     <>
       <div className="h-40 animate-pulse rounded-2xl border border-border/70 bg-muted/50" />
+      <div className="h-24 animate-pulse rounded-xl border border-border/70 bg-muted/50" />
       <div className="space-y-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="space-y-2">
@@ -137,7 +142,11 @@ function HomeContentFallback() {
   );
 }
 
-export default function HomePage() {
+type HomePageProps = {
+  searchParams: Promise<Record<string, string>>;
+};
+
+export default async function HomePage({ searchParams }: HomePageProps) {
   if (!hasEnvVars) {
     return (
       <EmptyState
@@ -147,6 +156,19 @@ export default function HomePage() {
       />
     );
   }
+
+  const params = await searchParams;
+
+  const filters: ListingsFeedFilters = {
+    q: params.q || undefined,
+    condition: params.condition || undefined,
+    courseId: params.courseId ? Number(params.courseId) : undefined,
+    listingType: params.listingType || undefined,
+    studyAreaId: params.studyAreaId ? Number(params.studyAreaId) : undefined,
+    universityId: params.universityId ? Number(params.universityId) : undefined,
+    minPrice: params.minPrice ? Number(params.minPrice) : undefined,
+    maxPrice: params.maxPrice ? Number(params.maxPrice) : undefined,
+  };
 
   return (
     <section className="flex flex-col gap-10">
@@ -166,10 +188,8 @@ export default function HomePage() {
       </div>
 
       <Suspense fallback={<HomeContentFallback />}>
-        <HomeContent />
+        <HomeContent filters={filters} />
       </Suspense>
     </section>
   );
 }
-
-

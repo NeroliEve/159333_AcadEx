@@ -36,19 +36,30 @@ function formatRelativeDate(dateString: string) {
   );
 }
 
+// Maps listing status to a badge colour class
+function statusBadgeClass(status: string) {
+  switch (status) {
+    case "pending": return "bg-yellow-100 text-yellow-800";
+    case "sold":    return "bg-red-100 text-red-800";
+    default:        return "bg-gray-100 text-gray-600";
+  }
+}
+
 export function ListingCard({ listing, viewerId, viewerRole }: ListingCardProps) {
   const sellerName = getProfileDisplayName(listing.seller, listing.seller?.email);
+  const isOwner = viewerId === listing.seller?.id || viewerRole === "admin";
 
   return (
     <Card className="overflow-hidden border-border/70 transition-all duration-200 hover:-translate-y-0.5 hover:scale-[1.01] hover:shadow-lg">
       <CardContent className="p-0">
-        <div className="relative flex h-full flex-col">
+        <div className="flex h-full flex-col">
+
+          {/* Clicking the image navigates to the listing — no invisible overlay needed */}
           <Link
             aria-label={`View details for ${listing.title}`}
-            className="absolute inset-0 z-0"
             href={`/listings/${listing.id}`}
-          />
-          <div className="aspect-[4/3] w-full bg-muted">
+            className="block aspect-[4/3] w-full bg-muted"
+          >
             {listing.primary_image_url ? (
               <img
                 alt={listing.title}
@@ -67,9 +78,9 @@ export function ListingCard({ listing, viewerId, viewerRole }: ListingCardProps)
                 </div>
               </div>
             )}
-          </div>
+          </Link>
 
-          <div className="relative z-10 flex flex-1 flex-col gap-4 p-5">
+          <div className="flex flex-1 flex-col gap-4 p-5">
             <div className="flex items-start justify-between gap-4">
               <div className="space-y-1">
                 <h3 className="text-lg font-semibold leading-tight">
@@ -81,9 +92,7 @@ export function ListingCard({ listing, viewerId, viewerRole }: ListingCardProps)
                   </Link>
                 </h3>
                 {listing.author ? (
-                  <p className="text-sm text-muted-foreground">
-                    by {listing.author}
-                  </p>
+                  <p className="text-sm text-muted-foreground">by {listing.author}</p>
                 ) : null}
               </div>
               <p className="whitespace-nowrap text-base font-semibold">
@@ -91,7 +100,7 @@ export function ListingCard({ listing, viewerId, viewerRole }: ListingCardProps)
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+            <div className="flex flex-wrap gap-2 text-xs">
               <span className="rounded-full bg-secondary px-2.5 py-1 text-secondary-foreground">
                 {formatListingCondition(listing.condition)}
               </span>
@@ -106,37 +115,33 @@ export function ListingCard({ listing, viewerId, viewerRole }: ListingCardProps)
                 </span>
               ) : null}
               {listing.status !== "available" ? (
-                <span className={`rounded-full px-2.5 py-1 font-medium ${
-                  listing.status === "pending"
-                    ? "bg-yellow-100 text-yellow-800"
-                    : listing.status === "sold"
-                    ? "bg-red-100 text-red-800"
-                    : "bg-gray-100 text-gray-600"
-                }`}>
+                <span className={`rounded-full px-2.5 py-1 font-medium ${statusBadgeClass(listing.status)}`}>
                   {listing.status.charAt(0).toUpperCase() + listing.status.slice(1)}
                 </span>
               ) : null}
             </div>
 
-            {listing.description ? (
-              <p className="text-sm text-muted-foreground">
-                {listing.description}
-              </p>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                No additional description provided.
-              </p>
-            )}
+            <p className="text-sm text-muted-foreground">
+              {listing.description ?? "No additional description provided."}
+            </p>
 
             <div className="mt-auto flex items-center justify-between gap-3 border-t border-border/70 pt-4 text-sm text-muted-foreground">
               <div>
-                <p>{sellerName}</p>
+                {listing.seller?.username ? (
+                  <Link
+                    href={`/profile/${listing.seller.username}`}
+                    className="font-medium underline underline-offset-2 hover:text-foreground transition-colors"
+                  >
+                    {sellerName}
+                  </Link>
+                ) : (
+                  <p className="font-medium">{sellerName}</p>
+                )}
                 <p className="text-xs">
-                  {listing.seller?.is_verified
-                    ? "Verified student"
-                    : "Student seller"}
+                  {listing.seller?.is_verified ? "Verified student" : "Student seller"}
                 </p>
               </div>
+
               <div className="flex items-center gap-3">
                 <p className="text-xs">{formatRelativeDate(listing.created_at)}</p>
                 <Link
@@ -145,8 +150,8 @@ export function ListingCard({ listing, viewerId, viewerRole }: ListingCardProps)
                 >
                   View details
                 </Link>
-                {(viewerId === listing.seller?.id || viewerRole === "admin") && (
-                  <div className="relative z-10 flex items-center gap-3">
+                {isOwner && (
+                  <div className="flex items-center gap-3">
                     <Link
                       href={`/listings/${listing.id}/edit`}
                       className="text-xs underline underline-offset-4 hover:text-foreground"
@@ -163,6 +168,7 @@ export function ListingCard({ listing, viewerId, viewerRole }: ListingCardProps)
               </div>
             </div>
           </div>
+
         </div>
       </CardContent>
     </Card>

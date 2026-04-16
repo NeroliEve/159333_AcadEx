@@ -3,14 +3,15 @@ import Link from "next/link";
 import { CreateListingForm } from "@/components/create-listing-form";
 import { EmptyState } from "@/components/empty-state";
 import { PillButton } from "@/components/ui/pill-button";
-import { getCourseOptions, getViewerContext } from "@/lib/marketplace";
+import { getCourseOptions, getStudyAreaOptions, getViewerContext } from "@/lib/marketplace";
 import { hasEnvVars } from "@/lib/utils";
 import { Suspense } from "react";
 
 async function CreateListingPageContent() {
-  const [{ profile, user }, courses] = await Promise.all([
+  const [{ profile, user }, courses, studyAreas] = await Promise.all([
     getViewerContext(),
     getCourseOptions(),
+    getStudyAreaOptions(),
   ]);
 
   if (!user) {
@@ -65,7 +66,7 @@ async function CreateListingPageContent() {
         </p>
       </div>
 
-      <CreateListingForm courses={courses} />
+      <CreateListingForm courses={courses} studyAreas={studyAreas} />
     </section>
   );
 }
