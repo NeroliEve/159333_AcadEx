@@ -15,11 +15,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { UniversityOption, ViewerProfile } from "@/lib/marketplace";
+import { createClient } from "@/lib/supabase/client";
 
 type EditProfileFormProps = {
   profile: (ViewerProfile & { bio?: string | null }) | null;
   universities: UniversityOption[];
 };
+
+const MAX_AVATAR_SIZE_BYTES = 1024 * 1024;
 
 export function EditProfileForm({
   profile,
@@ -29,6 +32,8 @@ export function EditProfileForm({
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAdminEnabled, setIsAdminEnabled] = useState(profile?.role === "admin");
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState(profile?.avatar_url ?? "");
+  const [selectedAvatarFile, setSelectedAvatarFile] = useState<File | null>(null);
   const [message, setMessage] = useState<{
     text: string;
     type: "success" | "error";
@@ -135,6 +140,10 @@ export function EditProfileForm({
   }, [profile?.role]);
 
   useEffect(() => {
+    setAvatarPreviewUrl(profile?.avatar_url ?? "");
+  }, [profile?.avatar_url]);
+
+  useEffect(() => {
     if (message?.type !== "success") {
       setIsToastVisible(false);
 
@@ -192,10 +201,48 @@ export function EditProfileForm({
     setIsSubmitting(true);
 
     try {
+      let avatarUrl = profile?.avatar_url ?? "";
+
+      if (selectedAvatarFile) {
+        if (!profile?.id) {
+          setMessage({ text: "Your profile is not ready for avatar uploads yet.", type: "error" });
+          return;
+        }
+
+        if (!selectedAvatarFile.type.startsWith("image/")) {
+          setMessage({ text: "Only image files are supported for profile pictures.", type: "error" });
+          return;
+        }
+
+        if (selectedAvatarFile.size > MAX_AVATAR_SIZE_BYTES) {
+          setMessage({ text: "Profile pictures must be 1MB or smaller.", type: "error" });
+          return;
+        }
+
+        const supabase = createClient();
+        const extension = selectedAvatarFile.name.split(".").pop()?.toLowerCase() || "png";
+        const filePath = `${profile.id}/avatar-${crypto.randomUUID()}.${extension}`;
+        const { error: uploadError } = await supabase.storage
+          .from("avatars")
+          .upload(filePath, selectedAvatarFile, {
+            cacheControl: "3600",
+            contentType: selectedAvatarFile.type,
+          });
+
+        if (uploadError) {
+          setMessage({ text: uploadError.message, type: "error" });
+          return;
+        }
+
+        const { data } = supabase.storage.from("avatars").getPublicUrl(filePath);
+        avatarUrl = data.publicUrl;
+      }
+
       const response = await fetch("/api/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          avatarUrl,
           firstName: formData.get("firstName"),
           lastName: formData.get("lastName"),
           username: formData.get("username"),
@@ -209,6 +256,8 @@ export function EditProfileForm({
       setMessage({ text: data.message, type: data.status });
 
       if (data.status === "success") {
+        setSelectedAvatarFile(null);
+        setAvatarPreviewUrl(avatarUrl);
         router.refresh();
       }
     } catch {
@@ -250,6 +299,66 @@ export function EditProfileForm({
 
           <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid gap-6 md:grid-cols-2">
+            <div className="grid gap-3 md:col-span-2">
+              <Label htmlFor="avatar">Profile picture</Label>
+              <div className="flex flex-col gap-4 rounded-lg border border-border/70 bg-secondary/20 p-4 sm:flex-row sm:items-center">
+                <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border/70 bg-background">
+                  {avatarPreviewUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      alt="Profile picture preview"
+                      className="h-full w-full object-cover"
+                      src={avatarPreviewUrl}
+                    />
+                  ) : (
+                    <span className="text-xl font-semibold text-muted-foreground">
+                      {profile?.first_name?.charAt(0) ?? "A"}
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid flex-1 gap-2">
+                  <Input
+                    id="avatar"
+                    name="avatar"
+                    type="file"
+                    accept="image/*"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0] ?? null;
+                      setSelectedAvatarFile(file);
+
+                      if (!file) {
+                        setAvatarPreviewUrl(profile?.avatar_url ?? "");
+                        return;
+                      }
+
+                      if (!file.type.startsWith("image/")) {
+                        setMessage({ text: "Only image files are supported for profile pictures.", type: "error" });
+                        event.target.value = "";
+                        setSelectedAvatarFile(null);
+                        setAvatarPreviewUrl(profile?.avatar_url ?? "");
+                        return;
+                      }
+
+                      if (file.size > MAX_AVATAR_SIZE_BYTES) {
+                        setMessage({ text: "Profile pictures must be 1MB or smaller.", type: "error" });
+                        event.target.value = "";
+                        setSelectedAvatarFile(null);
+                        setAvatarPreviewUrl(profile?.avatar_url ?? "");
+                        return;
+                      }
+
+                      setMessage(null);
+                      setAvatarPreviewUrl(URL.createObjectURL(file));
+                    }}
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Max size is 1MB. Only image files are supported.
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <div className="grid gap-2">
               <Label htmlFor="firstName">First name</Label>
               <Input
@@ -331,7 +440,7 @@ export function EditProfileForm({
                       checked={isAdminEnabled}
                       onChange={(event) => setIsAdminEnabled(event.target.checked)}
                     />
-                    <span>{isAdminEnabled ? "Admin enabled" : "Admin disabled"}</span>
+                    <span>{isAdminEnabled ? "Admin privileges enabled" : "Admin privileges disabled"}</span>
                   </label>
                 </div>
               </div>

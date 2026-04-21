@@ -25,6 +25,7 @@ export async function PATCH(request: Request) {
     const lastName = typeof body.lastName === "string" ? body.lastName.trim() : "";
     const username = typeof body.username === "string" ? body.username.trim().toLowerCase() : "";
     const bio = typeof body.bio === "string" ? body.bio.trim() : "";
+    const avatarUrl = typeof body.avatarUrl === "string" ? body.avatarUrl.trim() : "";
     const roleValue = body.role;
     const role =
       roleValue === "admin" || roleValue === "user" ? roleValue : null;
@@ -74,9 +75,24 @@ export async function PATCH(request: Request) {
       );
     }
 
+    if (avatarUrl) {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const expectedAvatarPrefix = supabaseUrl
+        ? `${supabaseUrl}/storage/v1/object/public/avatars/${user.id}/`
+        : null;
+
+      if (!URL.canParse(avatarUrl) || !expectedAvatarPrefix || !avatarUrl.startsWith(expectedAvatarPrefix)) {
+        return NextResponse.json<ProfileResponse>(
+          { message: "Upload a valid profile picture from your account.", status: "error" },
+          { status: 400 },
+        );
+      }
+    }
+
     const { error } = await supabase
       .from("profiles")
       .update({
+        avatar_url: avatarUrl || null,
         first_name: firstName,
         last_name: lastName,
         username,

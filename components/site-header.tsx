@@ -1,20 +1,31 @@
 import Link from "next/link";
 
 import { BrandTitle } from "@/components/brand-title";
-import { LogoutButton } from "@/components/logout-button";
+import { GoBackButton } from "@/components/go-back-button";
 import { ThemePicker } from "@/components/theme-picker";
+import { UserMenu } from "@/components/user-menu";
 import { PillButton } from "@/components/ui/pill-button";
-import { getViewerContext } from "@/lib/marketplace";
+import { getProfileDisplayName, getViewerContext } from "@/lib/marketplace";
 import { hasEnvVars } from "@/lib/utils";
 
-export async function SiteHeader() {
+type SiteHeaderProps = {
+  showAdminBackButton?: boolean;
+};
+
+export async function SiteHeader({
+  showAdminBackButton = false,
+}: SiteHeaderProps = {}) {
   let isAdmin = false;
+  let userAvatarUrl: string | null | undefined;
   let userEmail: string | undefined;
+  let userName: string | undefined;
 
   if (hasEnvVars) {
     const { profile, user } = await getViewerContext();
     isAdmin = profile?.role === "admin";
+    userAvatarUrl = profile?.avatar_url;
     userEmail = user?.email ?? profile?.email ?? undefined;
+    userName = profile ? getProfileDisplayName(profile, user?.email) : userEmail;
   }
 
   return (
@@ -32,18 +43,9 @@ export async function SiteHeader() {
               >
                 Home
               </Link>
-              <Link
-                href="/listings/new"
-                className="transition-colors hover:text-foreground"
-              >
-                Create listing
-              </Link>
-              <Link
-                href="/profile"
-                className="transition-colors hover:text-foreground"
-              >
-                Profile
-              </Link>
+              <PillButton asChild size="sm">
+                <Link href="/listings/new">Create listing</Link>
+              </PillButton>
             </nav>
           ) : null}
         </div>
@@ -55,15 +57,20 @@ export async function SiteHeader() {
         ) : userEmail ? (
           <div className="flex items-center gap-3">
             {isAdmin ? (
-              <PillButton asChild size="sm" variant="secondary">
-                <Link href="/admin">Admin dashboard</Link>
-              </PillButton>
+              showAdminBackButton ? (
+                <GoBackButton />
+              ) : (
+                <PillButton asChild size="sm" variant="secondary">
+                  <Link href="/admin">Admin dashboard</Link>
+                </PillButton>
+              )
             ) : null}
             <ThemePicker />
-            <span className="hidden text-sm text-muted-foreground sm:inline">
-              {userEmail}
-            </span>
-            <LogoutButton />
+            <UserMenu
+              avatarUrl={userAvatarUrl}
+              email={userEmail}
+              name={userName}
+            />
           </div>
         ) : (
           <div className="flex items-center gap-2">

@@ -28,6 +28,21 @@ function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
 }
 
+function getPasswordErrorMessage(error: unknown) {
+  if (!(error instanceof Error)) {
+    return "Could not update password.";
+  }
+
+  if (
+    error.message.includes("Current password required") ||
+    error.message.includes("invalid_credentials")
+  ) {
+    return "Your current password is incorrect.";
+  }
+
+  return error.message;
+}
+
 export function AccountSecurityForm({ email }: AccountSecurityFormProps) {
   const router = useRouter();
   const [currentEmail, setCurrentEmail] = useState(email);
@@ -35,6 +50,7 @@ export function AccountSecurityForm({ email }: AccountSecurityFormProps) {
   const [nextEmail, setNextEmail] = useState(email);
   const [emailMessage, setEmailMessage] = useState<FormMessage | null>(null);
   const [passwordMessage, setPasswordMessage] = useState<FormMessage | null>(null);
+  const [currentPassword, setCurrentPassword] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isEmailSubmitting, setIsEmailSubmitting] = useState(false);
@@ -160,6 +176,14 @@ export function AccountSecurityForm({ email }: AccountSecurityFormProps) {
 
     setPasswordMessage(null);
 
+    if (!currentPassword) {
+      setPasswordMessage({
+        text: "Enter your current password.",
+        type: "error",
+      });
+      return;
+    }
+
     if (password.length < 8) {
       setPasswordMessage({
         text: "Password must be at least 8 characters.",
@@ -180,19 +204,23 @@ export function AccountSecurityForm({ email }: AccountSecurityFormProps) {
 
     try {
       const supabase = createClient();
-      const { error } = await supabase.auth.updateUser({ password });
+      const { error } = await supabase.auth.updateUser({
+        current_password: currentPassword,
+        password,
+      });
 
       if (error) {
         throw error;
       }
 
+      setCurrentPassword("");
       setPassword("");
       setConfirmPassword("");
       setPasswordMessage(null);
       setToastMessage("Password updated successfully.");
     } catch (error: unknown) {
       setPasswordMessage({
-        text: error instanceof Error ? error.message : "Could not update password.",
+        text: getPasswordErrorMessage(error),
         type: "error",
       });
     } finally {
@@ -277,7 +305,8 @@ export function AccountSecurityForm({ email }: AccountSecurityFormProps) {
           <div className="space-y-1">
             <h3 className="text-base font-semibold">Password</h3>
             <p className="text-sm text-muted-foreground">
-              Use a strong password with at least 8 characters.
+              Enter your current password, then choose a new password with at
+              least 8 characters.
             </p>
           </div>
 
@@ -288,6 +317,20 @@ export function AccountSecurityForm({ email }: AccountSecurityFormProps) {
               {passwordMessage.text}
             </div>
           )}
+
+          <div className="grid gap-4">
+            <div className="grid gap-2 md:max-w-md">
+              <Label htmlFor="security-current-password">Current password</Label>
+              <Input
+                id="security-current-password"
+                type="password"
+                autoComplete="current-password"
+                value={currentPassword}
+                onChange={(event) => setCurrentPassword(event.target.value)}
+                required
+              />
+            </div>
+          </div>
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="grid gap-2">

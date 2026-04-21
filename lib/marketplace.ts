@@ -12,6 +12,7 @@ import type {
 
 type ProfileSummary = Pick<
   TableRow<"profiles">,
+  | "avatar_url"
   | "bio"
   | "id"
   | "email"
@@ -66,6 +67,7 @@ export type CourseOption = CourseSummary;
 export type UniversityOption = UniversitySummary;
 export type StudyAreaOption = StudyAreaSummary;
 export type ListingCondition = PublicEnum<"listing_condition">;
+export type ListingType = PublicEnum<"listing_type">;
 export type ListingInsert = TableInsert<"listings">;
 export type AdminCourse = CourseSummary;
 
@@ -89,7 +91,7 @@ const LISTING_CARD_SELECT = `
   primary_image_url,
   created_at,
   course:courses!listings_course_id_fkey(id, course_code, course_name, university, university_id),
-  seller:profiles!listings_seller_id_fkey(id, email, first_name, is_verified, last_name, university, university_id, username),
+  seller:profiles!listings_seller_id_fkey(id, avatar_url, email, first_name, is_verified, last_name, university, university_id, username),
   study_area:study_areas!listings_study_area_id_fkey(id, name, slug)
 `;
 
@@ -128,7 +130,7 @@ export async function getViewerContext(): Promise<{
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "bio, id, email, first_name, is_verified, last_name, role, university, university_id, username",
+      "avatar_url, bio, id, email, first_name, is_verified, last_name, role, university, university_id, username",
     )
     .eq("id", user.id)
     .maybeSingle();
@@ -176,11 +178,11 @@ export async function getListingsFeed(
   }
 
   if (filters.condition) {
-    query = query.eq("condition", filters.condition);
+    query = query.eq("condition", filters.condition as ListingCondition);
   }
 
   if (filters.listingType) {
-    query = query.eq("listing_type", filters.listingType);
+    query = query.eq("listing_type", filters.listingType as ListingType);
   }
 
   if (filters.studyAreaId) {
@@ -275,7 +277,7 @@ export async function getPublicProfile(username: string): Promise<{
   const { data: profileData, error: profileError } = await supabase
     .from("profiles")
     .select(
-      "bio, id, email, first_name, is_verified, last_name, role, university, university_id, username",
+      "avatar_url, bio, id, email, first_name, is_verified, last_name, role, university, university_id, username",
     )
     .eq("username", username)
     .maybeSingle();

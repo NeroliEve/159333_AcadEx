@@ -163,8 +163,9 @@ export function AdminDashboard({
         return;
       }
 
+      const university = data.university;
       setUniversities((current) =>
-        [...current, data.university].sort((a, b) => a.name.localeCompare(b.name)),
+        [...current, university].sort((a, b) => a.name.localeCompare(b.name)),
       );
       setUniversityDraft("");
       setUniversityState(null);
@@ -288,8 +289,9 @@ export function AdminDashboard({
         return;
       }
 
+      const course = data.course;
       setCourses((current) =>
-        [...current, data.course].sort((a, b) =>
+        [...current, course].sort((a, b) =>
           a.course_code.localeCompare(b.course_code),
         ),
       );

@@ -15,7 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import type { CourseOption, ListingDetailData, StudyAreaOption } from "@/lib/marketplace";
+import type { CourseOption, ListingDetailData, StudyAreaOption, ListingType } from "@/lib/marketplace";
 
 type EditListingFormProps = {
   listing: ListingDetailData;
@@ -130,7 +130,7 @@ export function EditListingForm({ listing, courses, studyAreas }: EditListingFor
                 name="listingType"
                 className={selectClass}
                 value={listingType}
-                onChange={(e) => setListingType(e.target.value)}
+                onChange={(e) => setListingType(e.target.value as ListingType)}
               >
                 <option value="sale_only">For sale</option>
                 <option value="trade_only">Trade only</option>
