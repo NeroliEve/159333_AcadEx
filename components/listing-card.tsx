@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { Card, CardContent } from "@/components/ui/card";
+import { ListingImageCarousel } from "@/components/listing-image-carousel";
 import { ListingManageMenu } from "@/components/listing-manage-menu";
 import {
   formatListingCondition,
@@ -55,30 +56,12 @@ export function ListingCard({ listing, viewerId, viewerRole }: ListingCardProps)
         <div className="flex h-full flex-col">
 
           {/* Clicking the image navigates to the listing — no invisible overlay needed */}
-          <Link
-            aria-label={`View details for ${listing.title}`}
+          <ListingImageCarousel
             href={`/listings/${listing.id}`}
-            className="relative block aspect-[4/3] w-full overflow-hidden rounded-t-xl bg-muted"
-          >
-            {listing.primary_image_url ? (
-              <img
-                alt={listing.title}
-                className="h-full w-full object-cover"
-                src={listing.primary_image_url}
-              />
-            ) : (
-              <div className="flex h-full items-center justify-center bg-[linear-gradient(135deg,hsl(var(--muted)),hsl(var(--secondary)))] px-6 text-center">
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-                    Acadex
-                  </p>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    No cover image added
-                  </p>
-                </div>
-              </div>
-            )}
-          </Link>
+            images={listing.images}
+            primaryImageUrl={listing.primary_image_url}
+            title={listing.title}
+          />
 
           {isOwner ? (
             <div className="absolute right-3 top-3 z-10">

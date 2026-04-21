@@ -40,7 +40,14 @@ type StudyAreaSummary = Pick<
   "id" | "name" | "slug"
 >;
 
-export type ListingCardData = Pick<
+export type ListingImageData = Pick<
+  TableRow<"listing_images">,
+  "id" | "image_url" | "is_primary" | "sort_order"
+>;
+
+type ListingImageRow = ListingImageData & Pick<TableRow<"listing_images">, "listing_id">;
+
+type ListingCardBase = Pick<
   TableRow<"listings">,
   | "author"
   | "condition"
@@ -59,8 +66,14 @@ export type ListingCardData = Pick<
   study_area: StudyAreaSummary | null;
 };
 
+export type ListingCardData = ListingCardBase & {
+  images: ListingImageData[];
+};
+
 export type ListingDetailData = ListingCardData &
-  Pick<TableRow<"listings">, "course_id" | "isbn" | "publisher" | "seller_id" | "study_area_id" | "wanted_trade_text">;
+  Pick<TableRow<"listings">, "course_id" | "isbn" | "publisher" | "seller_id" | "study_area_id" | "wanted_trade_text"> & {
+    images: ListingImageData[];
+  };
 
 export type ViewerProfile = ProfileSummary;
 export type CourseOption = CourseSummary;
@@ -111,6 +124,64 @@ const LISTING_CARD_SELECT_ANON = `
   course:courses!listings_course_id_fkey(id, course_code, course_name, university, university_id),
   study_area:study_areas!listings_study_area_id_fkey(id, name, slug)
 `;
+
+async function attachListingImages(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  listings: ListingCardBase[],
+): Promise<ListingCardData[]> {
+  if (listings.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("listing_images")
+    .select("id, listing_id, image_url, is_primary, sort_order")
+    .in("listing_id", listings.map((listing) => listing.id))
+    .order("sort_order", { ascending: true });
+
+  if (error) {
+    return listings.map((listing) => ({
+      ...listing,
+      images: listing.primary_image_url
+        ? [{
+            id: `primary-${listing.id}`,
+            image_url: listing.primary_image_url,
+            is_primary: true,
+            sort_order: 0,
+          }]
+        : [],
+    }));
+  }
+
+  const imagesByListing = new Map<string, ListingImageData[]>();
+
+  for (const image of (data ?? []) as ListingImageRow[]) {
+    const currentImages = imagesByListing.get(image.listing_id) ?? [];
+    currentImages.push({
+      id: image.id,
+      image_url: image.image_url,
+      is_primary: image.is_primary,
+      sort_order: image.sort_order,
+    });
+    imagesByListing.set(image.listing_id, currentImages);
+  }
+
+  return listings.map((listing) => {
+    const images = imagesByListing.get(listing.id);
+
+    return {
+      ...listing,
+      images: images && images.length > 0
+        ? images
+        : listing.primary_image_url
+          ? [{
+              id: `primary-${listing.id}`,
+              image_url: listing.primary_image_url,
+              is_primary: true,
+              sort_order: 0,
+            }]
+          : [],
+    };
+  });
+}
 
 // ─── Viewer ───────────────────────────────────────────────────────────────────
 
@@ -223,7 +294,7 @@ export async function getListingsFeed(
 
   return {
     error: null,
-    listings: (data ?? []) as unknown as ListingCardData[],
+    listings: await attachListingImages(supabase, (data ?? []) as unknown as ListingCardBase[]),
   };
 }
 
@@ -240,7 +311,7 @@ export async function getMyListings(userId: string): Promise<ListingCardData[]> 
     .is("deleted_at", null)
     .order("created_at", { ascending: false });
 
-  return (data ?? []) as unknown as ListingCardData[];
+  return attachListingImages(supabase, (data ?? []) as unknown as ListingCardBase[]);
 }
 
 export async function getListingById(id: string): Promise<{
@@ -259,7 +330,23 @@ export async function getListingById(id: string): Promise<{
     .maybeSingle();
 
   if (error) return { listing: null, error: error.message };
-  return { listing: data as unknown as ListingDetailData, error: null };
+  if (!data) return { listing: null, error: null };
+
+  const { data: images, error: imagesError } = await supabase
+    .from("listing_images")
+    .select("id, image_url, is_primary, sort_order")
+    .eq("listing_id", id)
+    .order("sort_order", { ascending: true });
+
+  if (imagesError) return { listing: null, error: imagesError.message };
+
+  return {
+    listing: {
+      ...(data as unknown as Omit<ListingDetailData, "images">),
+      images: (images ?? []) as ListingImageData[],
+    },
+    error: null,
+  };
 }
 
 // ─── Public profile ───────────────────────────────────────────────────────────
@@ -293,10 +380,15 @@ export async function getPublicProfile(username: string): Promise<{
     .is("deleted_at", null)
     .order("created_at", { ascending: false });
 
+  const listings = await attachListingImages(
+    supabase,
+    (listingsData ?? []) as unknown as ListingCardBase[],
+  );
+
   return {
     profile: {
       ...profileData,
-      listings: (listingsData ?? []) as unknown as ListingCardData[],
+      listings,
     },
     error: null,
   };
