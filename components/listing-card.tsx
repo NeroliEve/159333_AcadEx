@@ -3,8 +3,8 @@
 import Link from "next/link";
 
 import { Card, CardContent } from "@/components/ui/card";
-import { DeleteListingButton } from "@/components/delete-listing-button";
-import { ListingStatusButton } from "@/components/listing-status-button";
+import { ListingImageCarousel } from "@/components/listing-image-carousel";
+import { ListingManageMenu } from "@/components/listing-manage-menu";
 import {
   formatListingCondition,
   formatPrice,
@@ -47,38 +47,30 @@ function statusBadgeClass(status: string) {
 
 export function ListingCard({ listing, viewerId, viewerRole }: ListingCardProps) {
   const sellerName = getProfileDisplayName(listing.seller, listing.seller?.email);
-  const isOwner = viewerId === listing.seller?.id || viewerRole === "admin";
+  const isOwner =
+    viewerRole === "admin" || (!!viewerId && viewerId === listing.seller?.id);
 
   return (
-    <Card className="overflow-hidden border-border/70 transition-all duration-200 hover:-translate-y-0.5 hover:scale-[1.01] hover:shadow-lg">
+    <Card className="relative overflow-visible border-border/70 transition-all duration-200 hover:-translate-y-0.5 hover:scale-[1.01] hover:shadow-lg">
       <CardContent className="p-0">
         <div className="flex h-full flex-col">
 
           {/* Clicking the image navigates to the listing — no invisible overlay needed */}
-          <Link
-            aria-label={`View details for ${listing.title}`}
+          <ListingImageCarousel
             href={`/listings/${listing.id}`}
-            className="block aspect-[4/3] w-full bg-muted"
-          >
-            {listing.primary_image_url ? (
-              <img
-                alt={listing.title}
-                className="h-full w-full object-cover"
-                src={listing.primary_image_url}
+            images={listing.images}
+            primaryImageUrl={listing.primary_image_url}
+            title={listing.title}
+          />
+
+          {isOwner ? (
+            <div className="absolute right-3 top-3 z-10">
+              <ListingManageMenu
+                listingId={listing.id}
+                currentStatus={listing.status}
               />
-            ) : (
-              <div className="flex h-full items-center justify-center bg-[linear-gradient(135deg,hsl(var(--muted)),hsl(var(--secondary)))] px-6 text-center">
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-                    Acadex
-                  </p>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    No cover image added
-                  </p>
-                </div>
-              </div>
-            )}
-          </Link>
+            </div>
+          ) : null}
 
           <div className="flex flex-1 flex-col gap-4 p-5">
             <div className="flex items-start justify-between gap-4">
@@ -125,46 +117,41 @@ export function ListingCard({ listing, viewerId, viewerRole }: ListingCardProps)
               {listing.description ?? "No additional description provided."}
             </p>
 
-            <div className="mt-auto flex items-center justify-between gap-3 border-t border-border/70 pt-4 text-sm text-muted-foreground">
-              <div>
-                {listing.seller?.username ? (
-                  <Link
-                    href={`/profile/${listing.seller.username}`}
-                    className="font-medium underline underline-offset-2 hover:text-foreground transition-colors"
-                  >
-                    {sellerName}
-                  </Link>
-                ) : (
-                  <p className="font-medium">{sellerName}</p>
-                )}
-                <p className="text-xs">
-                  {listing.seller?.is_verified ? "Verified student" : "Student seller"}
-                </p>
-              </div>
+            <p className="text-xs text-muted-foreground">
+              {formatRelativeDate(listing.created_at)}
+            </p>
 
-              <div className="flex items-center gap-3">
-                <p className="text-xs">{formatRelativeDate(listing.created_at)}</p>
-                <Link
-                  href={`/listings/${listing.id}`}
-                  className="text-xs underline underline-offset-4 hover:text-foreground"
-                >
-                  View details
-                </Link>
-                {isOwner && (
-                  <div className="flex items-center gap-3">
-                    <Link
-                      href={`/listings/${listing.id}/edit`}
-                      className="text-xs underline underline-offset-4 hover:text-foreground"
-                    >
-                      Edit
-                    </Link>
-                    <DeleteListingButton listingId={listing.id} />
-                    <ListingStatusButton
-                      listingId={listing.id}
-                      currentStatus={listing.status}
+            <div className="mt-auto flex items-center gap-3 border-t border-border/70 pt-4 text-sm text-muted-foreground">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border/70 bg-secondary">
+                  {listing.seller?.avatar_url ? (
+                    <img
+                      alt={`${sellerName}'s profile picture`}
+                      className="h-full w-full object-cover"
+                      src={listing.seller.avatar_url}
                     />
-                  </div>
-                )}
+                  ) : (
+                    <span className="text-sm font-semibold text-muted-foreground">
+                      {sellerName.charAt(0)}
+                    </span>
+                  )}
+                </div>
+
+                <div className="min-w-0">
+                  {listing.seller?.username ? (
+                    <Link
+                      href={`/profile/${listing.seller.username}`}
+                      className="block truncate font-medium underline underline-offset-2 transition-colors hover:text-foreground"
+                    >
+                      {sellerName}
+                    </Link>
+                  ) : (
+                    <p className="truncate font-medium">{sellerName}</p>
+                  )}
+                  <p className="truncate text-xs">
+                    {listing.seller?.is_verified ? "Verified student" : "Student seller"}
+                  </p>
+                </div>
               </div>
             </div>
           </div>

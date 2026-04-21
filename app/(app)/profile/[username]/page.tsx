@@ -15,7 +15,8 @@ type Props = {
   params: Promise<{ username: string }>;
 };
 
-async function ProfileContent({ username }: { username: string }) {
+async function ProfileContent({ params }: Props) {
+  const { username } = await params;
   const [{ profile, error }, { profile: viewer }] = await Promise.all([
     getPublicProfile(username),
     getViewerContext(),
@@ -39,32 +40,56 @@ async function ProfileContent({ username }: { username: string }) {
   const isOwnProfile = viewer?.id === profile.id;
 
   return (
-    <div className="space-y-10">
+    <section className="flex flex-col gap-10">
+      <div className="space-y-2">
+        <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">
+          Seller profile
+        </p>
+        <h1 className="text-3xl font-semibold tracking-tight">@{username}</h1>
+      </div>
+
       {/* Profile header card */}
       <div className="rounded-2xl border border-border/70 bg-card p-8">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <h1 className="text-2xl font-semibold tracking-tight">{displayName}</h1>
-              <p className="text-sm text-muted-foreground">@{profile.username}</p>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              {profile.university ? (
-                <span className="rounded-full bg-secondary px-3 py-1 text-xs text-secondary-foreground">
-                  {profile.university}
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
+            <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border/70 bg-secondary">
+              {profile.avatar_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  alt={`${displayName}'s profile picture`}
+                  className="h-full w-full object-cover"
+                  src={profile.avatar_url}
+                />
+              ) : (
+                <span className="text-2xl font-semibold text-muted-foreground">
+                  {displayName.charAt(0)}
                 </span>
-              ) : null}
-              <span className="rounded-full bg-secondary px-3 py-1 text-xs text-secondary-foreground">
-                {profile.is_verified ? "Verified student" : "Student seller"}
-              </span>
+              )}
             </div>
 
-            {profile.bio ? (
-              <p className="max-w-xl text-sm leading-6 text-muted-foreground">
-                {profile.bio}
-              </p>
-            ) : null}
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <h1 className="text-2xl font-semibold tracking-tight">{displayName}</h1>
+                <p className="text-sm text-muted-foreground">@{profile.username}</p>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {profile.university ? (
+                  <span className="rounded-full bg-secondary px-3 py-1 text-xs text-secondary-foreground">
+                    {profile.university}
+                  </span>
+                ) : null}
+                <span className="rounded-full bg-secondary px-3 py-1 text-xs text-secondary-foreground">
+                  {profile.is_verified ? "Verified student" : "Student seller"}
+                </span>
+              </div>
+
+              {profile.bio ? (
+                <p className="max-w-xl text-sm leading-6 text-muted-foreground">
+                  {profile.bio}
+                </p>
+              ) : null}
+            </div>
           </div>
 
           {isOwnProfile && (
@@ -108,7 +133,7 @@ async function ProfileContent({ username }: { username: string }) {
           </div>
         )}
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -131,7 +156,7 @@ function ProfileFallback() {
   );
 }
 
-export default async function PublicProfilePage({ params }: Props) {
+export default function PublicProfilePage({ params }: Props) {
   if (!hasEnvVars) {
     return (
       <EmptyState
@@ -142,20 +167,9 @@ export default async function PublicProfilePage({ params }: Props) {
     );
   }
 
-  const { username } = await params;
-
   return (
-    <section className="flex flex-col gap-10">
-      <div className="space-y-2">
-        <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">
-          Seller profile
-        </p>
-        <h1 className="text-3xl font-semibold tracking-tight">@{username}</h1>
-      </div>
-
-      <Suspense fallback={<ProfileFallback />}>
-        <ProfileContent username={username} />
-      </Suspense>
-    </section>
+    <Suspense fallback={<ProfileFallback />}>
+      <ProfileContent params={params} />
+    </Suspense>
   );
 }

@@ -26,7 +26,7 @@ export default function AdminLayout({
   return (
     <div className="min-h-screen bg-background">
       <Suspense fallback={<HeaderFallback />}>
-        <SiteHeader />
+        <SiteHeader showAdminBackButton />
       </Suspense>
       <main className="mx-auto flex w-full max-w-5xl flex-col px-6 py-12">
         {children}

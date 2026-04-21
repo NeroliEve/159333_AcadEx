@@ -109,7 +109,7 @@ export function SignUpForm({
                   onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/\s/g, ""))}
                 />
                 <p className="text-sm text-muted-foreground">
-                  This is how you'll appear on listings.
+                  This is how you&apos;ll appear on listings.
                 </p>
               </div>
               <div className="grid gap-2">

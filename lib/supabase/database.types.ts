@@ -52,6 +52,41 @@ export type Database = {
           },
         ];
       };
+      listing_images: {
+        Row: {
+          created_at: string;
+          id: string;
+          image_url: string;
+          is_primary: boolean;
+          listing_id: string;
+          sort_order: number;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          image_url: string;
+          is_primary?: boolean;
+          listing_id: string;
+          sort_order?: number;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          image_url?: string;
+          is_primary?: boolean;
+          listing_id?: string;
+          sort_order?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "listing_images_listing_id_fkey";
+            columns: ["listing_id"];
+            isOneToOne: false;
+            referencedRelation: "listings";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       listings: {
         Row: {
           archived_at: string | null;

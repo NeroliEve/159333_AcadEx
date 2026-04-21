@@ -2,11 +2,41 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 type UpdateListingResponse = {
+  fieldErrors?: Partial<Record<FieldName, string>>;
   message?: string;
   status: "error" | "success";
 };
 
+type FieldName =
+  | "author"
+  | "condition"
+  | "description"
+  | "edition"
+  | "imageUrl"
+  | "isbn"
+  | "listingType"
+  | "price"
+  | "publisher"
+  | "title"
+  | "wantedTradeText";
+
 const validConditions = ["new", "like_new", "good", "fair", "poor"] as const;
+const validListingTypes = ["sale_only", "trade_only", "sale_or_trade"] as const;
+
+function str(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function getImageUrls(body: Record<string, unknown>) {
+  if (Array.isArray(body.imageUrls)) {
+    return body.imageUrls
+      .map((value) => (typeof value === "string" ? value.trim() : ""))
+      .filter(Boolean);
+  }
+
+  const imageUrl = str(body.imageUrl);
+  return imageUrl ? [imageUrl] : [];
+}
 
 export async function PATCH(
   request: Request,
@@ -34,7 +64,7 @@ export async function PATCH(
 
     const { data: listing } = await supabase
       .from("listings")
-      .select("seller_id")
+      .select("primary_image_url, seller_id")
       .eq("id", id)
       .maybeSingle();
 
@@ -60,10 +90,6 @@ export async function PATCH(
 
     const body = (await request.json()) as Record<string, unknown>;
 
-    function str(value: unknown) {
-      return typeof value === "string" ? value.trim() : "";
-    }
-
     const title           = str(body.title);
     const author          = str(body.author);
     const edition         = str(body.edition);
@@ -73,30 +99,89 @@ export async function PATCH(
     const condition       = str(body.condition);
     const listingType     = str(body.listingType) || "sale_only";
     const wantedTradeText = str(body.wantedTradeText);
-    const imageUrl        = str(body.imageUrl);
+    const imageUrls       = getImageUrls(body);
     const priceValue      = typeof body.price === "string" || typeof body.price === "number"
       ? String(body.price).trim() : "";
     const courseIdValue   = typeof body.courseId === "string" || typeof body.courseId === "number"
       ? String(body.courseId).trim() : "";
 
-    if (!title) {
-      return NextResponse.json<UpdateListingResponse>(
-        { message: "Book title is required.", status: "error" },
-        { status: 400 },
-      );
-    }
+    const fieldErrors: Partial<Record<FieldName, string>> = {};
+
+    if (!title) fieldErrors.title = "Book title is required.";
 
     const price = Number(priceValue);
     if (!priceValue || Number.isNaN(price) || price <= 0) {
+      fieldErrors.price = "Enter a valid price greater than 0.";
+    }
+
+    if (!validConditions.includes(condition as (typeof validConditions)[number])) {
+      fieldErrors.condition = "Choose a valid book condition.";
+    }
+
+    if (!validListingTypes.includes(listingType as (typeof validListingTypes)[number])) {
+      fieldErrors.listingType = "Choose a valid listing type.";
+    }
+
+    if (imageUrls.length > 3) {
+      fieldErrors.imageUrl = "Add up to 3 listing images.";
+    } else if (imageUrls.some((imageUrl) => !URL.canParse(imageUrl))) {
+      fieldErrors.imageUrl = "Upload valid listing images or leave this blank.";
+    }
+
+    if (Object.keys(fieldErrors).length > 0) {
       return NextResponse.json<UpdateListingResponse>(
-        { message: "Enter a valid price greater than 0.", status: "error" },
+        { fieldErrors, message: "Please fix the highlighted fields and try again.", status: "error" },
         { status: 400 },
       );
     }
 
-    if (!validConditions.includes(condition as (typeof validConditions)[number])) {
+    const { data: existingImages, error: existingImagesError } = await supabase
+      .from("listing_images")
+      .select("image_url")
+      .eq("listing_id", id);
+
+    if (existingImagesError) {
       return NextResponse.json<UpdateListingResponse>(
-        { message: "Choose a valid book condition.", status: "error" },
+        { message: existingImagesError.message, status: "error" },
+        { status: 400 },
+      );
+    }
+
+    const existingImageUrls = new Set(
+      [
+        listing.primary_image_url,
+        ...(existingImages ?? []).map((image) => image.image_url),
+      ].filter(Boolean) as string[],
+    );
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const expectedImagePrefixes = supabaseUrl
+      ? [
+          `${supabaseUrl}/storage/v1/object/public/listing-images/${listing.seller_id}/`,
+          ...(isAdmin && user.id !== listing.seller_id
+            ? [`${supabaseUrl}/storage/v1/object/public/listing-images/${user.id}/`]
+            : []),
+        ]
+      : [];
+
+    if (
+      imageUrls.some((imageUrl) => {
+        if (existingImageUrls.has(imageUrl)) return false;
+
+        const matchingPrefix = expectedImagePrefixes.find((prefix) => imageUrl.startsWith(prefix));
+        if (!matchingPrefix) return true;
+
+        const filename = imageUrl.slice(matchingPrefix.length);
+        return !filename || filename.includes("/");
+      })
+    ) {
+      return NextResponse.json<UpdateListingResponse>(
+        {
+          fieldErrors: {
+            imageUrl: "Upload listing images from your account.",
+          },
+          message: "Please fix the highlighted fields and try again.",
+          status: "error",
+        },
         { status: 400 },
       );
     }
@@ -116,9 +201,9 @@ export async function PATCH(
         description:       description || null,
         price,
         condition:         condition as (typeof validConditions)[number],
-        listing_type:      listingType as "sale_only" | "trade_only" | "sale_or_trade",
+        listing_type:      listingType as (typeof validListingTypes)[number],
         course_id:         courseId,
-        primary_image_url: imageUrl || null,
+        primary_image_url: imageUrls[0] ?? null,
         // clear wanted_trade_text if listing type is switched back to sale only
         wanted_trade_text: listingType !== "sale_only" ? wantedTradeText || null : null,
       })
@@ -129,6 +214,38 @@ export async function PATCH(
         { message: error.message, status: "error" },
         { status: 400 },
       );
+    }
+
+    const { error: deleteImagesError } = await supabase
+      .from("listing_images")
+      .delete()
+      .eq("listing_id", id);
+
+    if (deleteImagesError) {
+      return NextResponse.json<UpdateListingResponse>(
+        { message: deleteImagesError.message, status: "error" },
+        { status: 400 },
+      );
+    }
+
+    if (imageUrls.length > 0) {
+      const { error: insertImagesError } = await supabase
+        .from("listing_images")
+        .insert(
+          imageUrls.map((imageUrl, index) => ({
+            image_url: imageUrl,
+            is_primary: index === 0,
+            listing_id: id,
+            sort_order: index,
+          })),
+        );
+
+      if (insertImagesError) {
+        return NextResponse.json<UpdateListingResponse>(
+          { message: insertImagesError.message, status: "error" },
+          { status: 400 },
+        );
+      }
     }
 
     return NextResponse.json<UpdateListingResponse>({

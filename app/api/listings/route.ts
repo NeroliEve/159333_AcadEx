@@ -30,6 +30,17 @@ function str(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function getImageUrls(body: Record<string, unknown>) {
+  if (Array.isArray(body.imageUrls)) {
+    return body.imageUrls
+      .map((value) => (typeof value === "string" ? value.trim() : ""))
+      .filter(Boolean);
+  }
+
+  const imageUrl = str(body.imageUrl);
+  return imageUrl ? [imageUrl] : [];
+}
+
 export async function POST(request: Request) {
   try {
     if (!hasEnvVars) {
@@ -50,7 +61,7 @@ export async function POST(request: Request) {
     const condition     = str(body.condition);
     const listingType   = str(body.listingType) || "sale_only";
     const wantedTradeText = str(body.wantedTradeText);
-    const imageUrl      = str(body.imageUrl);
+    const imageUrls     = getImageUrls(body);
     const priceValue    = typeof body.price === "string" || typeof body.price === "number"
       ? String(body.price).trim()
       : "";
@@ -79,8 +90,10 @@ export async function POST(request: Request) {
       fieldErrors.listingType = "Choose a valid listing type.";
     }
 
-    if (imageUrl && !URL.canParse(imageUrl)) {
-      fieldErrors.imageUrl = "Add a valid image URL or leave this blank.";
+    if (imageUrls.length > 3) {
+      fieldErrors.imageUrl = "Add up to 3 listing images.";
+    } else if (imageUrls.some((imageUrl) => !URL.canParse(imageUrl))) {
+      fieldErrors.imageUrl = "Upload valid listing images or leave this blank.";
     }
 
     if (Object.keys(fieldErrors).length > 0) {
@@ -113,6 +126,33 @@ export async function POST(request: Request) {
       );
     }
 
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const expectedImagePrefix = supabaseUrl
+      ? `${supabaseUrl}/storage/v1/object/public/listing-images/${user.id}/`
+      : null;
+
+    if (
+      imageUrls.some((imageUrl) => {
+        if (!expectedImagePrefix || !imageUrl.startsWith(expectedImagePrefix)) {
+          return true;
+        }
+
+        const filename = imageUrl.slice(expectedImagePrefix.length);
+        return !filename || filename.includes("/");
+      })
+    ) {
+      return NextResponse.json<CreateListingResponse>(
+        {
+          fieldErrors: {
+            imageUrl: "Upload listing images from your account.",
+          },
+          message: "Please fix the highlighted fields and try again.",
+          status: "error",
+        },
+        { status: 400 },
+      );
+    }
+
     const courseId = courseIdValue && !Number.isNaN(Number(courseIdValue))
       ? Number(courseIdValue)
       : null;
@@ -126,7 +166,7 @@ export async function POST(request: Request) {
       isbn:             isbn || null,
       listing_type:     listingType as (typeof validListingTypes)[number],
       price,
-      primary_image_url: imageUrl || null,
+      primary_image_url: imageUrls[0] ?? null,
       publisher:        publisher || null,
       seller_id:        user.id,
       title,
@@ -134,15 +174,42 @@ export async function POST(request: Request) {
       wanted_trade_text: listingType !== "sale_only" ? wantedTradeText || null : null,
     };
 
-    const { error: listingError } = await supabase
+    const { data: listing, error: listingError } = await supabase
       .from("listings")
-      .insert(listingPayload);
+      .insert(listingPayload)
+      .select("id")
+      .single();
 
     if (listingError) {
       return NextResponse.json<CreateListingResponse>(
         { message: listingError.message, status: "error" },
         { status: 400 },
       );
+    }
+
+    if (imageUrls.length > 0) {
+      const { error: imageError } = await supabase
+        .from("listing_images")
+        .insert(
+          imageUrls.map((imageUrl, index) => ({
+            image_url: imageUrl,
+            is_primary: index === 0,
+            listing_id: listing.id,
+            sort_order: index,
+          })),
+        );
+
+      if (imageError) {
+        await supabase
+          .from("listings")
+          .delete()
+          .eq("id", listing.id);
+
+        return NextResponse.json<CreateListingResponse>(
+          { message: imageError.message, status: "error" },
+          { status: 400 },
+        );
+      }
     }
 
     return NextResponse.json<CreateListingResponse>({
