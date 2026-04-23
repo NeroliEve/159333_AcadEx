@@ -448,6 +448,84 @@ export async function getUniversityOptions(
   return data ?? [];
 }
 
+// ─── Transactions ─────────────────────────────────────────────────────────────
+
+export type TransactionData = {
+  id: string;
+  listing_id: string;
+  buyer_id: string;
+  seller_id: string;
+  agreed_price: number | null;
+  agreed_trade_text: string | null;
+  status: PublicEnum<"transaction_status">;
+  seller_confirmed_completed: boolean;
+  reservation_confirmed_at: string | null;
+  completed_at: string | null;
+  cancelled_at: string | null;
+  created_at: string;
+  updated_at: string;
+  listing: Pick<TableRow<"listings">, "id" | "title" | "primary_image_url" | "price" | "condition"> | null;
+  buyer: Pick<TableRow<"profiles">, "id" | "first_name" | "last_name" | "username" | "avatar_url"> | null;
+  seller: Pick<TableRow<"profiles">, "id" | "first_name" | "last_name" | "username" | "avatar_url"> | null;
+};
+
+const TRANSACTION_SELECT = `
+  id, listing_id, buyer_id, seller_id, agreed_price, agreed_trade_text,
+  status, seller_confirmed_completed, reservation_confirmed_at,
+  completed_at, cancelled_at, created_at, updated_at,
+  listing:listings!transactions_listing_id_fkey(id, title, primary_image_url, price, condition),
+  buyer:profiles!transactions_buyer_id_fkey(id, first_name, last_name, username, avatar_url),
+  seller:profiles!transactions_seller_id_fkey(id, first_name, last_name, username, avatar_url)
+`;
+
+// Fetches all transactions for a user split into buying and selling
+export async function getMyTransactions(userId: string): Promise<{
+  buying: TransactionData[];
+  selling: TransactionData[];
+}> {
+  if (!hasEnvVars) return { buying: [], selling: [] };
+
+  const supabase = await createClient();
+
+  const [{ data: buying }, { data: selling }] = await Promise.all([
+    supabase
+      .from("transactions")
+      .select(TRANSACTION_SELECT)
+      .eq("buyer_id", userId)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("transactions")
+      .select(TRANSACTION_SELECT)
+      .eq("seller_id", userId)
+      .order("created_at", { ascending: false }),
+  ]);
+
+  return {
+    buying: (buying ?? []) as unknown as TransactionData[],
+    selling: (selling ?? []) as unknown as TransactionData[],
+  };
+}
+
+// Checks if the viewer already has a pending transaction for a listing —
+// used on the listing detail page to show the right button state
+export async function getExistingTransaction(
+  listingId: string,
+  buyerId: string,
+): Promise<TransactionData | null> {
+  if (!hasEnvVars) return null;
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("transactions")
+    .select(TRANSACTION_SELECT)
+    .eq("listing_id", listingId)
+    .eq("buyer_id", buyerId)
+    .eq("status", "pending")
+    .maybeSingle();
+
+  return data as unknown as TransactionData | null;
+}
+
 // ─── Formatters ───────────────────────────────────────────────────────────────
 
 export function getProfileDisplayName(

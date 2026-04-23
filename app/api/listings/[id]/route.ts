@@ -104,6 +104,8 @@ export async function PATCH(
       ? String(body.price).trim() : "";
     const courseIdValue   = typeof body.courseId === "string" || typeof body.courseId === "number"
       ? String(body.courseId).trim() : "";
+    const studyAreaIdValue = typeof body.studyAreaId === "string" || typeof body.studyAreaId === "number"
+      ? String(body.studyAreaId).trim() : "";
 
     const fieldErrors: Partial<Record<FieldName, string>> = {};
 
@@ -190,6 +192,10 @@ export async function PATCH(
       ? Number(courseIdValue)
       : null;
 
+    const studyAreaId = studyAreaIdValue && !Number.isNaN(Number(studyAreaIdValue))
+      ? Number(studyAreaIdValue)
+      : null;
+
     const { error } = await supabase
       .from("listings")
       .update({
@@ -203,6 +209,7 @@ export async function PATCH(
         condition:         condition as (typeof validConditions)[number],
         listing_type:      listingType as (typeof validListingTypes)[number],
         course_id:         courseId,
+        study_area_id:     studyAreaId,
         primary_image_url: imageUrls[0] ?? null,
         // clear wanted_trade_text if listing type is switched back to sale only
         wanted_trade_text: listingType !== "sale_only" ? wantedTradeText || null : null,

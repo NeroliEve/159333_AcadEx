@@ -1,24 +1,31 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 
 import {
   getMyListings,
+  getMyTransactions,
   getUniversityOptions,
   getViewerContext,
+  formatPrice,
+  formatListingCondition,
+  type TransactionData,
 } from "@/lib/marketplace";
 
 import { AccountSecurityForm } from "@/components/account-security-form";
 import { EditProfileForm } from "@/components/edit-profile-form";
 import { ListingCard } from "@/components/listing-card";
+import { TransactionActions } from "@/components/transaction-actions";
 
 async function ProfileContent() {
   const { user, profile } = await getViewerContext();
 
   if (!user) redirect("/auth/login");
 
-  const [listings, universities] = await Promise.all([
+  const [listings, universities, transactions] = await Promise.all([
     getMyListings(user.id),
     getUniversityOptions(true),
+    getMyTransactions(user.id),
   ]);
 
   return (
@@ -32,7 +39,8 @@ async function ProfileContent() {
         </h1>
       </div>
 
-      <EditProfileForm profile={profile} universities={universities} />
+      {/* key forces a full remount when user changes so defaultValue re-initialises */}
+      <EditProfileForm key={profile?.id} profile={profile} universities={universities} />
       <AccountSecurityForm email={user.email ?? profile?.email ?? ""} />
 
       <div className="space-y-6">
@@ -62,7 +70,124 @@ async function ProfileContent() {
           </div>
         )}
       </div>
+
+      {/* Transaction history */}
+      <div className="space-y-6">
+        <div className="space-y-2">
+          <h2 className="text-2xl font-semibold tracking-tight">Transaction history</h2>
+          <p className="text-sm text-muted-foreground">
+            Your purchases and sales across all statuses.
+          </p>
+        </div>
+
+        {/* Buying */}
+        <div className="space-y-4">
+          <h3 className="text-base font-semibold tracking-tight">Buying</h3>
+          {transactions.buying.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No purchases yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {transactions.buying.map((tx) => (
+                <TransactionRow key={tx.id} transaction={tx} viewerId={user.id} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Selling */}
+        <div className="space-y-4">
+          <h3 className="text-base font-semibold tracking-tight">Selling</h3>
+          {transactions.selling.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No sales yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {transactions.selling.map((tx) => (
+                <TransactionRow key={tx.id} transaction={tx} viewerId={user.id} />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </section>
+  );
+}
+
+function transactionStatusBadge(status: TransactionData["status"]) {
+  switch (status) {
+    case "completed":  return "bg-green-100 text-green-800";
+    case "cancelled":  return "bg-red-100 text-red-800";
+    case "mismatch":   return "bg-orange-100 text-orange-800";
+    default:           return "bg-yellow-100 text-yellow-800"; // pending
+  }
+}
+
+function TransactionRow({ transaction: tx, viewerId }: { transaction: TransactionData; viewerId: string }) {
+  const isSeller = tx.seller_id === viewerId;
+  const otherParty = isSeller ? tx.buyer : tx.seller;
+  const otherName = otherParty
+    ? `${otherParty.first_name} ${otherParty.last_name}`.trim() || otherParty.username
+    : "Unknown";
+
+  return (
+    <div className="rounded-xl border border-border/70 bg-card p-5 space-y-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-start gap-4">
+          {/* Listing thumbnail */}
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border/70 bg-secondary">
+            {tx.listing?.primary_image_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                alt={tx.listing.title}
+                className="h-full w-full object-cover"
+                src={tx.listing.primary_image_url}
+              />
+            ) : (
+              <span className="text-xs text-muted-foreground">No img</span>
+            )}
+          </div>
+
+          <div className="space-y-1">
+            <Link
+              href={`/listings/${tx.listing_id}`}
+              className="text-sm font-semibold leading-tight underline underline-offset-2 hover:text-foreground transition-colors"
+            >
+              {tx.listing?.title ?? "Listing"}
+            </Link>
+            <p className="text-xs text-muted-foreground">
+              {isSeller ? `Buyer: ${otherName}` : `Seller: ${otherName}`}
+            </p>
+            {tx.listing?.condition ? (
+              <p className="text-xs text-muted-foreground">
+                {formatListingCondition(tx.listing.condition)}
+              </p>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
+          <span className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${transactionStatusBadge(tx.status)}`}>
+            {tx.status}
+          </span>
+          <p className="text-sm font-semibold">
+            {tx.agreed_price != null ? formatPrice(tx.agreed_price) : "Price TBC"}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {new Date(tx.created_at).toLocaleDateString("en-NZ", {
+              day: "numeric", month: "short", year: "numeric",
+            })}
+          </p>
+        </div>
+      </div>
+
+      {/* Action buttons — only shown while the transaction is still pending */}
+      {tx.status === "pending" ? (
+        <TransactionActions
+          transactionId={tx.id}
+          isSeller={isSeller}
+          isAccepted={!!tx.reservation_confirmed_at}
+        />
+      ) : null}
+    </div>
   );
 }
 

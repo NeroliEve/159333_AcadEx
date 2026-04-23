@@ -6,10 +6,12 @@ import { Suspense } from "react";
 
 import { DeleteListingButton } from "@/components/delete-listing-button";
 import { ListingStatusButton } from "@/components/listing-status-button";
+import { RequestToBuyButton } from "@/components/request-to-buy-button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   formatListingCondition,
   formatPrice,
+  getExistingTransaction,
   getListingById,
   getProfileDisplayName,
   getViewerContext,
@@ -61,6 +63,11 @@ async function ListingDetailContent({
   ]);
 
   if (error || !listing) notFound();
+
+  // Check if the viewer already has a pending transaction for this listing
+  const existingTransaction = user && user.id !== listing.seller_id
+    ? await getExistingTransaction(id, user.id)
+    : null;
 
   const sellerName = getProfileDisplayName(listing.seller, listing.seller?.email);
   const isOwner = user?.id === listing.seller_id;
@@ -256,9 +263,17 @@ async function ListingDetailContent({
               </div>
 
               <div className="flex flex-col gap-3">
+                {/* Request to buy — only shown to logged-in non-owners on available listings */}
+                {user && !isOwner && listing.status === "available" ? (
+                  <RequestToBuyButton
+                    listingId={listing.id}
+                    hasPendingTransaction={!!existingTransaction}
+                  />
+                ) : null}
+
                 {contactHref ? (
                   <a
-                    className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:opacity-90"
+                    className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium text-center transition-colors hover:bg-accent hover:text-accent-foreground"
                     href={contactHref}
                   >
                     Contact seller
@@ -301,6 +316,7 @@ async function ListingDetailContent({
         </aside>
 
       </div>
+
     </section>
   );
 }

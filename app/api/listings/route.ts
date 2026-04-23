@@ -68,6 +68,9 @@ export async function POST(request: Request) {
     const courseIdValue = typeof body.courseId === "string" || typeof body.courseId === "number"
       ? String(body.courseId).trim()
       : "";
+    const studyAreaIdValue = typeof body.studyAreaId === "string" || typeof body.studyAreaId === "number"
+      ? String(body.studyAreaId).trim()
+      : "";
 
     const fieldErrors: Partial<Record<FieldName, string>> = {};
 
@@ -157,6 +160,10 @@ export async function POST(request: Request) {
       ? Number(courseIdValue)
       : null;
 
+    const studyAreaId = studyAreaIdValue && !Number.isNaN(Number(studyAreaIdValue))
+      ? Number(studyAreaIdValue)
+      : null;
+
     const listingPayload: ListingInsert = {
       author:           author || null,
       condition:        condition as (typeof validConditions)[number],
@@ -169,6 +176,7 @@ export async function POST(request: Request) {
       primary_image_url: imageUrls[0] ?? null,
       publisher:        publisher || null,
       seller_id:        user.id,
+      study_area_id:    studyAreaId,
       title,
       // only store wanted_trade_text when the listing type involves trading
       wanted_trade_text: listingType !== "sale_only" ? wantedTradeText || null : null,

@@ -22,6 +22,7 @@ async function ProfileContent({ params }: Props) {
     getViewerContext(),
   ]);
 
+
   if (error) {
     return (
       <EmptyState

@@ -261,6 +261,88 @@ export type Database = {
         };
         Relationships: [];
       };
+      transactions: {
+        Row: {
+          id: string;
+          listing_id: string;
+          conversation_id: string | null;
+          buyer_id: string;
+          seller_id: string;
+          agreed_price: number | null;
+          agreed_trade_text: string | null;
+          status: Database["public"]["Enums"]["transaction_status"];
+          buyer_confirmed_completed: boolean;
+          seller_confirmed_completed: boolean;
+          reservation_requested_at: string | null;
+          reservation_confirmed_at: string | null;
+          reservation_expires_at: string | null;
+          completed_at: string | null;
+          cancelled_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          listing_id: string;
+          conversation_id?: string | null;
+          buyer_id: string;
+          seller_id: string;
+          agreed_price?: number | null;
+          agreed_trade_text?: string | null;
+          status?: Database["public"]["Enums"]["transaction_status"];
+          buyer_confirmed_completed?: boolean;
+          seller_confirmed_completed?: boolean;
+          reservation_requested_at?: string | null;
+          reservation_confirmed_at?: string | null;
+          reservation_expires_at?: string | null;
+          completed_at?: string | null;
+          cancelled_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          listing_id?: string;
+          conversation_id?: string | null;
+          buyer_id?: string;
+          seller_id?: string;
+          agreed_price?: number | null;
+          agreed_trade_text?: string | null;
+          status?: Database["public"]["Enums"]["transaction_status"];
+          buyer_confirmed_completed?: boolean;
+          seller_confirmed_completed?: boolean;
+          reservation_requested_at?: string | null;
+          reservation_confirmed_at?: string | null;
+          reservation_expires_at?: string | null;
+          completed_at?: string | null;
+          cancelled_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "transactions_listing_id_fkey";
+            columns: ["listing_id"];
+            isOneToOne: false;
+            referencedRelation: "listings";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "transactions_buyer_id_fkey";
+            columns: ["buyer_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "transactions_seller_id_fkey";
+            columns: ["seller_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       universities: {
         Row: {
           created_at: string;
@@ -311,6 +393,8 @@ export type Database = {
       listing_status: "available" | "pending" | "sold" | "archived";
       listing_type: "sale_only" | "trade_only" | "sale_or_trade";
       profile_role: "user" | "admin";
+      transaction_status: "pending" | "completed" | "cancelled" | "mismatch";
+      review_role: "buyer" | "seller";
     };
     CompositeTypes: {
       [_ in never]: never;
