@@ -526,6 +526,74 @@ export async function getExistingTransaction(
   return data as unknown as TransactionData | null;
 }
 
+// ─── Reviews ─────────────────────────────────────────────────────────────────
+
+export type ReviewData = {
+  id: string;
+  transaction_id: string;
+  reviewer_id: string;
+  reviewee_id: string;
+  reviewer_role: PublicEnum<"review_role">;
+  rating: number;
+  comment: string | null;
+  created_at: string;
+  reviewer: Pick<TableRow<"profiles">, "id" | "first_name" | "last_name" | "username" | "avatar_url"> | null;
+};
+
+export type SellerRatingSummary = {
+  average: number;
+  count: number;
+};
+
+// All reviews where this user is the reviewee — used on their public profile
+export async function getSellerReviews(revieweeId: string): Promise<ReviewData[]> {
+  if (!hasEnvVars) return [];
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("reviews")
+    .select("id, transaction_id, reviewer_id, reviewee_id, reviewer_role, rating, comment, created_at, reviewer:profiles!reviews_reviewer_id_fkey(id, first_name, last_name, username, avatar_url)")
+    .eq("reviewee_id", revieweeId)
+    .order("created_at", { ascending: false });
+
+  return (data ?? []) as unknown as ReviewData[];
+}
+
+// Average rating + count for the profile header badge
+export async function getSellerRatingSummary(revieweeId: string): Promise<SellerRatingSummary> {
+  if (!hasEnvVars) return { average: 0, count: 0 };
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("reviews")
+    .select("rating")
+    .eq("reviewee_id", revieweeId);
+
+  if (!data || data.length === 0) return { average: 0, count: 0 };
+
+  const average = data.reduce((sum, r) => sum + r.rating, 0) / data.length;
+  return { average: Math.round(average * 10) / 10, count: data.length };
+}
+
+// Check if the viewer already left a review for a specific transaction so we
+// can pre-fill the form or hide it
+export async function getReviewForTransaction(
+  transactionId: string,
+  reviewerId: string,
+): Promise<ReviewData | null> {
+  if (!hasEnvVars) return null;
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("reviews")
+    .select("id, transaction_id, reviewer_id, reviewee_id, reviewer_role, rating, comment, created_at, reviewer:profiles!reviews_reviewer_id_fkey(id, first_name, last_name, username, avatar_url)")
+    .eq("transaction_id", transactionId)
+    .eq("reviewer_id", reviewerId)
+    .maybeSingle();
+
+  return data as unknown as ReviewData | null;
+}
+
 // ─── Formatters ───────────────────────────────────────────────────────────────
 
 export function getProfileDisplayName(

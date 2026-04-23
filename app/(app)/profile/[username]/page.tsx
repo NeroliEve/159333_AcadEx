@@ -4,9 +4,13 @@ import Link from "next/link";
 
 import { ListingCard } from "@/components/listing-card";
 import { EmptyState } from "@/components/empty-state";
+import { StarRating } from "@/components/star-rating";
+import { ReviewsList } from "@/components/reviews-list";
 import {
   getPublicProfile,
   getProfileDisplayName,
+  getSellerRatingSummary,
+  getSellerReviews,
   getViewerContext,
 } from "@/lib/marketplace";
 import { hasEnvVars } from "@/lib/utils";
@@ -21,6 +25,10 @@ async function ProfileContent({ params }: Props) {
     getPublicProfile(username),
     getViewerContext(),
   ]);
+
+  const [ratingSummary, reviews] = profile
+    ? await Promise.all([getSellerRatingSummary(profile.id), getSellerReviews(profile.id)])
+    : [null, []];
 
 
   if (error) {
@@ -85,6 +93,15 @@ async function ProfileContent({ params }: Props) {
                 </span>
               </div>
 
+              {ratingSummary && ratingSummary.count > 0 ? (
+                <div className="flex items-center gap-2">
+                  <StarRating rating={ratingSummary.average} size="sm" />
+                  <span className="text-sm text-muted-foreground">
+                    {ratingSummary.average} · {ratingSummary.count} review{ratingSummary.count !== 1 ? "s" : ""}
+                  </span>
+                </div>
+              ) : null}
+
               {profile.bio ? (
                 <p className="max-w-xl text-sm leading-6 text-muted-foreground">
                   {profile.bio}
@@ -103,6 +120,9 @@ async function ProfileContent({ params }: Props) {
           )}
         </div>
       </div>
+
+      {/* Reviews */}
+      {reviews.length > 0 && <ReviewsList reviews={reviews} />}
 
       {/* Active listings */}
       <div className="space-y-6">

@@ -4,6 +4,61 @@ export type Database = {
   };
   public: {
     Tables: {
+      reviews: {
+        Row: {
+          id: string;
+          transaction_id: string;
+          reviewer_id: string;
+          reviewee_id: string;
+          reviewer_role: Database["public"]["Enums"]["review_role"];
+          rating: number;
+          comment: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          transaction_id: string;
+          reviewer_id: string;
+          reviewee_id: string;
+          reviewer_role: Database["public"]["Enums"]["review_role"];
+          rating: number;
+          comment?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          transaction_id?: string;
+          reviewer_id?: string;
+          reviewee_id?: string;
+          reviewer_role?: Database["public"]["Enums"]["review_role"];
+          rating?: number;
+          comment?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "reviews_transaction_id_fkey";
+            columns: ["transaction_id"];
+            isOneToOne: false;
+            referencedRelation: "transactions";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "reviews_reviewer_id_fkey";
+            columns: ["reviewer_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "reviews_reviewee_id_fkey";
+            columns: ["reviewee_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       courses: {
         Row: {
           course_code: string;

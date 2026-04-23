@@ -5,16 +5,19 @@ import Link from "next/link";
 import {
   getMyListings,
   getMyTransactions,
+  getReviewForTransaction,
   getUniversityOptions,
   getViewerContext,
   formatPrice,
   formatListingCondition,
+  type ReviewData,
   type TransactionData,
 } from "@/lib/marketplace";
 
 import { AccountSecurityForm } from "@/components/account-security-form";
 import { EditProfileForm } from "@/components/edit-profile-form";
 import { ListingCard } from "@/components/listing-card";
+import { ReviewForm } from "@/components/review-form";
 import { TransactionActions } from "@/components/transaction-actions";
 
 async function ProfileContent() {
@@ -27,6 +30,19 @@ async function ProfileContent() {
     getUniversityOptions(true),
     getMyTransactions(user.id),
   ]);
+
+  // For each completed transaction fetch whether the viewer already reviewed it
+  const completedTxIds = [...transactions.buying, ...transactions.selling]
+    .filter((tx) => tx.status === "completed")
+    .map((tx) => tx.id);
+
+  const reviewMap = new Map<string, ReviewData | null>();
+  await Promise.all(
+    completedTxIds.map(async (txId) => {
+      const review = await getReviewForTransaction(txId, user.id);
+      reviewMap.set(txId, review);
+    }),
+  );
 
   return (
     <section className="flex flex-col gap-10">
@@ -88,7 +104,7 @@ async function ProfileContent() {
           ) : (
             <div className="space-y-3">
               {transactions.buying.map((tx) => (
-                <TransactionRow key={tx.id} transaction={tx} viewerId={user.id} />
+                <TransactionRow key={tx.id} transaction={tx} viewerId={user.id} existingReview={reviewMap.get(tx.id) ?? null} />
               ))}
             </div>
           )}
@@ -102,7 +118,7 @@ async function ProfileContent() {
           ) : (
             <div className="space-y-3">
               {transactions.selling.map((tx) => (
-                <TransactionRow key={tx.id} transaction={tx} viewerId={user.id} />
+                <TransactionRow key={tx.id} transaction={tx} viewerId={user.id} existingReview={reviewMap.get(tx.id) ?? null} />
               ))}
             </div>
           )}
@@ -121,7 +137,15 @@ function transactionStatusBadge(status: TransactionData["status"]) {
   }
 }
 
-function TransactionRow({ transaction: tx, viewerId }: { transaction: TransactionData; viewerId: string }) {
+function TransactionRow({
+  transaction: tx,
+  viewerId,
+  existingReview,
+}: {
+  transaction: TransactionData;
+  viewerId: string;
+  existingReview: ReviewData | null;
+}) {
   const isSeller = tx.seller_id === viewerId;
   const otherParty = isSeller ? tx.buyer : tx.seller;
   const otherName = otherParty
@@ -186,6 +210,18 @@ function TransactionRow({ transaction: tx, viewerId }: { transaction: Transactio
           isSeller={isSeller}
           isAccepted={!!tx.reservation_confirmed_at}
         />
+      ) : null}
+
+      {/* Review form — only shown once the transaction is completed */}
+      {tx.status === "completed" && otherParty ? (
+        <div className="border-t border-border/70 pt-3">
+          <ReviewForm
+            transactionId={tx.id}
+            revieweeId={otherParty.id}
+            reviewerRole={isSeller ? "seller" : "buyer"}
+            existingReview={existingReview}
+          />
+        </div>
       ) : null}
     </div>
   );
