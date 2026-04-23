@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   getCourseOptions,
   getListingsFeed,
+  getSavedListingIds,
   getStudyAreaOptions,
   getUniversityOptions,
   getViewerContext,
@@ -22,11 +23,12 @@ type HomeContentProps = {
 
 async function HomeContent({ filters }: HomeContentProps) {
   const { profile, user } = await getViewerContext();
-  const [{ listings, error }, courses, universities, studyAreas] = await Promise.all([
+  const [{ listings, error }, courses, universities, studyAreas, savedIds] = await Promise.all([
     getListingsFeed(user ? "authenticated" : "anonymous", filters),
     getCourseOptions(),
     getUniversityOptions(true),
     getStudyAreaOptions(),
+    user ? getSavedListingIds(user.id) : Promise.resolve([]),
   ]);
 
   const createHref = user ? "/listings/new" : "/auth/login";
@@ -100,6 +102,7 @@ async function HomeContent({ filters }: HomeContentProps) {
                 listing={listing}
                 viewerId={profile?.id}
                 viewerRole={profile?.role}
+                isSaved={savedIds.includes(listing.id)}
               />
             ))}
           </div>

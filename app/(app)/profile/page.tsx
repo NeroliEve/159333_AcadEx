@@ -6,6 +6,7 @@ import {
   getMyListings,
   getMyTransactions,
   getReviewForTransaction,
+  getSavedListings,
   getUniversityOptions,
   getViewerContext,
   formatPrice,
@@ -25,10 +26,11 @@ async function ProfileContent() {
 
   if (!user) redirect("/auth/login");
 
-  const [listings, universities, transactions] = await Promise.all([
+  const [listings, universities, transactions, savedListings] = await Promise.all([
     getMyListings(user.id),
     getUniversityOptions(true),
     getMyTransactions(user.id),
+    getSavedListings(user.id),
   ]);
 
   // For each completed transaction fetch whether the viewer already reviewed it
@@ -81,6 +83,34 @@ async function ProfileContent() {
                 listing={listing}
                 viewerId={profile?.id}
                 viewerRole={profile?.role}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Saved listings */}
+      <div className="space-y-6">
+        <div className="space-y-2">
+          <h2 className="text-2xl font-semibold tracking-tight">Saved listings</h2>
+          <p className="text-sm text-muted-foreground">
+            Listings you&apos;ve hearted for later.
+          </p>
+        </div>
+
+        {savedListings.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            You haven&apos;t saved any listings yet. Tap the heart on any listing to save it.
+          </p>
+        ) : (
+          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {savedListings.map((listing) => (
+              <ListingCard
+                key={listing.id}
+                listing={listing}
+                viewerId={profile?.id}
+                viewerRole={profile?.role}
+                isSaved
               />
             ))}
           </div>

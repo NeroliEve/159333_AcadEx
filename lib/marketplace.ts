@@ -594,6 +594,39 @@ export async function getReviewForTransaction(
   return data as unknown as ReviewData | null;
 }
 
+// ─── Saved listings ──────────────────────────────────────────────────────────
+
+// Returns just the IDs — used to determine isSaved per card without fetching full data
+export async function getSavedListingIds(userId: string): Promise<string[]> {
+  if (!hasEnvVars) return [];
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("saved_listings")
+    .select("listing_id")
+    .eq("user_id", userId);
+
+  return (data ?? []).map((row) => row.listing_id as string);
+}
+
+// Returns full listing data for the saved listings section on the profile page
+export async function getSavedListings(userId: string): Promise<ListingCardData[]> {
+  if (!hasEnvVars) return [];
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("saved_listings")
+    .select(`listing:listings!saved_listings_listing_id_fkey(${LISTING_CARD_SELECT})`)
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+
+  const listings = (data ?? [])
+    .map((row) => (row as unknown as { listing: ListingCardBase | null }).listing)
+    .filter((l): l is ListingCardBase => l !== null);
+
+  return attachListingImages(supabase, listings);
+}
+
 // ─── Formatters ───────────────────────────────────────────────────────────────
 
 export function getProfileDisplayName(

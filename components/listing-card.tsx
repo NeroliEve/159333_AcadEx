@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { ListingImageCarousel } from "@/components/listing-image-carousel";
 import { ListingManageMenu } from "@/components/listing-manage-menu";
+import { SaveButton } from "@/components/save-button";
 import {
   formatListingCondition,
   formatPrice,
@@ -16,6 +17,7 @@ type ListingCardProps = {
   listing: ListingCardData;
   viewerId?: string;
   viewerRole?: string;
+  isSaved?: boolean;
 };
 
 function formatRelativeDate(dateString: string) {
@@ -45,7 +47,7 @@ function statusBadgeClass(status: string) {
   }
 }
 
-export function ListingCard({ listing, viewerId, viewerRole }: ListingCardProps) {
+export function ListingCard({ listing, viewerId, viewerRole, isSaved = false }: ListingCardProps) {
   const sellerName = getProfileDisplayName(listing.seller, listing.seller?.email);
   const isOwner =
     viewerRole === "admin" || (!!viewerId && viewerId === listing.seller?.id);
@@ -69,6 +71,10 @@ export function ListingCard({ listing, viewerId, viewerRole }: ListingCardProps)
                 listingId={listing.id}
                 currentStatus={listing.status}
               />
+            </div>
+          ) : viewerId ? (
+            <div className="absolute right-3 top-3 z-10">
+              <SaveButton listingId={listing.id} initialSaved={isSaved} />
             </div>
           ) : null}
 

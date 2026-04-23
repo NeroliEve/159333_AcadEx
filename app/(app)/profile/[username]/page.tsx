@@ -11,6 +11,7 @@ import {
   getProfileDisplayName,
   getSellerRatingSummary,
   getSellerReviews,
+  getSavedListingIds,
   getViewerContext,
 } from "@/lib/marketplace";
 import { hasEnvVars } from "@/lib/utils";
@@ -26,9 +27,13 @@ async function ProfileContent({ params }: Props) {
     getViewerContext(),
   ]);
 
-  const [ratingSummary, reviews] = profile
-    ? await Promise.all([getSellerRatingSummary(profile.id), getSellerReviews(profile.id)])
-    : [null, []];
+  const [ratingSummary, reviews, savedIds] = profile
+    ? await Promise.all([
+        getSellerRatingSummary(profile.id),
+        getSellerReviews(profile.id),
+        viewer ? getSavedListingIds(viewer.id) : Promise.resolve([]),
+      ])
+    : [null, [], []];
 
 
   if (error) {
@@ -149,6 +154,7 @@ async function ProfileContent({ params }: Props) {
                 listing={listing}
                 viewerId={viewer?.id}
                 viewerRole={viewer?.role}
+                isSaved={(savedIds as string[]).includes(listing.id)}
               />
             ))}
           </div>
