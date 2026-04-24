@@ -43,6 +43,12 @@ export async function SiteHeader({
               >
                 Home
               </Link>
+              <Link
+                href="/messages"
+                className="transition-colors hover:text-foreground"
+              >
+                Messages
+              </Link>
               <PillButton asChild size="sm">
                 <Link href="/listings/new">Create listing</Link>
               </PillButton>

@@ -18,12 +18,14 @@ import {
 } from "@/lib/marketplace";
 import { hasEnvVars } from "@/lib/utils";
 
-// Maps the listing_type enum value to a readable label
 function formatListingType(type: string) {
   switch (type) {
-    case "trade_only":    return "Trade only";
-    case "sale_or_trade": return "Sale or trade";
-    default:              return "For sale";
+    case "trade_only":
+      return "Trade only";
+    case "sale_or_trade":
+      return "Sale or trade";
+    default:
+      return "For sale";
   }
 }
 
@@ -64,25 +66,16 @@ async function ListingDetailContent({
 
   if (error || !listing) notFound();
 
-  // Check if the viewer already has a pending transaction for this listing
   const existingTransaction = user && user.id !== listing.seller_id
     ? await getExistingTransaction(id, user.id)
     : null;
 
-  const sellerName = getProfileDisplayName(listing.seller, listing.seller?.email);
+  const sellerName = getProfileDisplayName(listing.seller);
   const isOwner = user?.id === listing.seller_id;
   const isAdmin = profile?.role === "admin";
   const canManage = isOwner || isAdmin;
-
-  const contactHref = listing.seller?.email
-    ? `mailto:${listing.seller.email}?subject=${encodeURIComponent(
-        `Acadex listing: ${listing.title}`,
-      )}&body=${encodeURIComponent(
-        `Hi ${sellerName},\n\nI'm interested in your Acadex listing "${listing.title}".\n\nThanks!`,
-      )}`
-    : null;
-
-  const isTrade = listing.listing_type === "trade_only" || listing.listing_type === "sale_or_trade";
+  const isTrade =
+    listing.listing_type === "trade_only" || listing.listing_type === "sale_or_trade";
 
   return (
     <section className="space-y-8">
@@ -99,7 +92,7 @@ async function ListingDetailContent({
               {listing.seller?.username ? (
                 <Link
                   href={`/profile/${listing.seller.username}`}
-                  className="underline underline-offset-2 hover:text-foreground transition-colors"
+                  className="underline underline-offset-2 transition-colors hover:text-foreground"
                 >
                   {sellerName}
                 </Link>
@@ -108,7 +101,7 @@ async function ListingDetailContent({
               )}
             </p>
           </div>
-          <div className="text-left sm:text-right shrink-0">
+          <div className="shrink-0 text-left sm:text-right">
             <p className="text-3xl font-semibold">{formatPrice(listing.price)}</p>
             <p className="text-sm text-muted-foreground">
               {formatListingCondition(listing.condition)} condition
@@ -118,8 +111,6 @@ async function ListingDetailContent({
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
-
-        {/* Left column — image + details */}
         <Card className="overflow-hidden border-border/70">
           <CardContent className="p-0">
             <div className="aspect-[4/3] w-full bg-muted">
@@ -140,8 +131,6 @@ async function ListingDetailContent({
             </div>
 
             <div className="space-y-6 p-6">
-
-              {/* Status badges */}
               <div className="flex flex-wrap gap-2 text-xs">
                 <span className="rounded-full bg-secondary px-2.5 py-1 text-secondary-foreground">
                   {formatListingCondition(listing.condition)}
@@ -159,13 +148,12 @@ async function ListingDetailContent({
                     {listing.seller.university}
                   </span>
                 ) : null}
-                <span className="rounded-full bg-secondary px-2.5 py-1 text-secondary-foreground capitalize">
+                <span className="rounded-full bg-secondary px-2.5 py-1 capitalize text-secondary-foreground">
                   {listing.status}
                 </span>
               </div>
 
-              {/* Book details — edition, isbn, publisher */}
-              {(listing.edition || listing.isbn || listing.publisher || listing.course?.course_name) && (
+              {(listing.edition || listing.isbn || listing.publisher || listing.course?.course_name) ? (
                 <div className="space-y-3">
                   <h2 className="text-base font-semibold tracking-tight">Book details</h2>
                   <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
@@ -199,9 +187,8 @@ async function ListingDetailContent({
                     ) : null}
                   </dl>
                 </div>
-              )}
+              ) : null}
 
-              {/* Description */}
               <div className="space-y-3">
                 <h2 className="text-base font-semibold tracking-tight">Description</h2>
                 <p className="whitespace-pre-line text-sm leading-7 text-muted-foreground">
@@ -209,8 +196,7 @@ async function ListingDetailContent({
                 </p>
               </div>
 
-              {/* Trade info — only shown when seller is open to trading */}
-              {isTrade && (
+              {isTrade ? (
                 <div className="space-y-2 rounded-xl border border-border/70 bg-secondary/40 p-4">
                   <p className="text-sm font-medium">Open to trading</p>
                   {listing.wanted_trade_text ? (
@@ -219,24 +205,22 @@ async function ListingDetailContent({
                     </p>
                   ) : (
                     <p className="text-sm text-muted-foreground">
-                      The seller is open to a book swap — ask them what they&apos;re looking for.
+                      The seller is open to a book swap - ask them what they are looking for.
                     </p>
                   )}
                 </div>
-              )}
-
+              ) : null}
             </div>
           </CardContent>
         </Card>
 
-        {/* Right column — contact + manage */}
         <aside className="space-y-4">
           <Card className="border-border/70">
             <CardContent className="space-y-4 p-6">
               <div className="space-y-1">
                 <h2 className="text-lg font-semibold tracking-tight">Contact seller</h2>
                 <p className="text-sm leading-6 text-muted-foreground">
-                  Reach out directly to ask a question or arrange a handoff.
+                  Acadex keeps contact inside the app. Send a request to buy to open a text-only conversation for sorting out pickup, payment, or trade details.
                 </p>
               </div>
 
@@ -244,7 +228,7 @@ async function ListingDetailContent({
                 {listing.seller?.username ? (
                   <Link
                     href={`/profile/${listing.seller.username}`}
-                    className="font-medium underline underline-offset-2 hover:text-foreground transition-colors"
+                    className="font-medium underline underline-offset-2 transition-colors hover:text-foreground"
                   >
                     {sellerName}
                   </Link>
@@ -257,30 +241,38 @@ async function ListingDetailContent({
                 {listing.seller?.university ? (
                   <p className="text-muted-foreground">{listing.seller.university}</p>
                 ) : null}
-                {listing.seller?.email ? (
-                  <p className="break-all text-muted-foreground">{listing.seller.email}</p>
-                ) : null}
               </div>
 
               <div className="flex flex-col gap-3">
-                {/* Request to buy — only shown to logged-in non-owners on available listings */}
                 {user && !isOwner && listing.status === "available" ? (
                   <RequestToBuyButton
+                    conversationId={existingTransaction?.conversation_id}
                     listingId={listing.id}
                     hasPendingTransaction={!!existingTransaction}
                   />
                 ) : null}
 
-                {contactHref ? (
-                  <a
-                    className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium text-center transition-colors hover:bg-accent hover:text-accent-foreground"
-                    href={contactHref}
+                {existingTransaction?.conversation_id ? (
+                  <Link
+                    className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
+                    href={`/messages/${existingTransaction.conversation_id}`}
                   >
-                    Contact seller
-                  </a>
+                    Open conversation
+                  </Link>
+                ) : user && !isOwner ? (
+                  <p className="text-sm text-muted-foreground">
+                    Messaging opens once you send a request to buy.
+                  </p>
+                ) : !user ? (
+                  <p className="text-sm text-muted-foreground">
+                    Sign in to start a conversation through Acadex.
+                  </p>
                 ) : (
-                  <p className="text-sm text-muted-foreground">Seller contact details are not available.</p>
+                  <p className="text-sm text-muted-foreground">
+                    Seller contact stays private unless they choose to share it in chat.
+                  </p>
                 )}
+
                 <Link
                   className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
                   href="/home"
@@ -314,9 +306,7 @@ async function ListingDetailContent({
             </Card>
           ) : null}
         </aside>
-
       </div>
-
     </section>
   );
 }

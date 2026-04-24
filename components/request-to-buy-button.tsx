@@ -1,17 +1,25 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 type RequestToBuyButtonProps = {
   listingId: string;
-  // If the viewer already has a pending transaction we show a different state
   hasPendingTransaction: boolean;
+  conversationId?: string | null;
 };
 
-export function RequestToBuyButton({ listingId, hasPendingTransaction }: RequestToBuyButtonProps) {
+export function RequestToBuyButton({
+  listingId,
+  hasPendingTransaction,
+  conversationId,
+}: RequestToBuyButtonProps) {
   const router = useRouter();
   const [isPending, setIsPending] = useState(hasPendingTransaction);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(
+    conversationId ?? null,
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,8 +42,8 @@ export function RequestToBuyButton({ listingId, hasPendingTransaction }: Request
     }
 
     setIsPending(true);
+    setActiveConversationId(json.conversationId ?? null);
     setIsLoading(false);
-    // Refresh the page so the listing status badge updates
     router.refresh();
   }
 
@@ -46,8 +54,16 @@ export function RequestToBuyButton({ listingId, hasPendingTransaction }: Request
           Request sent
         </div>
         <p className="text-xs text-muted-foreground text-center">
-          The seller has been notified. Check your transaction history for updates.
+          The seller has been notified. You can continue in the conversation thread.
         </p>
+        {activeConversationId ? (
+          <Link
+            className="inline-flex h-10 w-full items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
+            href={`/messages/${activeConversationId}`}
+          >
+            Open conversation
+          </Link>
+        ) : null}
       </div>
     );
   }

@@ -48,7 +48,7 @@ function statusBadgeClass(status: string) {
 }
 
 export function ListingCard({ listing, viewerId, viewerRole, isSaved = false }: ListingCardProps) {
-  const sellerName = getProfileDisplayName(listing.seller, listing.seller?.email);
+  const sellerName = getProfileDisplayName(listing.seller);
   const isOwner =
     viewerRole === "admin" || (!!viewerId && viewerId === listing.seller?.id);
 

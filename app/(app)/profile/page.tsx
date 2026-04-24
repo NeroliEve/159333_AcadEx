@@ -1,25 +1,24 @@
-import { Suspense } from "react";
-import { redirect } from "next/navigation";
 import Link from "next/link";
-
-import {
-  getMyListings,
-  getMyTransactions,
-  getReviewForTransaction,
-  getSavedListings,
-  getUniversityOptions,
-  getViewerContext,
-  formatPrice,
-  formatListingCondition,
-  type ReviewData,
-  type TransactionData,
-} from "@/lib/marketplace";
+import { redirect } from "next/navigation";
+import { Suspense } from "react";
 
 import { AccountSecurityForm } from "@/components/account-security-form";
 import { EditProfileForm } from "@/components/edit-profile-form";
 import { ListingCard } from "@/components/listing-card";
 import { ReviewForm } from "@/components/review-form";
 import { TransactionActions } from "@/components/transaction-actions";
+import {
+  formatListingCondition,
+  formatPrice,
+  getMyListings,
+  getMyTransactions,
+  getReviewForTransaction,
+  getSavedListings,
+  getUniversityOptions,
+  getViewerContext,
+  type ReviewData,
+  type TransactionData,
+} from "@/lib/marketplace";
 
 async function ProfileContent() {
   const { user, profile } = await getViewerContext();
@@ -33,7 +32,6 @@ async function ProfileContent() {
     getSavedListings(user.id),
   ]);
 
-  // For each completed transaction fetch whether the viewer already reviewed it
   const completedTxIds = [...transactions.buying, ...transactions.selling]
     .filter((tx) => tx.status === "completed")
     .map((tx) => tx.id);
@@ -57,7 +55,6 @@ async function ProfileContent() {
         </h1>
       </div>
 
-      {/* key forces a full remount when user changes so defaultValue re-initialises */}
       <EditProfileForm key={profile?.id} profile={profile} universities={universities} />
       <AccountSecurityForm email={user.email ?? profile?.email ?? ""} />
 
@@ -89,7 +86,6 @@ async function ProfileContent() {
         )}
       </div>
 
-      {/* Saved listings */}
       <div className="space-y-6">
         <div className="space-y-2">
           <h2 className="text-2xl font-semibold tracking-tight">Saved listings</h2>
@@ -107,17 +103,16 @@ async function ProfileContent() {
             {savedListings.map((listing) => (
               <ListingCard
                 key={listing.id}
+                isSaved
                 listing={listing}
                 viewerId={profile?.id}
                 viewerRole={profile?.role}
-                isSaved
               />
             ))}
           </div>
         )}
       </div>
 
-      {/* Transaction history */}
       <div className="space-y-6">
         <div className="space-y-2">
           <h2 className="text-2xl font-semibold tracking-tight">Transaction history</h2>
@@ -126,7 +121,6 @@ async function ProfileContent() {
           </p>
         </div>
 
-        {/* Buying */}
         <div className="space-y-4">
           <h3 className="text-base font-semibold tracking-tight">Buying</h3>
           {transactions.buying.length === 0 ? (
@@ -134,13 +128,17 @@ async function ProfileContent() {
           ) : (
             <div className="space-y-3">
               {transactions.buying.map((tx) => (
-                <TransactionRow key={tx.id} transaction={tx} viewerId={user.id} existingReview={reviewMap.get(tx.id) ?? null} />
+                <TransactionRow
+                  key={tx.id}
+                  existingReview={reviewMap.get(tx.id) ?? null}
+                  transaction={tx}
+                  viewerId={user.id}
+                />
               ))}
             </div>
           )}
         </div>
 
-        {/* Selling */}
         <div className="space-y-4">
           <h3 className="text-base font-semibold tracking-tight">Selling</h3>
           {transactions.selling.length === 0 ? (
@@ -148,7 +146,12 @@ async function ProfileContent() {
           ) : (
             <div className="space-y-3">
               {transactions.selling.map((tx) => (
-                <TransactionRow key={tx.id} transaction={tx} viewerId={user.id} existingReview={reviewMap.get(tx.id) ?? null} />
+                <TransactionRow
+                  key={tx.id}
+                  existingReview={reviewMap.get(tx.id) ?? null}
+                  transaction={tx}
+                  viewerId={user.id}
+                />
               ))}
             </div>
           )}
@@ -160,10 +163,14 @@ async function ProfileContent() {
 
 function transactionStatusBadge(status: TransactionData["status"]) {
   switch (status) {
-    case "completed":  return "bg-green-100 text-green-800";
-    case "cancelled":  return "bg-red-100 text-red-800";
-    case "mismatch":   return "bg-orange-100 text-orange-800";
-    default:           return "bg-yellow-100 text-yellow-800"; // pending
+    case "completed":
+      return "bg-green-100 text-green-800";
+    case "cancelled":
+      return "bg-red-100 text-red-800";
+    case "mismatch":
+      return "bg-orange-100 text-orange-800";
+    default:
+      return "bg-yellow-100 text-yellow-800";
   }
 }
 
@@ -183,10 +190,9 @@ function TransactionRow({
     : "Unknown";
 
   return (
-    <div className="rounded-xl border border-border/70 bg-card p-5 space-y-3">
+    <div className="space-y-3 rounded-xl border border-border/70 bg-card p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-start gap-4">
-          {/* Listing thumbnail */}
           <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border/70 bg-secondary">
             {tx.listing?.primary_image_url ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -203,7 +209,7 @@ function TransactionRow({
           <div className="space-y-1">
             <Link
               href={`/listings/${tx.listing_id}`}
-              className="text-sm font-semibold leading-tight underline underline-offset-2 hover:text-foreground transition-colors"
+              className="text-sm font-semibold leading-tight underline underline-offset-2 transition-colors hover:text-foreground"
             >
               {tx.listing?.title ?? "Listing"}
             </Link>
@@ -227,29 +233,40 @@ function TransactionRow({
           </p>
           <p className="text-xs text-muted-foreground">
             {new Date(tx.created_at).toLocaleDateString("en-NZ", {
-              day: "numeric", month: "short", year: "numeric",
+              day: "numeric",
+              month: "short",
+              year: "numeric",
             })}
           </p>
         </div>
       </div>
 
-      {/* Action buttons — only shown while the transaction is still pending */}
       {tx.status === "pending" ? (
         <TransactionActions
           transactionId={tx.id}
-          isSeller={isSeller}
           isAccepted={!!tx.reservation_confirmed_at}
+          isSeller={isSeller}
         />
       ) : null}
 
-      {/* Review form — only shown once the transaction is completed */}
+      {tx.conversation_id ? (
+        <div className="flex">
+          <Link
+            href={`/messages/${tx.conversation_id}`}
+            className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
+          >
+            Open conversation
+          </Link>
+        </div>
+      ) : null}
+
       {tx.status === "completed" && otherParty ? (
         <div className="border-t border-border/70 pt-3">
           <ReviewForm
-            transactionId={tx.id}
+            existingReview={existingReview}
             revieweeId={otherParty.id}
             reviewerRole={isSeller ? "seller" : "buyer"}
-            existingReview={existingReview}
+            transactionId={tx.id}
           />
         </div>
       ) : null}

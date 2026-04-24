@@ -104,7 +104,7 @@ const LISTING_CARD_SELECT = `
   primary_image_url,
   created_at,
   course:courses!listings_course_id_fkey(id, course_code, course_name, university, university_id),
-  seller:profiles!listings_seller_id_fkey(id, avatar_url, email, first_name, is_verified, last_name, university, university_id, username),
+  seller:profiles!listings_seller_id_fkey(id, avatar_url, first_name, is_verified, last_name, university, university_id, username),
   study_area:study_areas!listings_study_area_id_fkey(id, name, slug)
 `;
 
@@ -453,6 +453,7 @@ export async function getUniversityOptions(
 export type TransactionData = {
   id: string;
   listing_id: string;
+  conversation_id: string | null;
   buyer_id: string;
   seller_id: string;
   agreed_price: number | null;
@@ -470,7 +471,7 @@ export type TransactionData = {
 };
 
 const TRANSACTION_SELECT = `
-  id, listing_id, buyer_id, seller_id, agreed_price, agreed_trade_text,
+  id, listing_id, conversation_id, buyer_id, seller_id, agreed_price, agreed_trade_text,
   status, seller_confirmed_completed, reservation_confirmed_at,
   completed_at, cancelled_at, created_at, updated_at,
   listing:listings!transactions_listing_id_fkey(id, title, primary_image_url, price, condition),

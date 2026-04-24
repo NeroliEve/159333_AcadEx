@@ -73,6 +73,13 @@ export function UserMenu({ avatarUrl, email, name }: UserMenuProps) {
 
           <div className="grid gap-1 pt-2">
             <Link
+              href="/messages"
+              className="rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+              onClick={() => setIsOpen(false)}
+            >
+              Messages
+            </Link>
+            <Link
               href="/profile"
               className="rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
               onClick={() => setIsOpen(false)}
