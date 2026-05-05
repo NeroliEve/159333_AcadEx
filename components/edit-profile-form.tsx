@@ -31,7 +31,6 @@ export function EditProfileForm({
   const pathname = usePathname();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isAdminEnabled, setIsAdminEnabled] = useState(profile?.role === "admin");
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState(profile?.avatar_url ?? "");
   const [selectedAvatarFile, setSelectedAvatarFile] = useState<File | null>(null);
   const [message, setMessage] = useState<{
@@ -130,14 +129,10 @@ export function EditProfileForm({
   }, []);
 
   useEffect(() => {
-    if (pathname !== "/profile") {
+    if (pathname !== "/profile/edit") {
       setMessage(null);
     }
   }, [pathname]);
-
-  useEffect(() => {
-    setIsAdminEnabled(profile?.role === "admin");
-  }, [profile?.role]);
 
   useEffect(() => {
     setAvatarPreviewUrl(profile?.avatar_url ?? "");
@@ -248,7 +243,6 @@ export function EditProfileForm({
           username: formData.get("username"),
           universityId: formData.get("universityId"),
           bio: formData.get("bio"),
-          role: formData.get("isAdmin") === "on" ? "admin" : "user",
         }),
       });
 
@@ -415,35 +409,6 @@ export function EditProfileForm({
                 defaultValue={profile?.bio ?? ""}
                 className="h-32 resize-none"
               />
-            </div>
-
-            <div className="grid gap-3 md:col-span-2">
-              <div className="rounded-xl border border-border/70 bg-secondary/35 p-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="space-y-1">
-                    <Label htmlFor="isAdmin">Admin testing access</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Turn this on to give your current signed-in account admin
-                      permissions across the app in this testing environment.
-                    </p>
-                  </div>
-
-                  <label
-                    htmlFor="isAdmin"
-                    className="flex items-center gap-3 rounded-full border border-border/70 bg-background px-3 py-2 text-sm font-medium"
-                  >
-                    <input
-                      id="isAdmin"
-                      name="isAdmin"
-                      type="checkbox"
-                      className="h-4 w-4 accent-foreground"
-                      checked={isAdminEnabled}
-                      onChange={(event) => setIsAdminEnabled(event.target.checked)}
-                    />
-                    <span>{isAdminEnabled ? "Admin privileges enabled" : "Admin privileges disabled"}</span>
-                  </label>
-                </div>
-              </div>
             </div>
           </div>
 

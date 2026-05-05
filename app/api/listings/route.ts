@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { getMarketplaceSuspendedResponse, getViewerAccessContext } from "@/lib/admin";
 import type { ListingInsert } from "@/lib/marketplace";
-import { createClient } from "@/lib/supabase/server";
 import { hasEnvVars } from "@/lib/utils";
 
 type FieldName =
@@ -106,20 +106,23 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const { profile: viewerProfile, supabase, userId } = await getViewerAccessContext();
 
-    if (!user) {
+    if (!userId) {
       return NextResponse.json<CreateListingResponse>(
         { message: "You need to sign in before creating a listing.", status: "error" },
         { status: 401 },
       );
     }
 
+    if (viewerProfile?.account_status === "suspended") {
+      return getMarketplaceSuspendedResponse("create listings");
+    }
+
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .maybeSingle();
 
     if (profileError || !profile) {
@@ -131,7 +134,7 @@ export async function POST(request: Request) {
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const expectedImagePrefix = supabaseUrl
-      ? `${supabaseUrl}/storage/v1/object/public/listing-images/${user.id}/`
+      ? `${supabaseUrl}/storage/v1/object/public/listing-images/${userId}/`
       : null;
 
     if (
@@ -175,7 +178,7 @@ export async function POST(request: Request) {
       price,
       primary_image_url: imageUrls[0] ?? null,
       publisher:        publisher || null,
-      seller_id:        user.id,
+      seller_id:        userId,
       study_area_id:    studyAreaId,
       title,
       // only store wanted_trade_text when the listing type involves trading

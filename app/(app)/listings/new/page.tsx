@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { isMarketplaceSuspended } from "@/lib/admin";
 import { CreateListingForm } from "@/components/create-listing-form";
 import { EmptyState } from "@/components/empty-state";
 import { PillButton } from "@/components/ui/pill-button";
@@ -42,6 +43,18 @@ async function CreateListingPageContent() {
           </PillButton>
         </div>
       </section>
+    );
+  }
+
+  if (isMarketplaceSuspended(profile)) {
+    return (
+      <EmptyState
+        actionHref="/home"
+        actionLabel="Back to home"
+        description="Your account is currently suspended from marketplace activity, so new listings cannot be created."
+        eyebrow="Create listing"
+        title="Listing creation is disabled"
+      />
     );
   }
 

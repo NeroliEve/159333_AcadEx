@@ -12,6 +12,7 @@ import type {
 
 type ProfileSummary = Pick<
   TableRow<"profiles">,
+  | "account_status"
   | "avatar_url"
   | "bio"
   | "id"
@@ -20,6 +21,7 @@ type ProfileSummary = Pick<
   | "is_verified"
   | "last_name"
   | "role"
+  | "suspended_at"
   | "university"
   | "university_id"
   | "username"
@@ -201,7 +203,7 @@ export async function getViewerContext(): Promise<{
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "avatar_url, bio, id, email, first_name, is_verified, last_name, role, university, university_id, username",
+      "account_status, avatar_url, bio, id, email, first_name, is_verified, last_name, role, suspended_at, university, university_id, username",
     )
     .eq("id", user.id)
     .maybeSingle();
@@ -364,7 +366,7 @@ export async function getPublicProfile(username: string): Promise<{
   const { data: profileData, error: profileError } = await supabase
     .from("profiles")
     .select(
-      "avatar_url, bio, id, email, first_name, is_verified, last_name, role, university, university_id, username",
+      "account_status, avatar_url, bio, id, email, first_name, is_verified, last_name, role, suspended_at, university, university_id, username",
     )
     .eq("username", username)
     .maybeSingle();

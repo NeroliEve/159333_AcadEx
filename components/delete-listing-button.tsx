@@ -11,7 +11,12 @@ export function DeleteListingButton({ listingId }: { listingId: string }) {
     if (!confirm("Are you sure you want to delete this listing?")) return;
     setIsDeleting(true);
     try {
-      await fetch(`/api/listings/${listingId}`, { method: "DELETE" });
+      const response = await fetch(`/api/listings/${listingId}`, { method: "DELETE" });
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => ({}))) as { message?: string };
+        window.alert(payload.message ?? "Could not delete this listing.");
+        return;
+      }
       router.refresh();
     } finally {
       setIsDeleting(false);

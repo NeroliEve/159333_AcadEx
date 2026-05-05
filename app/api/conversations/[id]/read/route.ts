@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 
-import { createClient } from "@/lib/supabase/server";
+import {
+  getMarketplaceSuspendedResponse,
+  getViewerAccessContext,
+} from "@/lib/admin";
 
 type ReadRouteContext = {
   params: Promise<{ id: string }>;
@@ -10,16 +13,17 @@ export async function POST(
   _request: Request,
   context: ReadRouteContext,
 ) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { profile, supabase, userId } = await getViewerAccessContext();
 
-  if (!user) {
+  if (!userId) {
     return NextResponse.json(
       { error: "You must be logged in to update read status." },
       { status: 401 },
     );
+  }
+
+  if (profile?.account_status === "suspended") {
+    return getMarketplaceSuspendedResponse("read messages");
   }
 
   const { id } = await context.params;
@@ -41,7 +45,7 @@ export async function POST(
     .update({ is_read: true })
     .eq("conversation_id", id)
     .eq("is_read", false)
-    .neq("sender_id", user.id)
+    .neq("sender_id", userId)
     .select("id");
 
   if (error) {

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
+import { isMarketplaceSuspended } from "@/lib/admin";
 import { EditListingForm } from "@/components/edit-listing-form";
 import { EmptyState } from "@/components/empty-state";
 import {
@@ -20,6 +21,18 @@ async function EditListingPageContent({
   const { user, profile } = await getViewerContext();
 
   if (!user) redirect("/auth/login");
+
+  if (isMarketplaceSuspended(profile)) {
+    return (
+      <EmptyState
+        actionHref="/home"
+        actionLabel="Back to home"
+        description="Your account is currently suspended from marketplace activity, so listings cannot be edited."
+        eyebrow="Edit listing"
+        title="Listing editing is disabled"
+      />
+    );
+  }
 
   const [{ listing, error }, courses, studyAreas] = await Promise.all([
     getListingById(id),

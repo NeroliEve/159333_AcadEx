@@ -317,6 +317,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          account_status: Database["public"]["Enums"]["profile_account_status"]
           avatar_url: string | null
           bio: string | null
           created_at: string
@@ -326,12 +327,15 @@ export type Database = {
           is_verified: boolean
           last_name: string
           role: Database["public"]["Enums"]["profile_role"]
+          suspended_at: string | null
+          suspended_by: string | null
           university: string | null
           university_id: number | null
           updated_at: string
           username: string
         }
         Insert: {
+          account_status?: Database["public"]["Enums"]["profile_account_status"]
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
@@ -341,12 +345,15 @@ export type Database = {
           is_verified?: boolean
           last_name: string
           role?: Database["public"]["Enums"]["profile_role"]
+          suspended_at?: string | null
+          suspended_by?: string | null
           university?: string | null
           university_id?: number | null
           updated_at?: string
           username: string
         }
         Update: {
+          account_status?: Database["public"]["Enums"]["profile_account_status"]
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
@@ -356,12 +363,21 @@ export type Database = {
           is_verified?: boolean
           last_name?: string
           role?: Database["public"]["Enums"]["profile_role"]
+          suspended_at?: string | null
+          suspended_by?: string | null
           university?: string | null
           university_id?: number | null
           updated_at?: string
           username?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "profiles_suspended_by_fkey"
+            columns: ["suspended_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "profiles_university_id_fkey"
             columns: ["university_id"]
@@ -766,6 +782,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      is_active_admin: {
+        Args: never
+        Returns: boolean
+      }
       is_admin: {
         Args: never
         Returns: boolean
@@ -775,6 +795,7 @@ export type Database = {
       listing_condition: "new" | "like_new" | "good" | "fair" | "poor"
       listing_status: "available" | "pending" | "sold" | "archived"
       listing_type: "sale_only" | "trade_only" | "sale_or_trade"
+      profile_account_status: "active" | "suspended"
       profile_role: "user" | "admin"
       report_status: "pending" | "reviewed" | "resolved" | "dismissed"
       report_type: "user" | "listing" | "conversation" | "message"
@@ -910,6 +931,7 @@ export const Constants = {
       listing_condition: ["new", "like_new", "good", "fair", "poor"],
       listing_status: ["available", "pending", "sold", "archived"],
       listing_type: ["sale_only", "trade_only", "sale_or_trade"],
+      profile_account_status: ["active", "suspended"],
       profile_role: ["user", "admin"],
       report_status: ["pending", "reviewed", "resolved", "dismissed"],
       report_type: ["user", "listing", "conversation", "message"],

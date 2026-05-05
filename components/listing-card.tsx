@@ -16,6 +16,7 @@ import {
 type ListingCardProps = {
   listing: ListingCardData;
   viewerId?: string;
+  viewerAccountStatus?: "active" | "suspended";
   viewerRole?: string;
   isSaved?: boolean;
 };
@@ -47,10 +48,18 @@ function statusBadgeClass(status: string) {
   }
 }
 
-export function ListingCard({ listing, viewerId, viewerRole, isSaved = false }: ListingCardProps) {
+export function ListingCard({
+  listing,
+  viewerId,
+  viewerAccountStatus = "active",
+  viewerRole,
+  isSaved = false,
+}: ListingCardProps) {
   const sellerName = getProfileDisplayName(listing.seller);
+  const canUseMarketplace = viewerAccountStatus !== "suspended";
   const isOwner =
-    viewerRole === "admin" || (!!viewerId && viewerId === listing.seller?.id);
+    canUseMarketplace &&
+    (viewerRole === "admin" || (!!viewerId && viewerId === listing.seller?.id));
 
   return (
     <Card className="relative overflow-visible border-border/70 transition-all duration-200 hover:-translate-y-0.5 hover:scale-[1.01] hover:shadow-lg">
@@ -72,7 +81,7 @@ export function ListingCard({ listing, viewerId, viewerRole, isSaved = false }: 
                 currentStatus={listing.status}
               />
             </div>
-          ) : viewerId ? (
+          ) : viewerId && canUseMarketplace ? (
             <div className="absolute right-3 top-3 z-10">
               <SaveButton listingId={listing.id} initialSaved={isSaved} />
             </div>

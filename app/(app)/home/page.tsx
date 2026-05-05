@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 
+import { isMarketplaceSuspended } from "@/lib/admin";
 import { EmptyState } from "@/components/empty-state";
 import { ListingCard } from "@/components/listing-card";
 import { SearchFilterBar } from "@/components/search-filter-bar";
@@ -31,8 +32,11 @@ async function HomeContent({ filters }: HomeContentProps) {
     user ? getSavedListingIds(user.id) : Promise.resolve([]),
   ]);
 
-  const createHref = user ? "/listings/new" : "/auth/login";
-  const createLabel = user ? "Create listing" : "Sign in to create";
+  const isSuspended = isMarketplaceSuspended(profile);
+  const createHref = user ? (isSuspended ? "/home" : "/listings/new") : "/auth/login";
+  const createLabel = user
+    ? (isSuspended ? "Marketplace suspended" : "Create listing")
+    : "Sign in to create";
 
   return (
     <>
@@ -100,6 +104,7 @@ async function HomeContent({ filters }: HomeContentProps) {
               <ListingCard
                 key={listing.id}
                 listing={listing}
+                viewerAccountStatus={profile?.account_status}
                 viewerId={profile?.id}
                 viewerRole={profile?.role}
                 isSaved={savedIds.includes(listing.id)}

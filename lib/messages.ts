@@ -158,6 +158,30 @@ export async function getMyConversationSummaries(
   );
 }
 
+export async function getUnreadMessageCount(
+  viewerId: string,
+): Promise<number> {
+  if (!hasEnvVars) return 0;
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("conversations")
+    .select("id")
+    .or(`buyer_id.eq.${viewerId},seller_id.eq.${viewerId}`);
+
+  if (error || !data || data.length === 0) return 0;
+
+  const conversationIds = data.map((conversation) => conversation.id);
+  const { count } = await supabase
+    .from("messages")
+    .select("id", { count: "exact", head: true })
+    .in("conversation_id", conversationIds)
+    .eq("is_read", false)
+    .neq("sender_id", viewerId);
+
+  return count ?? 0;
+}
+
 export async function getConversationDetail(
   conversationId: string,
   viewerId: string,

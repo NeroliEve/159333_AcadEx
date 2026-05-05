@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+
+import {
+  getMarketplaceSuspendedResponse,
+  getViewerAccessContext,
+} from "@/lib/admin";
 
 type UpdateListingResponse = {
   fieldErrors?: Partial<Record<FieldName, string>>;
@@ -44,23 +48,18 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const { profile: viewerProfile, supabase, userId } = await getViewerAccessContext();
 
-    if (!user) {
+    if (!userId) {
       return NextResponse.json<UpdateListingResponse>(
         { message: "You need to sign in to edit a listing.", status: "error" },
         { status: 401 },
       );
     }
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .maybeSingle();
+    if (viewerProfile?.account_status === "suspended") {
+      return getMarketplaceSuspendedResponse("edit listings");
+    }
 
     const { data: listing } = await supabase
       .from("listings")
@@ -75,8 +74,8 @@ export async function PATCH(
       );
     }
 
-    const isOwner = listing.seller_id === user.id;
-    const isAdmin = profile?.role === "admin";
+    const isOwner = listing.seller_id === userId;
+    const isAdmin = viewerProfile?.role === "admin";
 
     if (!isOwner && !isAdmin) {
       return NextResponse.json<UpdateListingResponse>(
@@ -159,8 +158,8 @@ export async function PATCH(
     const expectedImagePrefixes = supabaseUrl
       ? [
           `${supabaseUrl}/storage/v1/object/public/listing-images/${listing.seller_id}/`,
-          ...(isAdmin && user.id !== listing.seller_id
-            ? [`${supabaseUrl}/storage/v1/object/public/listing-images/${user.id}/`]
+          ...(isAdmin && userId !== listing.seller_id
+            ? [`${supabaseUrl}/storage/v1/object/public/listing-images/${userId}/`]
             : []),
         ]
       : [];
@@ -279,23 +278,18 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const { profile: viewerProfile, supabase, userId } = await getViewerAccessContext();
 
-    if (!user) {
+    if (!userId) {
       return NextResponse.json(
         { message: "You need to sign in to delete a listing.", status: "error" },
         { status: 401 },
       );
     }
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .maybeSingle();
+    if (viewerProfile?.account_status === "suspended") {
+      return getMarketplaceSuspendedResponse("delete listings");
+    }
 
     const { data: listing } = await supabase
       .from("listings")
@@ -310,8 +304,8 @@ export async function DELETE(
       );
     }
 
-    const isOwner = listing.seller_id === user.id;
-    const isAdmin = profile?.role === "admin";
+    const isOwner = listing.seller_id === userId;
+    const isAdmin = viewerProfile?.role === "admin";
 
     if (!isOwner && !isAdmin) {
       return NextResponse.json(

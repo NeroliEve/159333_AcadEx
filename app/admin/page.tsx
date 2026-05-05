@@ -1,25 +1,26 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 
-import { AdminDashboard } from "@/components/admin-dashboard";
+import { AdminModerationPanel } from "@/components/admin-moderation-panel";
+import { getAdminContext, getAdminWorkspaceData } from "@/lib/admin";
 import {
   getAdminCourses,
   getUniversityOptions,
-  getViewerContext,
 } from "@/lib/marketplace";
 
 async function AdminContent() {
-  const { profile, user } = await getViewerContext();
+  const { isAdmin, supabase, userId } = await getAdminContext();
 
-  if (!user) {
+  if (!userId) {
     redirect("/auth/login");
   }
 
-  if (profile?.role !== "admin") {
+  if (!isAdmin) {
     redirect("/home");
   }
 
-  const [courses, universities] = await Promise.all([
+  const [workspace, courses, universities] = await Promise.all([
+    getAdminWorkspaceData(supabase),
     getAdminCourses(),
     getUniversityOptions(true),
   ]);
@@ -32,16 +33,25 @@ async function AdminContent() {
         </p>
         <div className="space-y-2">
           <h1 className="text-3xl font-semibold tracking-tight">
-            Admin dashboard
+            Admin moderation
           </h1>
           <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-            Manage the shared university list and the global course catalog used
-            throughout the marketplace.
+            Oversee listings, users, verification, reports, support tickets,
+            audit history, and the shared catalog.
           </p>
         </div>
       </div>
 
-      <AdminDashboard courses={courses} universities={universities} />
+      <AdminModerationPanel
+        auditLogs={workspace.auditLogs}
+        courses={courses}
+        listings={workspace.listings}
+        overview={workspace.overview}
+        reports={workspace.reports}
+        supportTickets={workspace.supportTickets}
+        universities={universities}
+        users={workspace.users}
+      />
     </section>
   );
 }

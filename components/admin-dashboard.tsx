@@ -41,6 +41,8 @@ type EditableUniversity = {
   slug: string;
 };
 
+type CatalogSection = "courses" | "universities";
+
 export function AdminDashboard({
   courses: initialCourses,
   universities: initialUniversities,
@@ -73,6 +75,9 @@ export function AdminDashboard({
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isToastVisible, setIsToastVisible] = useState(false);
+  const [catalogSection, setCatalogSection] = useState<CatalogSection>("universities");
+  const [courseQuery, setCourseQuery] = useState("");
+  const [universityQuery, setUniversityQuery] = useState("");
   const toastTimeoutRef = useRef<number | null>(null);
   const toastTransitionTimeoutRef = useRef<number | null>(null);
 
@@ -80,6 +85,34 @@ export function AdminDashboard({
     () => [...universities].sort((a, b) => a.name.localeCompare(b.name)),
     [universities],
   );
+  const sortedCourses = useMemo(
+    () => [...courses].sort((a, b) => a.course_code.localeCompare(b.course_code)),
+    [courses],
+  );
+  const filteredUniversities = useMemo(() => {
+    const query = universityQuery.trim().toLowerCase();
+
+    return sortedUniversities.filter((university) =>
+      query
+        ? [university.name, university.slug].join(" ").toLowerCase().includes(query)
+        : true,
+    );
+  }, [sortedUniversities, universityQuery]);
+  const filteredCourses = useMemo(() => {
+    const query = courseQuery.trim().toLowerCase();
+
+    return sortedCourses.filter((course) => {
+      const universityName =
+        sortedUniversities.find((university) => university.id === course.university_id)?.name ?? "";
+
+      return query
+        ? [course.course_code, course.course_name, universityName]
+            .join(" ")
+            .toLowerCase()
+            .includes(query)
+        : true;
+    });
+  }, [courseQuery, sortedCourses, sortedUniversities]);
 
   useEffect(() => {
     if (!toastMessage) {
@@ -403,259 +436,358 @@ export function AdminDashboard({
       ) : null}
 
       <div className="grid gap-8">
-      <Card className="border-border/70">
-        <CardHeader>
-          <CardTitle>University management</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {universityState?.status === "error" ? (
-            <div
-              className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive"
-            >
-              {universityState.message}
+        <Card className="border-border/70">
+          <CardContent className="space-y-6 p-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="space-y-1">
+                <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">
+                  Catalog library
+                </p>
+                <h2 className="text-2xl font-semibold tracking-tight">Managed courses and universities</h2>
+                <p className="text-sm text-muted-foreground">
+                  Browse, search, create, and update the academic catalog without scrolling through long forms.
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border border-border/70 bg-secondary/30 px-4 py-3 text-sm">
+                  <p className="font-medium">{sortedUniversities.length} universities</p>
+                  <p className="text-muted-foreground">{filteredUniversities.length} currently shown</p>
+                </div>
+                <div className="rounded-xl border border-border/70 bg-secondary/30 px-4 py-3 text-sm">
+                  <p className="font-medium">{sortedCourses.length} courses</p>
+                  <p className="text-muted-foreground">{filteredCourses.length} currently shown</p>
+                </div>
+              </div>
             </div>
-          ) : null}
 
-          <form onSubmit={createUniversity} className="grid gap-4 md:grid-cols-[1fr_auto]">
-            <div className="grid gap-2">
-              <Label htmlFor="newUniversityName">Add university</Label>
-              <Input
-                id="newUniversityName"
-                value={universityDraft}
-                onChange={(event) => setUniversityDraft(event.target.value)}
-                placeholder="University of Auckland"
-                required
-              />
-            </div>
-            <PillButton
-              type="submit"
-              className="self-end"
-              disabled={pendingKey === "create-university"}
-            >
-              {pendingKey === "create-university" ? "Adding..." : "Add university"}
-            </PillButton>
-          </form>
-
-          <div className="grid gap-4">
-            {sortedUniversities.map((university) => (
-              <div
-                key={university.id}
-                className="grid gap-4 rounded-xl border border-border/70 p-4 md:grid-cols-[1fr_auto_auto]"
+            <div className="flex flex-wrap gap-2">
+              <PillButton
+                type="button"
+                variant={catalogSection === "universities" ? "primary" : "secondary"}
+                onClick={() => setCatalogSection("universities")}
               >
-                <div className="grid gap-2">
-                  <Label htmlFor={`university-${university.id}`}>Name</Label>
+                Universities
+              </PillButton>
+              <PillButton
+                type="button"
+                variant={catalogSection === "courses" ? "primary" : "secondary"}
+                onClick={() => setCatalogSection("courses")}
+              >
+                Courses
+              </PillButton>
+            </div>
+          </CardContent>
+        </Card>
+
+        {catalogSection === "universities" ? (
+          <Card className="border-border/70">
+            <CardHeader>
+              <CardTitle>Universities</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {universityState?.status === "error" ? (
+                <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                  {universityState.message}
+                </div>
+              ) : null}
+
+              <div className="grid gap-4 xl:grid-cols-[1.1fr_1fr]">
+                <form onSubmit={createUniversity} className="grid gap-4 rounded-2xl border border-border/70 bg-secondary/15 p-5 md:grid-cols-[1fr_auto] md:items-end">
+                  <div className="grid gap-2">
+                    <Label htmlFor="newUniversityName">Add university</Label>
+                    <Input
+                      id="newUniversityName"
+                      value={universityDraft}
+                      onChange={(event) => setUniversityDraft(event.target.value)}
+                      placeholder="University of Auckland"
+                      required
+                    />
+                  </div>
+                  <PillButton
+                    type="submit"
+                    disabled={pendingKey === "create-university"}
+                  >
+                    {pendingKey === "create-university" ? "Adding..." : "Add university"}
+                  </PillButton>
+                </form>
+
+                <div className="grid gap-2 rounded-2xl border border-border/70 p-5">
+                  <Label htmlFor="university-query">Search universities</Label>
                   <Input
-                    id={`university-${university.id}`}
-                    value={university.name}
-                    onChange={(event) =>
-                      setUniversities((current) =>
-                        current.map((item) =>
-                          item.id === university.id
-                            ? { ...item, name: event.target.value }
-                            : item,
-                        ),
-                      )
-                    }
+                    id="university-query"
+                    value={universityQuery}
+                    onChange={(event) => setUniversityQuery(event.target.value)}
+                    placeholder="Name or slug"
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Slug: {university.slug}
+                  <p className="text-sm text-muted-foreground">
+                    {filteredUniversities.length} of {sortedUniversities.length} universities shown
                   </p>
                 </div>
-                <PillButton
-                  type="button"
-                  variant="secondary"
-                  className="self-end"
-                  disabled={pendingKey === `university-save-${university.id}`}
-                  onClick={() => updateUniversity(university.id)}
-                >
-                  {pendingKey === `university-save-${university.id}`
-                    ? "Saving..."
-                    : "Save"}
-                </PillButton>
-                <PillButton
-                  type="button"
-                  className="self-end"
-                  disabled={pendingKey === `university-delete-${university.id}`}
-                  onClick={() => deleteUniversity(university.id)}
-                >
-                  {pendingKey === `university-delete-${university.id}`
-                    ? "Deleting..."
-                    : "Delete"}
-                </PillButton>
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
 
-      <Card className="border-border/70">
-        <CardHeader>
-          <CardTitle>Course management</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {courseState?.status === "error" ? (
-            <div
-              className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive"
-            >
-              {courseState.message}
-            </div>
-          ) : null}
-
-          <form onSubmit={createCourse} className="grid gap-4 lg:grid-cols-[1fr_1.5fr_1.5fr_auto]">
-            <div className="grid gap-2">
-              <Label htmlFor="newCourseCode">Course code</Label>
-              <Input
-                id="newCourseCode"
-                value={courseDraft.course_code}
-                onChange={(event) =>
-                  setCourseDraft((current) => ({
-                    ...current,
-                    course_code: event.target.value,
-                  }))
-                }
-                placeholder="159333"
-                required
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="newCourseName">Course name</Label>
-              <Input
-                id="newCourseName"
-                value={courseDraft.course_name}
-                onChange={(event) =>
-                  setCourseDraft((current) => ({
-                    ...current,
-                    course_name: event.target.value,
-                  }))
-                }
-                placeholder="Cloud Application Development"
-                required
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="newCourseUniversityId">University</Label>
-              <select
-                id="newCourseUniversityId"
-                value={courseDraft.university_id}
-                onChange={(event) =>
-                  setCourseDraft((current) => ({
-                    ...current,
-                    university_id: event.target.value,
-                  }))
-                }
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                required
-              >
-                <option value="">Select a university</option>
-                {sortedUniversities.map((university) => (
-                  <option key={university.id} value={university.id}>
-                    {university.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <PillButton
-              type="submit"
-              className="self-end"
-              disabled={pendingKey === "create-course"}
-            >
-              {pendingKey === "create-course" ? "Adding..." : "Add course"}
-            </PillButton>
-          </form>
-
-          <div className="grid gap-4">
-            {courses.map((course) => (
-              <div
-                key={course.id}
-                className="grid gap-4 rounded-xl border border-border/70 p-4 lg:grid-cols-[1fr_1.5fr_1.5fr_auto_auto]"
-              >
-                <div className="grid gap-2">
-                  <Label htmlFor={`course-code-${course.id}`}>Course code</Label>
-                  <Input
-                    id={`course-code-${course.id}`}
-                    value={course.course_code}
-                    onChange={(event) =>
-                      setCourses((current) =>
-                        current.map((item) =>
-                          item.id === course.id
-                            ? { ...item, course_code: event.target.value }
-                            : item,
-                        ),
-                      )
-                    }
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor={`course-name-${course.id}`}>Course name</Label>
-                  <Input
-                    id={`course-name-${course.id}`}
-                    value={course.course_name}
-                    onChange={(event) =>
-                      setCourses((current) =>
-                        current.map((item) =>
-                          item.id === course.id
-                            ? { ...item, course_name: event.target.value }
-                            : item,
-                        ),
-                      )
-                    }
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor={`course-university-${course.id}`}>
-                    University
-                  </Label>
-                  <select
-                    id={`course-university-${course.id}`}
-                    value={course.university_id?.toString() ?? ""}
-                    onChange={(event) =>
-                      setCourses((current) =>
-                        current.map((item) =>
-                          item.id === course.id
-                            ? {
-                                ...item,
-                                university_id: event.target.value
-                                  ? Number(event.target.value)
-                                  : null,
-                              }
-                            : item,
-                        ),
-                      )
-                    }
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {filteredUniversities.map((university) => (
+                  <div
+                    key={university.id}
+                    className="grid gap-4 rounded-2xl border border-border/70 p-5"
                   >
-                    <option value="">Select a university</option>
-                    {sortedUniversities.map((university) => (
-                      <option key={university.id} value={university.id}>
-                        {university.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <PillButton
-                  type="button"
-                  variant="secondary"
-                  className="self-end"
-                  disabled={pendingKey === `course-save-${course.id}`}
-                  onClick={() => updateCourse(course.id)}
-                >
-                  {pendingKey === `course-save-${course.id}` ? "Saving..." : "Save"}
-                </PillButton>
-                <PillButton
-                  type="button"
-                  className="self-end"
-                  disabled={pendingKey === `course-delete-${course.id}`}
-                  onClick={() => deleteCourse(course.id)}
-                >
-                  {pendingKey === `course-delete-${course.id}`
-                    ? "Deleting..."
-                    : "Delete"}
-                </PillButton>
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap gap-2 text-xs">
+                        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-emerald-900">
+                          {university.is_active ? "active" : "inactive"}
+                        </span>
+                        <span className="rounded-full border border-border/70 bg-secondary/50 px-3 py-1 text-muted-foreground">
+                          slug: {university.slug}
+                        </span>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor={`university-${university.id}`}>Name</Label>
+                        <Input
+                          id={`university-${university.id}`}
+                          value={university.name}
+                          onChange={(event) =>
+                            setUniversities((current) =>
+                              current.map((item) =>
+                                item.id === university.id
+                                  ? { ...item, name: event.target.value }
+                                  : item,
+                              ),
+                            )
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <PillButton
+                        type="button"
+                        variant="secondary"
+                        disabled={pendingKey === `university-save-${university.id}`}
+                        onClick={() => updateUniversity(university.id)}
+                      >
+                        {pendingKey === `university-save-${university.id}` ? "Saving..." : "Save"}
+                      </PillButton>
+                      <PillButton
+                        type="button"
+                        disabled={pendingKey === `university-delete-${university.id}`}
+                        onClick={() => deleteUniversity(university.id)}
+                      >
+                        {pendingKey === `university-delete-${university.id}` ? "Deleting..." : "Delete"}
+                      </PillButton>
+                    </div>
+                  </div>
+                ))}
+                {filteredUniversities.length === 0 ? (
+                  <div className="rounded-2xl border border-border/70 px-5 py-6 text-sm text-muted-foreground md:col-span-2 xl:col-span-3">
+                    No universities match the current search.
+                  </div>
+                ) : null}
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {catalogSection === "courses" ? (
+          <Card className="border-border/70">
+            <CardHeader>
+              <CardTitle>Courses</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {courseState?.status === "error" ? (
+                <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                  {courseState.message}
+                </div>
+              ) : null}
+
+              <div className="grid gap-4 xl:grid-cols-[1.6fr_1fr]">
+                <form onSubmit={createCourse} className="grid gap-4 rounded-2xl border border-border/70 bg-secondary/15 p-5 lg:grid-cols-[1fr_1.5fr_1.2fr_auto] lg:items-end">
+                  <div className="grid gap-2">
+                    <Label htmlFor="newCourseCode">Course code</Label>
+                    <Input
+                      id="newCourseCode"
+                      value={courseDraft.course_code}
+                      onChange={(event) =>
+                        setCourseDraft((current) => ({
+                          ...current,
+                          course_code: event.target.value,
+                        }))
+                      }
+                      placeholder="159333"
+                      required
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="newCourseName">Course name</Label>
+                    <Input
+                      id="newCourseName"
+                      value={courseDraft.course_name}
+                      onChange={(event) =>
+                        setCourseDraft((current) => ({
+                          ...current,
+                          course_name: event.target.value,
+                        }))
+                      }
+                      placeholder="Cloud Application Development"
+                      required
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="newCourseUniversityId">University</Label>
+                    <select
+                      id="newCourseUniversityId"
+                      value={courseDraft.university_id}
+                      onChange={(event) =>
+                        setCourseDraft((current) => ({
+                          ...current,
+                          university_id: event.target.value,
+                        }))
+                      }
+                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      required
+                    >
+                      <option value="">Select a university</option>
+                      {sortedUniversities.map((university) => (
+                        <option key={university.id} value={university.id}>
+                          {university.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <PillButton
+                    type="submit"
+                    disabled={pendingKey === "create-course"}
+                  >
+                    {pendingKey === "create-course" ? "Adding..." : "Add course"}
+                  </PillButton>
+                </form>
+
+                <div className="grid gap-2 rounded-2xl border border-border/70 p-5">
+                  <Label htmlFor="course-query">Search courses</Label>
+                  <Input
+                    id="course-query"
+                    value={courseQuery}
+                    onChange={(event) => setCourseQuery(event.target.value)}
+                    placeholder="Code, name, or university"
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    {filteredCourses.length} of {sortedCourses.length} courses shown
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {filteredCourses.map((course) => {
+                  const linkedUniversity =
+                    sortedUniversities.find((university) => university.id === course.university_id)?.name ??
+                    "No university";
+
+                  return (
+                    <div
+                      key={course.id}
+                      className="grid gap-4 rounded-2xl border border-border/70 p-5"
+                    >
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap gap-2 text-xs">
+                          <span className="rounded-full border border-border/70 bg-secondary/50 px-3 py-1">
+                            {course.course_code}
+                          </span>
+                          <span className="rounded-full border border-border/70 bg-secondary/50 px-3 py-1 text-muted-foreground">
+                            {linkedUniversity}
+                          </span>
+                        </div>
+
+                        <div className="grid gap-3">
+                          <div className="grid gap-2">
+                            <Label htmlFor={`course-code-${course.id}`}>Course code</Label>
+                            <Input
+                              id={`course-code-${course.id}`}
+                              value={course.course_code}
+                              onChange={(event) =>
+                                setCourses((current) =>
+                                  current.map((item) =>
+                                    item.id === course.id
+                                      ? { ...item, course_code: event.target.value }
+                                      : item,
+                                  ),
+                                )
+                              }
+                            />
+                          </div>
+                          <div className="grid gap-2">
+                            <Label htmlFor={`course-name-${course.id}`}>Course name</Label>
+                            <Input
+                              id={`course-name-${course.id}`}
+                              value={course.course_name}
+                              onChange={(event) =>
+                                setCourses((current) =>
+                                  current.map((item) =>
+                                    item.id === course.id
+                                      ? { ...item, course_name: event.target.value }
+                                      : item,
+                                  ),
+                                )
+                              }
+                            />
+                          </div>
+                          <div className="grid gap-2">
+                            <Label htmlFor={`course-university-${course.id}`}>University</Label>
+                            <select
+                              id={`course-university-${course.id}`}
+                              value={course.university_id?.toString() ?? ""}
+                              onChange={(event) =>
+                                setCourses((current) =>
+                                  current.map((item) =>
+                                    item.id === course.id
+                                      ? {
+                                          ...item,
+                                          university_id: event.target.value ? Number(event.target.value) : null,
+                                        }
+                                      : item,
+                                  ),
+                                )
+                              }
+                              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                            >
+                              <option value="">Select a university</option>
+                              {sortedUniversities.map((university) => (
+                                <option key={university.id} value={university.id}>
+                                  {university.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <PillButton
+                          type="button"
+                          variant="secondary"
+                          disabled={pendingKey === `course-save-${course.id}`}
+                          onClick={() => updateCourse(course.id)}
+                        >
+                          {pendingKey === `course-save-${course.id}` ? "Saving..." : "Save"}
+                        </PillButton>
+                        <PillButton
+                          type="button"
+                          disabled={pendingKey === `course-delete-${course.id}`}
+                          onClick={() => deleteCourse(course.id)}
+                        >
+                          {pendingKey === `course-delete-${course.id}` ? "Deleting..." : "Delete"}
+                        </PillButton>
+                      </div>
+                    </div>
+                  );
+                })}
+                {filteredCourses.length === 0 ? (
+                  <div className="rounded-2xl border border-border/70 px-5 py-6 text-sm text-muted-foreground md:col-span-2 xl:col-span-3">
+                    No courses match the current search.
+                  </div>
+                ) : null}
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
       </div>
     </>
   );

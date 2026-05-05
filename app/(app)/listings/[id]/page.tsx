@@ -1,13 +1,13 @@
-/* eslint-disable @next/next/no-img-element */
-
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
 import { DeleteListingButton } from "@/components/delete-listing-button";
+import { ListingDetailGallery } from "@/components/listing-detail-gallery";
 import { ListingStatusButton } from "@/components/listing-status-button";
 import { RequestToBuyButton } from "@/components/request-to-buy-button";
 import { Card, CardContent } from "@/components/ui/card";
+import { isMarketplaceSuspended } from "@/lib/admin";
 import {
   formatListingCondition,
   formatPrice,
@@ -71,9 +71,10 @@ async function ListingDetailContent({
     : null;
 
   const sellerName = getProfileDisplayName(listing.seller);
+  const isSuspended = isMarketplaceSuspended(profile);
   const isOwner = user?.id === listing.seller_id;
-  const isAdmin = profile?.role === "admin";
-  const canManage = isOwner || isAdmin;
+  const isAdmin = profile?.role === "admin" && !isSuspended;
+  const canManage = !isSuspended && (isOwner || isAdmin);
   const isTrade =
     listing.listing_type === "trade_only" || listing.listing_type === "sale_or_trade";
 
@@ -113,22 +114,11 @@ async function ListingDetailContent({
       <div className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
         <Card className="overflow-hidden border-border/70">
           <CardContent className="p-0">
-            <div className="aspect-[4/3] w-full bg-muted">
-              {listing.primary_image_url ? (
-                <img
-                  alt={listing.title}
-                  className="h-full w-full object-cover"
-                  src={listing.primary_image_url}
-                />
-              ) : (
-                <div className="flex h-full items-center justify-center bg-[linear-gradient(135deg,hsl(var(--muted)),hsl(var(--secondary)))] px-6 text-center">
-                  <div>
-                    <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Acadex</p>
-                    <p className="mt-2 text-sm text-muted-foreground">No cover image added</p>
-                  </div>
-                </div>
-              )}
-            </div>
+            <ListingDetailGallery
+              images={listing.images}
+              primaryImageUrl={listing.primary_image_url}
+              title={listing.title}
+            />
 
             <div className="space-y-6 p-6">
               <div className="flex flex-wrap gap-2 text-xs">
@@ -244,7 +234,7 @@ async function ListingDetailContent({
               </div>
 
               <div className="flex flex-col gap-3">
-                {user && !isOwner && listing.status === "available" ? (
+                {user && !isOwner && !isSuspended && listing.status === "available" ? (
                   <RequestToBuyButton
                     conversationId={existingTransaction?.conversation_id}
                     listingId={listing.id}
@@ -252,16 +242,13 @@ async function ListingDetailContent({
                   />
                 ) : null}
 
-                {existingTransaction?.conversation_id ? (
-                  <Link
-                    className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
-                    href={`/messages/${existingTransaction.conversation_id}`}
-                  >
-                    Open conversation
-                  </Link>
-                ) : user && !isOwner ? (
+                {!existingTransaction && user && !isOwner && !isSuspended ? (
                   <p className="text-sm text-muted-foreground">
                     Messaging opens once you send a request to buy.
+                  </p>
+                ) : user && isSuspended ? (
+                  <p className="text-sm text-muted-foreground">
+                    Your account is suspended from marketplace activity.
                   </p>
                 ) : !user ? (
                   <p className="text-sm text-muted-foreground">

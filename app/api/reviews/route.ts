@@ -1,12 +1,19 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+
+import {
+  getMarketplaceSuspendedResponse,
+  getViewerAccessContext,
+} from "@/lib/admin";
 
 export async function POST(request: Request) {
-  const supabase = await createClient();
+  const { profile, supabase, userId } = await getViewerAccessContext();
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
+  if (!userId) {
     return NextResponse.json({ error: "You must be logged in to leave a review." }, { status: 401 });
+  }
+
+  if (profile?.account_status === "suspended") {
+    return getMarketplaceSuspendedResponse("leave reviews");
   }
 
   const { transactionId, revieweeId, reviewerRole, rating, comment } = await request.json();
@@ -20,7 +27,7 @@ export async function POST(request: Request) {
   if (reviewerRole !== "buyer" && reviewerRole !== "seller") {
     return NextResponse.json({ error: "Invalid reviewer role." }, { status: 400 });
   }
-  if (user.id === revieweeId) {
+  if (userId === revieweeId) {
     return NextResponse.json({ error: "You can't review yourself." }, { status: 400 });
   }
 
@@ -37,7 +44,7 @@ export async function POST(request: Request) {
   if (transaction.status !== "completed") {
     return NextResponse.json({ error: "You can only review a completed transaction." }, { status: 400 });
   }
-  if (user.id !== transaction.buyer_id && user.id !== transaction.seller_id) {
+  if (userId !== transaction.buyer_id && userId !== transaction.seller_id) {
     return NextResponse.json({ error: "You are not part of this transaction." }, { status: 403 });
   }
 
@@ -47,7 +54,7 @@ export async function POST(request: Request) {
     .upsert(
       {
         transaction_id: transactionId,
-        reviewer_id: user.id,
+        reviewer_id: userId,
         reviewee_id: revieweeId,
         reviewer_role: reviewerRole,
         rating,

@@ -1,12 +1,19 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+
+import {
+  getMarketplaceSuspendedResponse,
+  getViewerAccessContext,
+} from "@/lib/admin";
 
 export async function POST(request: Request) {
-  const supabase = await createClient();
+  const { profile, supabase, userId } = await getViewerAccessContext();
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
+  if (!userId) {
     return NextResponse.json({ error: "You must be logged in to request a purchase." }, { status: 401 });
+  }
+
+  if (profile?.account_status === "suspended") {
+    return getMarketplaceSuspendedResponse("request purchases");
   }
 
   const { listingId } = await request.json();
@@ -25,7 +32,7 @@ export async function POST(request: Request) {
   if (!listing) {
     return NextResponse.json({ error: "Listing not found." }, { status: 404 });
   }
-  if (listing.seller_id === user.id) {
+  if (listing.seller_id === userId) {
     return NextResponse.json({ error: "You can't purchase your own listing." }, { status: 400 });
   }
   if (listing.status !== "available") {
@@ -37,7 +44,7 @@ export async function POST(request: Request) {
     .from("transactions")
     .select("id")
     .eq("listing_id", listingId)
-    .eq("buyer_id", user.id)
+    .eq("buyer_id", userId)
     .eq("status", "pending")
     .maybeSingle();
 
@@ -53,7 +60,7 @@ export async function POST(request: Request) {
     .from("conversations")
     .select("id")
     .eq("listing_id", listingId)
-    .eq("buyer_id", user.id)
+    .eq("buyer_id", userId)
     .eq("seller_id", listing.seller_id)
     .maybeSingle();
 
@@ -64,7 +71,7 @@ export async function POST(request: Request) {
       .from("conversations")
       .insert({
         listing_id: listingId,
-        buyer_id: user.id,
+        buyer_id: userId,
         seller_id: listing.seller_id,
       })
       .select("id")
@@ -81,7 +88,7 @@ export async function POST(request: Request) {
   // The listing only moves to "pending" when the seller accepts one of the requests.
   const { error: txError } = await supabase.from("transactions").insert({
     listing_id: listingId,
-    buyer_id: user.id,
+    buyer_id: userId,
     seller_id: listing.seller_id,
     conversation_id: conversationId,
     agreed_price: listing.price,

@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 
+import {
+  getMarketplaceSuspendedResponse,
+  getViewerAccessContext,
+} from "@/lib/admin";
 import { MAX_MESSAGE_LENGTH, MESSAGE_SELECT } from "@/lib/messages";
-import { createClient } from "@/lib/supabase/server";
 
 type MessageRouteContext = {
   params: Promise<{ id: string }>;
@@ -11,16 +14,17 @@ export async function POST(
   request: Request,
   context: MessageRouteContext,
 ) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { profile, supabase, userId } = await getViewerAccessContext();
 
-  if (!user) {
+  if (!userId) {
     return NextResponse.json(
       { error: "You must be logged in to send messages." },
       { status: 401 },
     );
+  }
+
+  if (profile?.account_status === "suspended") {
+    return getMarketplaceSuspendedResponse("send messages");
   }
 
   const { id } = await context.params;
@@ -62,7 +66,7 @@ export async function POST(
     .insert({
       content,
       conversation_id: id,
-      sender_id: user.id,
+      sender_id: userId,
     })
     .select(MESSAGE_SELECT)
     .single();

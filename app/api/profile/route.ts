@@ -26,9 +26,6 @@ export async function PATCH(request: Request) {
     const username = typeof body.username === "string" ? body.username.trim().toLowerCase() : "";
     const bio = typeof body.bio === "string" ? body.bio.trim() : "";
     const avatarUrl = typeof body.avatarUrl === "string" ? body.avatarUrl.trim() : "";
-    const roleValue = body.role;
-    const role =
-      roleValue === "admin" || roleValue === "user" ? roleValue : null;
     const universityIdValue =
       typeof body.universityId === "string" || typeof body.universityId === "number"
         ? String(body.universityId).trim()
@@ -57,13 +54,6 @@ export async function PATCH(request: Request) {
     if (!username) {
       return NextResponse.json<ProfileResponse>(
         { message: "Username is required.", status: "error" },
-        { status: 400 },
-      );
-    }
-
-    if (role === null) {
-      return NextResponse.json<ProfileResponse>(
-        { message: "Choose a valid account role.", status: "error" },
         { status: 400 },
       );
     }
@@ -99,7 +89,6 @@ export async function PATCH(request: Request) {
         university: null,
         university_id: universityId,
         bio: bio || null,
-        role,
       })
       .eq("id", user.id);
 

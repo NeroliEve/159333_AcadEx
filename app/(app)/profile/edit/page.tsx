@@ -1,0 +1,68 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { Suspense } from "react";
+
+import { AccountSecurityForm } from "@/components/account-security-form";
+import { EditProfileForm } from "@/components/edit-profile-form";
+import { PillButton } from "@/components/ui/pill-button";
+import { getUniversityOptions, getViewerContext } from "@/lib/marketplace";
+
+async function ProfileEditContent() {
+  const { user, profile } = await getViewerContext();
+
+  if (!user) {
+    redirect("/auth/login");
+  }
+
+  const universities = await getUniversityOptions(true);
+
+  return (
+    <section className="flex flex-col gap-10">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-2">
+          <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">
+            Profile
+          </p>
+          <h1 className="text-3xl font-semibold tracking-tight">
+            Edit your profile
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Update your public details and account security settings.
+          </p>
+        </div>
+
+        {profile?.username ? (
+          <PillButton asChild size="sm" variant="secondary">
+            <Link href={`/profile/${profile.username}`}>View profile</Link>
+          </PillButton>
+        ) : null}
+      </div>
+
+      <EditProfileForm key={profile?.id} profile={profile} universities={universities} />
+      <AccountSecurityForm email={user.email ?? profile?.email ?? ""} />
+    </section>
+  );
+}
+
+function ProfileEditFallback() {
+  return (
+    <section className="flex flex-col gap-10">
+      <div className="space-y-2">
+        <div className="h-4 w-24 animate-pulse rounded bg-muted" />
+        <div className="h-8 w-56 animate-pulse rounded bg-muted" />
+        <div className="h-4 w-72 animate-pulse rounded bg-muted" />
+      </div>
+
+      <div className="h-64 animate-pulse rounded-2xl border border-border/70 bg-muted/40" />
+      <div className="h-80 animate-pulse rounded-2xl border border-border/70 bg-muted/40" />
+    </section>
+  );
+}
+
+export default function ProfileEditPage() {
+  return (
+    <Suspense fallback={<ProfileEditFallback />}>
+      <ProfileEditContent />
+    </Suspense>
+  );
+}

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ListingCard } from "@/components/listing-card";
 import { EmptyState } from "@/components/empty-state";
 import { StarRating } from "@/components/star-rating";
+import { PillButton } from "@/components/ui/pill-button";
 import { ReviewsList } from "@/components/reviews-list";
 import {
   getPublicProfile,
@@ -55,6 +56,28 @@ async function ProfileContent({ params }: Props) {
 
   return (
     <section className="flex flex-col gap-10">
+      {isOwnProfile ? (
+        <div className="space-y-4 rounded-2xl border border-border/70 bg-card p-6">
+          <div className="space-y-1">
+            <h2 className="text-xl font-semibold tracking-tight">Manage your account</h2>
+            <p className="text-sm text-muted-foreground">
+              Edit your public details or open your private profile pages.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+            <PillButton asChild size="sm">
+              <Link href="/profile/edit">Edit profile</Link>
+            </PillButton>
+            <PillButton asChild size="sm" variant="secondary">
+              <Link href="/profile/saved">Saved listings</Link>
+            </PillButton>
+            <PillButton asChild size="sm" variant="secondary">
+              <Link href="/profile/transactions">Transaction history</Link>
+            </PillButton>
+          </div>
+        </div>
+      ) : null}
       <div className="space-y-2">
         <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">
           Seller profile
@@ -115,14 +138,6 @@ async function ProfileContent({ params }: Props) {
             </div>
           </div>
 
-          {isOwnProfile && (
-            <Link
-              href="/profile"
-              className="shrink-0 text-sm underline underline-offset-4 text-muted-foreground hover:text-foreground"
-            >
-              Edit your profile
-            </Link>
-          )}
         </div>
       </div>
 
@@ -152,6 +167,7 @@ async function ProfileContent({ params }: Props) {
               <ListingCard
                 key={listing.id}
                 listing={listing}
+                viewerAccountStatus={viewer?.account_status}
                 viewerId={viewer?.id}
                 viewerRole={viewer?.role}
                 isSaved={(savedIds as string[]).includes(listing.id)}

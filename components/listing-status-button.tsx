@@ -34,11 +34,16 @@ export function ListingStatusButton({
     const newStatus = e.target.value as ListingStatus;
     setIsUpdating(true);
     try {
-      await fetch(`/api/listings/${listingId}/status`, {
+      const response = await fetch(`/api/listings/${listingId}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),
       });
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => ({}))) as { message?: string };
+        window.alert(payload.message ?? "Could not update the listing status.");
+        return;
+      }
       router.refresh();
     } finally {
       setIsUpdating(false);

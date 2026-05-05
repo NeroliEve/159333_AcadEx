@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+
+import {
+  getMarketplaceSuspendedResponse,
+  getViewerAccessContext,
+} from "@/lib/admin";
 
 type StatusResponse = {
   message?: string;
@@ -14,23 +18,18 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const { profile, supabase, userId } = await getViewerAccessContext();
 
-    if (!user) {
+    if (!userId) {
       return NextResponse.json<StatusResponse>(
         { message: "You need to sign in to update a listing.", status: "error" },
         { status: 401 },
       );
     }
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .maybeSingle();
+    if (profile?.account_status === "suspended") {
+      return getMarketplaceSuspendedResponse("update listings");
+    }
 
     const { data: listing } = await supabase
       .from("listings")
@@ -45,7 +44,7 @@ export async function PATCH(
       );
     }
 
-    const isOwner = listing.seller_id === user.id;
+    const isOwner = listing.seller_id === userId;
     const isAdmin = profile?.role === "admin";
 
     if (!isOwner && !isAdmin) {

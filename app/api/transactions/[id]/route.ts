@@ -1,16 +1,23 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+
+import {
+  getMarketplaceSuspendedResponse,
+  getViewerAccessContext,
+} from "@/lib/admin";
 
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const supabase = await createClient();
+  const { profile, supabase, userId } = await getViewerAccessContext();
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
+  if (!userId) {
     return NextResponse.json({ error: "You must be logged in." }, { status: 401 });
+  }
+
+  if (profile?.account_status === "suspended") {
+    return getMarketplaceSuspendedResponse("update transactions");
   }
 
   const { action } = await request.json() as { action: "accept" | "complete" | "cancel" };
@@ -33,8 +40,8 @@ export async function PATCH(
     return NextResponse.json({ error: "This transaction is no longer active." }, { status: 400 });
   }
 
-  const isBuyer = user.id === transaction.buyer_id;
-  const isSeller = user.id === transaction.seller_id;
+  const isBuyer = userId === transaction.buyer_id;
+  const isSeller = userId === transaction.seller_id;
 
   if (!isBuyer && !isSeller) {
     return NextResponse.json({ error: "You are not part of this transaction." }, { status: 403 });

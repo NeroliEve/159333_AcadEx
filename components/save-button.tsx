@@ -17,11 +17,17 @@ export function SaveButton({ listingId, initialSaved }: SaveButtonProps) {
 
     setLoading(true);
     const method = saved ? "DELETE" : "POST";
-    await fetch("/api/saved-listings", {
+    const response = await fetch("/api/saved-listings", {
       method,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ listingId }),
     });
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => ({}))) as { error?: string };
+      window.alert(payload.error ?? "Could not update your saved listings.");
+      setLoading(false);
+      return;
+    }
     setSaved((prev) => !prev);
     setLoading(false);
   }

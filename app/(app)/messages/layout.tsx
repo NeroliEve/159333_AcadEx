@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
+import { isMarketplaceSuspended } from "@/lib/admin";
+import { EmptyState } from "@/components/empty-state";
 import { MessagesShell } from "@/components/messages-shell";
 import { getMyConversationSummaries } from "@/lib/messages";
 import { getViewerContext } from "@/lib/marketplace";
@@ -10,10 +12,22 @@ async function MessagesLayoutContent({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const { user } = await getViewerContext();
+  const { profile, user } = await getViewerContext();
 
   if (!user) {
     redirect("/auth/login");
+  }
+
+  if (isMarketplaceSuspended(profile)) {
+    return (
+      <EmptyState
+        actionHref="/home"
+        actionLabel="Back to home"
+        description="Your account is currently suspended from marketplace activity, so messaging is unavailable."
+        eyebrow="Messages"
+        title="Messaging is disabled"
+      />
+    );
   }
 
   const summaries = await getMyConversationSummaries(user.id);
