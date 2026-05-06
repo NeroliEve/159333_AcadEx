@@ -222,6 +222,7 @@ export type ListingsFeedFilters = {
   universityId?: number;
   minPrice?: number;
   maxPrice?: number;
+  sellerName?: string;
 };
 
 type ListingsFeedAudience = "anonymous" | "authenticated";
@@ -267,12 +268,31 @@ export async function getListingsFeed(
   }
 
   if (filters.universityId) {
-    // Supabase doesn't support filtering on a joined table's column directly,
-    // so we fetch matching profile IDs first then filter by seller
+    // Match listings where the seller is from this university OR the listing's course belongs to this university
+    const [{ data: matchingProfiles }, { data: matchingCourses }] = await Promise.all([
+      supabase.from("profiles").select("id").eq("university_id", filters.universityId),
+      supabase.from("courses").select("id").eq("university_id", filters.universityId),
+    ]);
+
+    const sellerIds = (matchingProfiles ?? []).map((p) => p.id);
+    const courseIds = (matchingCourses ?? []).map((c) => c.id);
+
+    const orParts: string[] = [];
+    if (sellerIds.length > 0) orParts.push(`seller_id.in.(${sellerIds.join(",")})`);
+    if (courseIds.length > 0) orParts.push(`course_id.in.(${courseIds.join(",")})`);
+
+    if (orParts.length === 0) return { error: null, listings: [] };
+
+    query = query.or(orParts.join(","));
+  }
+
+  if (filters.sellerName) {
     const { data: matchingProfiles } = await supabase
       .from("profiles")
       .select("id")
-      .eq("university_id", filters.universityId);
+      .or(
+        `username.ilike.%${filters.sellerName}%,first_name.ilike.%${filters.sellerName}%,last_name.ilike.%${filters.sellerName}%`,
+      );
 
     const sellerIds = (matchingProfiles ?? []).map((p) => p.id);
     if (sellerIds.length === 0) return { error: null, listings: [] };

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 
 import { isMarketplaceSuspended } from "@/lib/admin";
+import { AiSearchBar } from "@/components/ai-search-bar";
 import { EmptyState } from "@/components/empty-state";
 import { ListingCard } from "@/components/listing-card";
 import { SearchFilterBar } from "@/components/search-filter-bar";
@@ -19,10 +20,11 @@ import {
 import { hasEnvVars } from "@/lib/utils";
 
 type HomeContentProps = {
+  aiExplanation?: string;
   filters: ListingsFeedFilters;
 };
 
-async function HomeContent({ filters }: HomeContentProps) {
+async function HomeContent({ aiExplanation, filters }: HomeContentProps) {
   const { profile, user } = await getViewerContext();
   const [{ listings, error }, courses, universities, studyAreas, savedIds] = await Promise.all([
     getListingsFeed(user ? "authenticated" : "anonymous", filters),
@@ -62,6 +64,15 @@ async function HomeContent({ filters }: HomeContentProps) {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {aiExplanation && (
+        <div className="flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4">
+          <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+            Claude
+          </span>
+          <p className="text-sm text-foreground">{aiExplanation}</p>
+        </div>
       )}
 
       <SearchFilterBar courses={courses} universities={universities} studyAreas={studyAreas} />
@@ -167,6 +178,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
   const params = await searchParams;
 
+  const aiExplanation = params._ai || undefined;
+
   const filters: ListingsFeedFilters = {
     q: params.q || undefined,
     condition: params.condition || undefined,
@@ -176,6 +189,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     universityId: params.universityId ? Number(params.universityId) : undefined,
     minPrice: params.minPrice ? Number(params.minPrice) : undefined,
     maxPrice: params.maxPrice ? Number(params.maxPrice) : undefined,
+    sellerName: params.sellerName || undefined,
   };
 
   return (
@@ -195,8 +209,10 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         </div>
       </div>
 
+      <AiSearchBar />
+
       <Suspense fallback={<HomeContentFallback />}>
-        <HomeContent filters={filters} />
+        <HomeContent aiExplanation={aiExplanation} filters={filters} />
       </Suspense>
     </section>
   );
