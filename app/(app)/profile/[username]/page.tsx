@@ -2,9 +2,12 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import Link from "next/link";
 
+import { BlockUserButton } from "@/components/block-user-button";
 import { ListingCard } from "@/components/listing-card";
 import { EmptyState } from "@/components/empty-state";
+import { ReportButton } from "@/components/report-button";
 import { StarRating } from "@/components/star-rating";
+import { getBlockedUserIds } from "@/lib/reports-server";
 import { PillButton } from "@/components/ui/pill-button";
 import { ReviewsList } from "@/components/reviews-list";
 import {
@@ -53,6 +56,8 @@ async function ProfileContent({ params }: Props) {
 
   const displayName = getProfileDisplayName(profile, undefined);
   const isOwnProfile = viewer?.id === profile.id;
+  const blockedIds = viewer && !isOwnProfile ? await getBlockedUserIds(viewer.id) : [];
+  const isBlocked = blockedIds.includes(profile.id);
 
   return (
     <section className="flex flex-col gap-10">
@@ -74,6 +79,12 @@ async function ProfileContent({ params }: Props) {
             </PillButton>
             <PillButton asChild size="sm" variant="secondary">
               <Link href="/profile/transactions">Transaction history</Link>
+            </PillButton>
+            <PillButton asChild size="sm" variant="secondary">
+              <Link href="/profile/reports">My reports</Link>
+            </PillButton>
+            <PillButton asChild size="sm" variant="secondary">
+              <Link href="/profile/blocked">Blocked users</Link>
             </PillButton>
           </div>
         </div>
@@ -134,6 +145,13 @@ async function ProfileContent({ params }: Props) {
                 <p className="max-w-xl text-sm leading-6 text-muted-foreground">
                   {profile.bio}
                 </p>
+              ) : null}
+
+              {viewer && !isOwnProfile ? (
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <ReportButton targetKind="user" targetId={profile.id} label="Report this user" />
+                  <BlockUserButton userId={profile.id} initiallyBlocked={isBlocked} />
+                </div>
               ) : null}
             </div>
           </div>

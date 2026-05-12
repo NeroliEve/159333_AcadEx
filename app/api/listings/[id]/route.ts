@@ -111,8 +111,13 @@ export async function PATCH(
     if (!title) fieldErrors.title = "Book title is required.";
 
     const price = Number(priceValue);
-    if (!priceValue || Number.isNaN(price) || price <= 0) {
+    const isTradeOnly = listingType === "trade_only";
+    if (!isTradeOnly && (!priceValue || Number.isNaN(price) || price <= 0)) {
       fieldErrors.price = "Enter a valid price greater than 0.";
+    }
+
+    if (listingType !== "sale_only" && !wantedTradeText) {
+      fieldErrors.wantedTradeText = "Describe what you'd trade for.";
     }
 
     if (!validConditions.includes(condition as (typeof validConditions)[number])) {
@@ -204,7 +209,7 @@ export async function PATCH(
         isbn:              isbn || null,
         publisher:         publisher || null,
         description:       description || null,
-        price,
+        price:             isTradeOnly ? null : price,
         condition:         condition as (typeof validConditions)[number],
         listing_type:      listingType as (typeof validListingTypes)[number],
         course_id:         courseId,

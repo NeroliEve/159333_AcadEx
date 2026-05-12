@@ -26,10 +26,9 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid action." }, { status: 400 });
   }
 
-  // Load the transaction to check permissions and current state
   const { data: transaction } = await supabase
     .from("transactions")
-    .select("id, listing_id, buyer_id, seller_id, status")
+    .select("id, listing_id, offered_listing_id, buyer_id, seller_id, status, reservation_confirmed_at")
     .eq("id", id)
     .maybeSingle();
 
@@ -52,52 +51,58 @@ export async function PATCH(
   }
 
   const now = new Date().toISOString();
+  const listingIds = [transaction.listing_id];
+  if (transaction.offered_listing_id) listingIds.push(transaction.offered_listing_id);
 
   if (action === "accept") {
-    // Seller accepts this request — move listing to pending and cancel all
-    // other pending requests for the same listing so no one else can claim it
     const [{ error: txError }, { error: listingError }] = await Promise.all([
       supabase.from("transactions").update({
         status: "pending",
         reservation_confirmed_at: now,
         updated_at: now,
       }).eq("id", id),
-      supabase.from("listings").update({ status: "pending" }).eq("id", transaction.listing_id),
+      supabase.from("listings").update({ status: "pending" }).in("id", listingIds),
     ]);
 
     if (txError || listingError) {
       return NextResponse.json({ error: txError?.message ?? listingError?.message }, { status: 500 });
     }
 
-    // Cancel all other pending requests for this listing
+    // Cancel all other pending requests competing for either listing
     await supabase
       .from("transactions")
       .update({ status: "cancelled", cancelled_at: now, updated_at: now })
-      .eq("listing_id", transaction.listing_id)
+      .in("listing_id", listingIds)
       .eq("status", "pending")
       .neq("id", id);
+
+    if (transaction.offered_listing_id) {
+      await supabase
+        .from("transactions")
+        .update({ status: "cancelled", cancelled_at: now, updated_at: now })
+        .eq("offered_listing_id", transaction.offered_listing_id)
+        .eq("status", "pending")
+        .neq("id", id);
+    }
   }
 
   if (action === "complete") {
-    // Seller confirms the exchange happened — listing moves to sold
-    const [{ error: txError }] = await Promise.all([
+    const [{ error: txError }, { error: listingError }] = await Promise.all([
       supabase.from("transactions").update({
         status: "completed",
         seller_confirmed_completed: true,
         completed_at: now,
         updated_at: now,
       }).eq("id", id),
-      supabase.from("listings").update({ status: "sold" }).eq("id", transaction.listing_id),
+      supabase.from("listings").update({ status: "sold" }).in("id", listingIds),
     ]);
 
-    if (txError) {
-      return NextResponse.json({ error: txError.message }, { status: 500 });
+    if (txError || listingError) {
+      return NextResponse.json({ error: txError?.message ?? listingError?.message }, { status: 500 });
     }
   }
 
   if (action === "cancel") {
-    // Either party cancels — if the listing was pending (seller had accepted),
-    // revert it back to available so other buyers can request again
     const { error: txError } = await supabase
       .from("transactions")
       .update({ status: "cancelled", cancelled_at: now, updated_at: now })
@@ -107,12 +112,12 @@ export async function PATCH(
       return NextResponse.json({ error: txError.message }, { status: 500 });
     }
 
-    // Only revert listing if this was the accepted transaction (reservation_confirmed_at set)
-    if (transaction.status === "pending") {
+    // Only revert listings if the seller had already accepted (they were marked pending)
+    if (transaction.reservation_confirmed_at) {
       await supabase
         .from("listings")
         .update({ status: "available" })
-        .eq("id", transaction.listing_id);
+        .in("id", listingIds);
     }
   }
 

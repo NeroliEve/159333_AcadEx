@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import { useMessagesContext } from "@/components/messages-context";
+import { ReportButton } from "@/components/report-button";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -247,11 +248,21 @@ export function MessagesWorkspace({
                 {conversation.listing?.title ?? "Conversation"}
               </h2>
               <p className="text-sm text-muted-foreground">
-                Chatting with {otherParticipantName}
+                Chatting with{" "}
+                {otherParticipant?.username ? (
+                  <Link
+                    href={`/profile/${otherParticipant.username}`}
+                    className="underline underline-offset-2 transition-colors hover:text-foreground"
+                  >
+                    {otherParticipantName}
+                  </Link>
+                ) : (
+                  otherParticipantName
+                )}
                 {otherParticipant?.university ? ` • ${otherParticipant.university}` : ""}
               </p>
             </div>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               {conversation.listing ? (
                 <Button asChild size="sm" variant="outline">
                   <Link href={`/listings/${conversation.listing.id}`}>
@@ -259,6 +270,11 @@ export function MessagesWorkspace({
                   </Link>
                 </Button>
               ) : null}
+              <ReportButton
+                targetKind="conversation"
+                targetId={conversation.id}
+                label="Report conversation"
+              />
             </div>
           </div>
         </div>
@@ -315,11 +331,21 @@ export function MessagesWorkspace({
                       <p className="whitespace-pre-wrap break-words text-sm leading-6">
                         {message.content}
                       </p>
-                      {isOwnMessage && message.is_read ? (
-                        <p className="text-[11px] text-primary-foreground/75">
-                          Seen
-                        </p>
-                      ) : null}
+                      <div className="flex items-center justify-between gap-2">
+                        {isOwnMessage && message.is_read ? (
+                          <p className="text-[11px] text-primary-foreground/75">
+                            Seen
+                          </p>
+                        ) : <span />}
+                        {!isOwnMessage ? (
+                          <ReportButton
+                            targetKind="message"
+                            targetId={message.id}
+                            label="Report"
+                            className="!text-[11px]"
+                          />
+                        ) : null}
+                      </div>
                     </div>
                   </div>
                 );

@@ -263,11 +263,13 @@ export function CreateListingForm({ courses, studyAreas }: CreateListingFormProp
               <FieldError message={state?.fieldErrors?.publisher} />
             </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="price">Price (NZD)</Label>
-              <Input id="price" name="price" min="1" placeholder="45" required step="1" type="number" />
-              <FieldError message={state?.fieldErrors?.price} />
-            </div>
+            {listingType !== "trade_only" && (
+              <div className="grid gap-2">
+                <Label htmlFor="price">Price (NZD)</Label>
+                <Input id="price" name="price" min="1" placeholder="45" required step="1" type="number" />
+                <FieldError message={state?.fieldErrors?.price} />
+              </div>
+            )}
 
             <div className="grid gap-2">
               <Label htmlFor="condition">Condition</Label>

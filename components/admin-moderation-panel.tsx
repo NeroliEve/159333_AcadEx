@@ -1362,15 +1362,80 @@ export function AdminModerationPanel({
                   </div>
 
                   <div className="grid gap-2 text-sm text-muted-foreground">
-                    <p>Reporter: {formatPersonName(report.reporter)}</p>
+                    <p>
+                      Reporter:{" "}
+                      {report.reporter?.username ? (
+                        <Link
+                          href={`/profile/${report.reporter.username}`}
+                          className="underline underline-offset-2 transition-colors hover:text-foreground"
+                        >
+                          {formatPersonName(report.reporter)}
+                        </Link>
+                      ) : (
+                        formatPersonName(report.reporter)
+                      )}
+                    </p>
                     {report.reportedUser ? (
-                      <p>Reported user: {formatPersonName(report.reportedUser)}</p>
+                      <p>
+                        Reported user:{" "}
+                        {report.reportedUser.username ? (
+                          <Link
+                            href={`/profile/${report.reportedUser.username}`}
+                            className="underline underline-offset-2 transition-colors hover:text-foreground"
+                          >
+                            {formatPersonName(report.reportedUser)}
+                          </Link>
+                        ) : (
+                          formatPersonName(report.reportedUser)
+                        )}
+                      </p>
                     ) : null}
                     {report.reportedListing ? (
-                      <p>Reported listing: {report.reportedListing.title}</p>
+                      <p>
+                        Reported listing:{" "}
+                        <Link
+                          href={`/listings/${report.reportedListing.id}`}
+                          className="underline underline-offset-2 transition-colors hover:text-foreground"
+                        >
+                          {report.reportedListing.title}
+                        </Link>
+                      </p>
+                    ) : null}
+                    {report.reportedConversation ? (
+                      <p>
+                        Reported conversation:{" "}
+                        <Link
+                          href={`/messages/${report.reportedConversation.id}`}
+                          className="underline underline-offset-2 transition-colors hover:text-foreground"
+                        >
+                          Open conversation
+                        </Link>
+                      </p>
                     ) : null}
                     {report.reportedMessage ? (
-                      <p>Reported message: {report.reportedMessage.content}</p>
+                      <div className="space-y-2 rounded-lg border border-border/70 bg-secondary/30 p-3">
+                        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                          Reported message in context
+                        </p>
+                        <div className="space-y-1">
+                          {(report.reportedMessage.context ?? []).map((msg) => {
+                            const before = report.reportedMessage && msg.created_at < report.reportedMessage.created_at;
+                            return (
+                              <p
+                                key={msg.id}
+                                className={`text-xs ${before ? "text-muted-foreground" : "text-muted-foreground"}`}
+                              >
+                                <span className="font-medium">{before ? "← " : "→ "}</span>
+                                {msg.content}
+                              </p>
+                            );
+                          })}
+                          <p className="rounded-md border border-destructive/30 bg-destructive/5 p-2 text-sm">
+                            <span className="font-medium">⚑ </span>
+                            {report.reportedMessage.content}
+                          </p>
+                        </div>
+                      </div>
                     ) : null}
                     {report.description ? <p>{report.description}</p> : null}
                   </div>
@@ -1411,16 +1476,31 @@ export function AdminModerationPanel({
                     </div>
                   </div>
 
-                  <Textarea
-                    placeholder="Optional report handling notes."
-                    value={reportNotes[report.id] ?? ""}
-                    onChange={(event) =>
-                      setReportNotes((current) => ({
-                        ...current,
-                        [report.id]: event.target.value,
-                      }))
-                    }
-                  />
+                  {report.resolution_note ? (
+                    <div className="rounded-lg border border-border/70 bg-secondary/30 p-3 text-sm">
+                      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                        Last admin note (visible to reporter)
+                      </p>
+                      <p className="mt-1">{report.resolution_note}</p>
+                    </div>
+                  ) : null}
+
+                  <div className="space-y-1">
+                    <Label htmlFor={`report-notes-${report.id}`}>
+                      Admin note {report.status === "pending" ? "(optional)" : "(visible to reporter)"}
+                    </Label>
+                    <Textarea
+                      id={`report-notes-${report.id}`}
+                      placeholder="Explain what action was taken. Reporters see this on their My reports page."
+                      value={reportNotes[report.id] ?? ""}
+                      onChange={(event) =>
+                        setReportNotes((current) => ({
+                          ...current,
+                          [report.id]: event.target.value,
+                        }))
+                      }
+                    />
+                  </div>
                 </CardContent>
               </Card>
             ))}
@@ -1562,7 +1642,7 @@ export function AdminModerationPanel({
                   <div>
                     <p className="text-sm font-semibold">{entry.action_type}</p>
                     <p className="text-sm text-muted-foreground">
-                      By {formatPersonName(entry.admin)}
+                      By {entry.admin ? formatPersonName(entry.admin) : "System (automated)"}
                     </p>
                   </div>
                   <p className="text-xs text-muted-foreground">

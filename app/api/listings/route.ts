@@ -77,10 +77,17 @@ export async function POST(request: Request) {
     if (!title) fieldErrors.title = "Add the book title.";
 
     const price = Number(priceValue);
-    if (!priceValue) {
-      fieldErrors.price = "Add a sale price.";
-    } else if (Number.isNaN(price) || price <= 0) {
-      fieldErrors.price = "Enter a valid price greater than 0.";
+    const isTradeOnly = listingType === "trade_only";
+    if (!isTradeOnly) {
+      if (!priceValue) {
+        fieldErrors.price = "Add a sale price.";
+      } else if (Number.isNaN(price) || price <= 0) {
+        fieldErrors.price = "Enter a valid price greater than 0.";
+      }
+    }
+
+    if (listingType !== "sale_only" && !wantedTradeText) {
+      fieldErrors.wantedTradeText = "Describe what you'd trade for.";
     }
 
     if (!condition) {
@@ -175,7 +182,7 @@ export async function POST(request: Request) {
       edition:          edition || null,
       isbn:             isbn || null,
       listing_type:     listingType as (typeof validListingTypes)[number],
-      price,
+      price:            isTradeOnly ? null : price,
       primary_image_url: imageUrls[0] ?? null,
       publisher:        publisher || null,
       seller_id:        userId,

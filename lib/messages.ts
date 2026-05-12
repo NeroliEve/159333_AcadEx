@@ -142,7 +142,24 @@ export async function getMyConversationSummaries(
 
   if (error || !data || data.length === 0) return [];
 
-  const conversationRows = sortConversations(data as unknown as ConversationRow[]);
+  // Hide conversations with anyone the viewer has blocked OR who has blocked the viewer
+  const { data: blocks } = await supabase
+    .from("user_blocks")
+    .select("blocker_id, blocked_id")
+    .or(`blocker_id.eq.${viewerId},blocked_id.eq.${viewerId}`);
+
+  const blockedCounterparties = new Set<string>(
+    (blocks ?? []).map((row) => (row.blocker_id === viewerId ? row.blocked_id : row.blocker_id)),
+  );
+
+  const filteredRows = (data as unknown as ConversationRow[]).filter((conv) => {
+    const otherId = conv.buyer_id === viewerId ? conv.seller_id : conv.buyer_id;
+    return !blockedCounterparties.has(otherId);
+  });
+
+  if (filteredRows.length === 0) return [];
+
+  const conversationRows = sortConversations(filteredRows);
   const conversationIds = conversationRows.map((conversation) => conversation.id);
   const { data: messageData } = await supabase
     .from("messages")
@@ -166,12 +183,30 @@ export async function getUnreadMessageCount(
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("conversations")
-    .select("id")
+    .select("id, buyer_id, seller_id")
     .or(`buyer_id.eq.${viewerId},seller_id.eq.${viewerId}`);
 
   if (error || !data || data.length === 0) return 0;
 
-  const conversationIds = data.map((conversation) => conversation.id);
+  // Skip conversations with blocked users (either direction)
+  const { data: blocks } = await supabase
+    .from("user_blocks")
+    .select("blocker_id, blocked_id")
+    .or(`blocker_id.eq.${viewerId},blocked_id.eq.${viewerId}`);
+
+  const blockedCounterparties = new Set<string>(
+    (blocks ?? []).map((row) => (row.blocker_id === viewerId ? row.blocked_id : row.blocker_id)),
+  );
+
+  const conversationIds = data
+    .filter((conv) => {
+      const otherId = conv.buyer_id === viewerId ? conv.seller_id : conv.buyer_id;
+      return !blockedCounterparties.has(otherId);
+    })
+    .map((conversation) => conversation.id);
+
+  if (conversationIds.length === 0) return 0;
+
   const { count } = await supabase
     .from("messages")
     .select("id", { count: "exact", head: true })

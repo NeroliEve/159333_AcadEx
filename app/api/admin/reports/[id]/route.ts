@@ -52,9 +52,10 @@ export async function PATCH(
         reviewed_at: reviewedAt,
         reviewed_by: reviewedBy,
         status: nextStatus as (typeof validStatuses)[number],
+        resolution_note: notes || null,
       })
       .eq("id", id)
-      .select("id, reviewed_at, reviewed_by, status")
+      .select("id, reviewed_at, reviewed_by, status, resolution_note")
       .single();
 
     if (error || !report) {

@@ -22,6 +22,7 @@ type ProfileSummary = Pick<
   | "last_name"
   | "role"
   | "suspended_at"
+  | "transactions_seen_at"
   | "university"
   | "university_id"
   | "username"
@@ -203,7 +204,7 @@ export async function getViewerContext(): Promise<{
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "account_status, avatar_url, bio, id, email, first_name, is_verified, last_name, role, suspended_at, university, university_id, username",
+      "account_status, avatar_url, bio, id, email, first_name, is_verified, last_name, role, suspended_at, transactions_seen_at, university, university_id, username",
     )
     .eq("id", user.id)
     .maybeSingle();
@@ -240,12 +241,26 @@ export async function getListingsFeed(
   }
 
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  let blockedIds: string[] = [];
+  if (user) {
+    const { data: blocks } = await supabase
+      .from("user_blocks")
+      .select("blocked_id")
+      .eq("blocker_id", user.id);
+    blockedIds = (blocks ?? []).map((row) => row.blocked_id);
+  }
 
   let query = supabase
     .from("listings")
     .select(audience === "authenticated" ? LISTING_CARD_SELECT : LISTING_CARD_SELECT_ANON)
     .in("status", ["available", "pending", "sold"])
     .is("deleted_at", null);
+
+  if (blockedIds.length > 0) {
+    query = query.not("seller_id", "in", `(${blockedIds.join(",")})`);
+  }
 
   if (filters.q) {
     query = query.or(`title.ilike.%${filters.q}%,author.ilike.%${filters.q}%`);
@@ -336,6 +351,38 @@ export async function getMyListings(userId: string): Promise<ListingCardData[]> 
   return attachListingImages(supabase, (data ?? []) as unknown as ListingCardBase[]);
 }
 
+// Listings owned by the user that are still available to offer in a trade.
+export async function getMyAvailableListings(
+  userId: string,
+): Promise<
+  Array<{
+    id: string;
+    title: string;
+    primary_image_url: string | null;
+    price: number | null;
+    listing_type: ListingType;
+  }>
+> {
+  if (!hasEnvVars) return [];
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("listings")
+    .select("id, title, primary_image_url, price, listing_type")
+    .eq("seller_id", userId)
+    .eq("status", "available")
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false });
+
+  return (data ?? []) as unknown as Array<{
+    id: string;
+    title: string;
+    primary_image_url: string | null;
+    price: number | null;
+    listing_type: ListingType;
+  }>;
+}
+
 export async function getListingById(id: string): Promise<{
   listing: ListingDetailData | null;
   error: string | null;
@@ -386,7 +433,7 @@ export async function getPublicProfile(username: string): Promise<{
   const { data: profileData, error: profileError } = await supabase
     .from("profiles")
     .select(
-      "account_status, avatar_url, bio, id, email, first_name, is_verified, last_name, role, suspended_at, university, university_id, username",
+      "account_status, avatar_url, bio, id, email, first_name, is_verified, last_name, role, suspended_at, transactions_seen_at, university, university_id, username",
     )
     .eq("username", username)
     .maybeSingle();
@@ -475,6 +522,7 @@ export async function getUniversityOptions(
 export type TransactionData = {
   id: string;
   listing_id: string;
+  offered_listing_id: string | null;
   conversation_id: string | null;
   buyer_id: string;
   seller_id: string;
@@ -488,15 +536,17 @@ export type TransactionData = {
   created_at: string;
   updated_at: string;
   listing: Pick<TableRow<"listings">, "id" | "title" | "primary_image_url" | "price" | "condition"> | null;
+  offered_listing: Pick<TableRow<"listings">, "id" | "title" | "primary_image_url" | "price" | "condition"> | null;
   buyer: Pick<TableRow<"profiles">, "id" | "first_name" | "last_name" | "username" | "avatar_url"> | null;
   seller: Pick<TableRow<"profiles">, "id" | "first_name" | "last_name" | "username" | "avatar_url"> | null;
 };
 
 const TRANSACTION_SELECT = `
-  id, listing_id, conversation_id, buyer_id, seller_id, agreed_price, agreed_trade_text,
+  id, listing_id, offered_listing_id, conversation_id, buyer_id, seller_id, agreed_price, agreed_trade_text,
   status, seller_confirmed_completed, reservation_confirmed_at,
   completed_at, cancelled_at, created_at, updated_at,
   listing:listings!transactions_listing_id_fkey(id, title, primary_image_url, price, condition),
+  offered_listing:listings!transactions_offered_listing_id_fkey(id, title, primary_image_url, price, condition),
   buyer:profiles!transactions_buyer_id_fkey(id, first_name, last_name, username, avatar_url),
   seller:profiles!transactions_seller_id_fkey(id, first_name, last_name, username, avatar_url)
 `;

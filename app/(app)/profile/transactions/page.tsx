@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
+import { MarkTransactionsSeen } from "@/components/mark-transactions-seen";
 import { ReviewForm } from "@/components/review-form";
 import { TransactionActions } from "@/components/transaction-actions";
 import { isMarketplaceSuspended } from "@/lib/admin";
@@ -97,6 +98,34 @@ function TransactionRow({
         </div>
       </div>
 
+      {tx.offered_listing ? (
+        <div className="flex items-start gap-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
+          <div className="flex h-12 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border/70 bg-secondary">
+            {tx.offered_listing.primary_image_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                alt={tx.offered_listing.title}
+                className="h-full w-full object-cover"
+                src={tx.offered_listing.primary_image_url}
+              />
+            ) : (
+              <span className="text-[10px] text-muted-foreground">No img</span>
+            )}
+          </div>
+          <div className="min-w-0 space-y-0.5">
+            <p className="text-xs font-medium uppercase tracking-wider text-primary">
+              {isSeller ? "Offered in trade" : "You offered"}
+            </p>
+            <Link
+              href={`/listings/${tx.offered_listing.id}`}
+              className="text-sm font-medium underline underline-offset-2 transition-colors hover:text-foreground"
+            >
+              {tx.offered_listing.title}
+            </Link>
+          </div>
+        </div>
+      ) : null}
+
       {tx.status === "pending" && !isSuspended ? (
         <TransactionActions
           transactionId={tx.id}
@@ -159,6 +188,7 @@ async function ProfileTransactionsContent() {
 
   return (
     <section className="flex flex-col gap-10">
+      <MarkTransactionsSeen />
       <div className="space-y-2">
         <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">
           Profile

@@ -15,6 +15,7 @@ export type ViewerAccessProfile = Pick<
   | "last_name"
   | "role"
   | "suspended_at"
+  | "transactions_seen_at"
   | "university"
   | "university_id"
   | "username"
@@ -81,12 +82,19 @@ export type AdminReportRecord = Pick<
   | "id"
   | "reason"
   | "report_type"
+  | "resolution_note"
   | "reviewed_at"
   | "status"
 > & {
   reportedConversation: Pick<TableRow<"conversations">, "id" | "listing_id"> | null;
   reportedListing: Pick<TableRow<"listings">, "deleted_at" | "id" | "status" | "title"> | null;
-  reportedMessage: Pick<TableRow<"messages">, "content" | "id"> | null;
+  reportedMessage:
+    | (Pick<TableRow<"messages">, "content" | "id" | "conversation_id" | "sender_id" | "created_at"> & {
+        context?: Array<
+          Pick<TableRow<"messages">, "id" | "content" | "sender_id" | "created_at">
+        >;
+      })
+    | null;
   reportedUser: Pick<TableRow<"profiles">, "email" | "first_name" | "id" | "last_name" | "username"> | null;
   reporter: Pick<TableRow<"profiles">, "email" | "first_name" | "id" | "last_name" | "username"> | null;
   reviewedBy: Pick<TableRow<"profiles">, "first_name" | "id" | "last_name" | "username"> | null;
@@ -137,7 +145,7 @@ export type AdminWorkspaceData = {
 };
 
 const VIEWER_PROFILE_SELECT =
-  "account_status, avatar_url, bio, email, first_name, id, is_verified, last_name, role, suspended_at, university, university_id, username";
+  "account_status, avatar_url, bio, email, first_name, id, is_verified, last_name, role, suspended_at, transactions_seen_at, university, university_id, username";
 const ADMIN_USER_SELECT =
   "account_status, avatar_url, bio, email, first_name, id, is_verified, last_name, role, suspended_at, university, university_id, updated_at, username";
 const ADMIN_LISTING_SELECT = `
@@ -160,11 +168,12 @@ const ADMIN_REPORT_SELECT = `
   description,
   reason,
   report_type,
+  resolution_note,
   reviewed_at,
   status,
   reportedConversation:conversations!reports_reported_conversation_id_fkey(id, listing_id),
   reportedListing:listings!reports_reported_listing_id_fkey(id, deleted_at, status, title),
-  reportedMessage:messages!reports_reported_message_id_fkey(id, content),
+  reportedMessage:messages!reports_reported_message_id_fkey(id, content, conversation_id, sender_id, created_at),
   reportedUser:profiles!reports_reported_user_id_fkey(id, email, first_name, last_name, username),
   reporter:profiles!reports_reporter_id_fkey(id, email, first_name, last_name, username),
   reviewedBy:profiles!reports_reviewed_by_fkey(id, first_name, last_name, username)
@@ -378,6 +387,42 @@ export async function getAdminWorkspaceData(
     throw new Error(firstError.message);
   }
 
+  // For every report against a message, fetch the 2 messages before and 2 after
+  // from the same conversation so admins can read the surrounding context.
+  const reportsWithContext = await Promise.all(
+    ((reports ?? []) as unknown as AdminReportRecord[]).map(async (report) => {
+      const reportedMessage = report.reportedMessage;
+      if (!reportedMessage?.conversation_id || !reportedMessage?.created_at) {
+        return report;
+      }
+
+      const [{ data: before }, { data: after }] = await Promise.all([
+        supabase
+          .from("messages")
+          .select("id, content, sender_id, created_at")
+          .eq("conversation_id", reportedMessage.conversation_id)
+          .lt("created_at", reportedMessage.created_at)
+          .order("created_at", { ascending: false })
+          .limit(2),
+        supabase
+          .from("messages")
+          .select("id, content, sender_id, created_at")
+          .eq("conversation_id", reportedMessage.conversation_id)
+          .gt("created_at", reportedMessage.created_at)
+          .order("created_at", { ascending: true })
+          .limit(2),
+      ]);
+
+      return {
+        ...report,
+        reportedMessage: {
+          ...reportedMessage,
+          context: [...(before ?? []).reverse(), ...(after ?? [])],
+        },
+      };
+    }),
+  );
+
   return {
     auditLogs: (auditLogs ?? []) as unknown as AdminAuditRecord[],
     listings: (listings ?? []) as unknown as AdminListingRecord[],
@@ -389,7 +434,7 @@ export async function getAdminWorkspaceData(
       suspendedUsers: suspendedUsersCount ?? 0,
       unverifiedUsers: unverifiedUsersCount ?? 0,
     },
-    reports: (reports ?? []) as unknown as AdminReportRecord[],
+    reports: reportsWithContext,
     supportTickets: (supportTickets ?? []) as unknown as AdminSupportTicketRecord[],
     users: (users ?? []) as unknown as AdminUserRecord[],
   };

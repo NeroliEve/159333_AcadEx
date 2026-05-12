@@ -5,7 +5,9 @@ import { Suspense } from "react";
 import { DeleteListingButton } from "@/components/delete-listing-button";
 import { ListingDetailGallery } from "@/components/listing-detail-gallery";
 import { ListingStatusButton } from "@/components/listing-status-button";
+import { ReportButton } from "@/components/report-button";
 import { RequestToBuyButton } from "@/components/request-to-buy-button";
+import { RequestToTradeButton } from "@/components/request-to-trade-button";
 import { Card, CardContent } from "@/components/ui/card";
 import { isMarketplaceSuspended } from "@/lib/admin";
 import {
@@ -13,6 +15,7 @@ import {
   formatPrice,
   getExistingTransaction,
   getListingById,
+  getMyAvailableListings,
   getProfileDisplayName,
   getViewerContext,
 } from "@/lib/marketplace";
@@ -77,6 +80,13 @@ async function ListingDetailContent({
   const canManage = !isSuspended && (isOwner || isAdmin);
   const isTrade =
     listing.listing_type === "trade_only" || listing.listing_type === "sale_or_trade";
+  const canBuy = listing.listing_type !== "trade_only";
+  const canTrade = isTrade;
+
+  const offerableListings =
+    canTrade && user && !isOwner && !isSuspended && listing.status === "available"
+      ? (await getMyAvailableListings(user.id)).filter((entry) => entry.id !== listing.id)
+      : [];
 
   return (
     <section className="space-y-8">
@@ -235,16 +245,28 @@ async function ListingDetailContent({
 
               <div className="flex flex-col gap-3">
                 {user && !isOwner && !isSuspended && listing.status === "available" ? (
-                  <RequestToBuyButton
-                    conversationId={existingTransaction?.conversation_id}
-                    listingId={listing.id}
-                    hasPendingTransaction={!!existingTransaction}
-                  />
+                  <>
+                    {canBuy ? (
+                      <RequestToBuyButton
+                        conversationId={existingTransaction?.conversation_id}
+                        listingId={listing.id}
+                        hasPendingTransaction={!!existingTransaction}
+                      />
+                    ) : null}
+                    {canTrade ? (
+                      <RequestToTradeButton
+                        conversationId={existingTransaction?.conversation_id}
+                        listingId={listing.id}
+                        hasPendingTransaction={!!existingTransaction}
+                        offerableListings={offerableListings}
+                      />
+                    ) : null}
+                  </>
                 ) : null}
 
                 {!existingTransaction && user && !isOwner && !isSuspended ? (
                   <p className="text-sm text-muted-foreground">
-                    Messaging opens once you send a request to buy.
+                    Messaging opens once you send a request.
                   </p>
                 ) : user && isSuspended ? (
                   <p className="text-sm text-muted-foreground">
@@ -266,6 +288,12 @@ async function ListingDetailContent({
                 >
                   Back to listings
                 </Link>
+
+                {user && !isOwner && !isSuspended ? (
+                  <div className="flex justify-center pt-1">
+                    <ReportButton targetKind="listing" targetId={listing.id} label="Report this listing" />
+                  </div>
+                ) : null}
               </div>
             </CardContent>
           </Card>

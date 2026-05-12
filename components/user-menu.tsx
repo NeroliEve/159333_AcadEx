@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
 
@@ -10,6 +10,7 @@ type UserMenuProps = {
   avatarUrl?: string | null;
   email?: string | null;
   initialUnreadCount?: number;
+  initialUnseenTransactionCount?: number;
   isSuspended?: boolean;
   name?: string | null;
 };
@@ -26,18 +27,63 @@ export function UserMenu({
   avatarUrl,
   email,
   initialUnreadCount = 0,
+  initialUnseenTransactionCount = 0,
   isSuspended = false,
   name,
 }: UserMenuProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const menuRef = useRef<HTMLDivElement>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(initialUnreadCount);
+  const [unseenTxCount, setUnseenTxCount] = useState(initialUnseenTransactionCount);
 
   useEffect(() => {
     setUnreadCount(initialUnreadCount);
   }, [initialUnreadCount]);
+
+  useEffect(() => {
+    setUnseenTxCount(initialUnseenTransactionCount);
+  }, [initialUnseenTransactionCount]);
+
+  useEffect(() => {
+    if (isSuspended) {
+      setUnseenTxCount(0);
+      return;
+    }
+    let isMounted = true;
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`user-menu-transactions-${Math.random().toString(36).slice(2)}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "transactions" },
+        () => {
+          void refreshTxCount();
+        },
+      )
+      .subscribe();
+
+    async function refreshTxCount() {
+      try {
+        const response = await fetch("/api/transactions/unseen-count", { cache: "no-store" });
+        if (!response.ok) {
+          if (response.status === 401 && isMounted) setUnseenTxCount(0);
+          return;
+        }
+        const data = (await response.json()) as { count?: number };
+        if (isMounted) setUnseenTxCount(typeof data.count === "number" ? data.count : 0);
+      } catch {
+        if (isMounted) setUnseenTxCount(0);
+      }
+    }
+
+    void refreshTxCount();
+
+    return () => {
+      isMounted = false;
+      void supabase.removeChannel(channel);
+    };
+  }, [isSuspended, pathname]);
 
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
@@ -150,8 +196,9 @@ export function UserMenu({
   async function logout() {
     const supabase = createClient();
     await supabase.auth.signOut();
-    router.push("/");
-    router.refresh();
+    // Full reload clears Next.js router cache so cached RSC from the
+    // previous user can't leak into the next session.
+    window.location.href = "/";
   }
 
   return (
@@ -200,18 +247,32 @@ export function UserMenu({
 
           <div className="grid gap-1 pt-2">
             {!isSuspended ? (
-              <Link
-                href="/messages"
-                className="flex items-center justify-between rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                onClick={() => setIsOpen(false)}
-              >
-                <span>Messages</span>
-                {unreadCount > 0 ? (
-                  <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
-                    {formatUnreadCount(unreadCount)}
-                  </span>
-                ) : null}
-              </Link>
+              <>
+                <Link
+                  href="/messages"
+                  className="flex items-center justify-between rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                  onClick={() => setIsOpen(false)}
+                >
+                  <span>Messages</span>
+                  {unreadCount > 0 ? (
+                    <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
+                      {formatUnreadCount(unreadCount)}
+                    </span>
+                  ) : null}
+                </Link>
+                <Link
+                  href="/profile/transactions"
+                  className="flex items-center justify-between rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                  onClick={() => setIsOpen(false)}
+                >
+                  <span>Transactions</span>
+                  {unseenTxCount > 0 ? (
+                    <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
+                      {formatUnreadCount(unseenTxCount)}
+                    </span>
+                  ) : null}
+                </Link>
+              </>
             ) : null}
             <Link
               href="/profile"
@@ -219,6 +280,20 @@ export function UserMenu({
               onClick={() => setIsOpen(false)}
             >
               View profile
+            </Link>
+            <Link
+              href="/profile/reports"
+              className="rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+              onClick={() => setIsOpen(false)}
+            >
+              My reports
+            </Link>
+            <Link
+              href="/profile/blocked"
+              className="rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+              onClick={() => setIsOpen(false)}
+            >
+              Blocked users
             </Link>
             <button
               type="button"

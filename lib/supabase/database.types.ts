@@ -329,6 +329,7 @@ export type Database = {
           role: Database["public"]["Enums"]["profile_role"]
           suspended_at: string | null
           suspended_by: string | null
+          transactions_seen_at: string | null
           university: string | null
           university_id: number | null
           updated_at: string
@@ -347,6 +348,7 @@ export type Database = {
           role?: Database["public"]["Enums"]["profile_role"]
           suspended_at?: string | null
           suspended_by?: string | null
+          transactions_seen_at?: string | null
           university?: string | null
           university_id?: number | null
           updated_at?: string
@@ -365,6 +367,7 @@ export type Database = {
           role?: Database["public"]["Enums"]["profile_role"]
           suspended_at?: string | null
           suspended_by?: string | null
+          transactions_seen_at?: string | null
           university?: string | null
           university_id?: number | null
           updated_at?: string
@@ -399,6 +402,7 @@ export type Database = {
           reported_message_id: string | null
           reported_user_id: string | null
           reporter_id: string | null
+          resolution_note: string | null
           reviewed_at: string | null
           reviewed_by: string | null
           status: Database["public"]["Enums"]["report_status"]
@@ -415,6 +419,7 @@ export type Database = {
           reported_message_id?: string | null
           reported_user_id?: string | null
           reporter_id?: string | null
+          resolution_note?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: Database["public"]["Enums"]["report_status"]
@@ -431,6 +436,7 @@ export type Database = {
           reported_message_id?: string | null
           reported_user_id?: string | null
           reporter_id?: string | null
+          resolution_note?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: Database["public"]["Enums"]["report_status"]
@@ -569,6 +575,39 @@ export type Database = {
           },
         ]
       }
+      user_blocks: {
+        Row: {
+          blocker_id: string
+          blocked_id: string
+          created_at: string
+        }
+        Insert: {
+          blocker_id: string
+          blocked_id: string
+          created_at?: string
+        }
+        Update: {
+          blocker_id?: string
+          blocked_id?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_blocks_blocker_id_fkey"
+            columns: ["blocker_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_blocks_blocked_id_fkey"
+            columns: ["blocked_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       study_areas: {
         Row: {
           created_at: string
@@ -662,6 +701,7 @@ export type Database = {
           created_at: string
           id: string
           listing_id: string
+          offered_listing_id: string | null
           reservation_confirmed_at: string | null
           reservation_expires_at: string | null
           reservation_requested_at: string
@@ -681,6 +721,7 @@ export type Database = {
           created_at?: string
           id?: string
           listing_id: string
+          offered_listing_id?: string | null
           reservation_confirmed_at?: string | null
           reservation_expires_at?: string | null
           reservation_requested_at?: string
@@ -700,6 +741,7 @@ export type Database = {
           created_at?: string
           id?: string
           listing_id?: string
+          offered_listing_id?: string | null
           reservation_confirmed_at?: string | null
           reservation_expires_at?: string | null
           reservation_requested_at?: string
