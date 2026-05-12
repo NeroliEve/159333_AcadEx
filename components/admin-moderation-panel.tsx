@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { AdminDashboard } from "@/components/admin-dashboard";
+import { AdminStatsPanel } from "@/components/admin-stats-panel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -47,14 +48,14 @@ type AdminTab =
   | "catalog";
 
 const tabs: Array<{ id: AdminTab; label: string }> = [
-  { id: "overview", label: "Overview" },
-  { id: "users", label: "Users" },
-  { id: "listings", label: "Listings" },
+  { id: "overview",    label: "Overview" },
+  { id: "users",       label: "Users" },
+  { id: "listings",    label: "Listings" },
   { id: "verification", label: "Verification" },
-  { id: "reports", label: "Reports" },
-  { id: "support", label: "Support" },
-  { id: "audit", label: "Audit" },
-  { id: "catalog", label: "Catalog" },
+  { id: "reports",     label: "Reports" },
+  { id: "support",     label: "Support" },
+  { id: "audit",       label: "Audit" },
+  { id: "catalog",     label: "Catalog" },
 ];
 
 function formatDateTime(value: string | null | undefined) {
@@ -677,6 +678,16 @@ export function AdminModerationPanel({
                 ) : null}
               </CardContent>
             </Card>
+          </div>
+
+          <div className="space-y-4 pt-4">
+            <div className="border-t border-border/70 pt-6">
+              <h2 className="text-xl font-semibold tracking-tight">AcadEx exchange statistics</h2>
+              <p className="text-sm text-muted-foreground">
+                Live insights from completed exchanges across the platform.
+              </p>
+            </div>
+            <AdminStatsPanel />
           </div>
         </div>
       ) : null}

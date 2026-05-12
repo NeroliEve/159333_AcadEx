@@ -40,7 +40,7 @@ export function AiSearchBar() {
         return;
       }
 
-      // Build URL params from the filters Gemini extracted
+      // Build URL params from the filters Claude extracted
       const params = new URLSearchParams(data.filters ?? {});
 
       // Pass the explanation through the URL so the home page can display it
