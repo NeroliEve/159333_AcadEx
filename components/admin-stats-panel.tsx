@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   Area,
   AreaChart,
@@ -12,7 +12,9 @@ import {
   Pie,
   PieChart,
   ResponsiveContainer,
-  Tooltip,
+  Tooltip as RechartsTooltip,
+  type TooltipContentProps,
+  type TooltipValueType,
   XAxis,
   YAxis,
 } from "recharts";
@@ -94,6 +96,68 @@ function formatYearLevel(level: string) {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
+function formatTooltipValue(value: TooltipValueType | undefined) {
+  if (Array.isArray(value)) {
+    return value.join(" - ");
+  }
+
+  return value ?? "N/A";
+}
+
+function getTooltipName(name: unknown, dataKey: unknown) {
+  if (typeof name === "string" || typeof name === "number") {
+    return name;
+  }
+
+  if (typeof dataKey === "string" || typeof dataKey === "number") {
+    return dataKey;
+  }
+
+  return "Value";
+}
+
+function ChartTooltip({
+  active,
+  label,
+  payload,
+}: TooltipContentProps<TooltipValueType, string | number>) {
+  if (!active || payload.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="min-w-32 rounded-md border border-border bg-popover px-3 py-2 text-sm text-popover-foreground shadow-lg">
+      {label != null ? (
+        <p className="mb-1 max-w-48 truncate text-xs font-medium text-muted-foreground">
+          {label}
+        </p>
+      ) : null}
+      <div className="space-y-1">
+        {payload.map((item, index) => {
+          const colour = item.color ?? item.fill ?? item.stroke ?? "hsl(var(--primary))";
+          const name = getTooltipName(item.name, item.dataKey);
+
+          return (
+            <div key={`${name}-${index}`} className="flex items-center justify-between gap-4">
+              <span className="flex min-w-0 items-center gap-2">
+                <span
+                  className="h-2.5 w-2.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: colour }}
+                />
+                <span className="truncate text-muted-foreground">{name}</span>
+              </span>
+              <span className="font-medium tabular-nums">
+                {formatTooltipValue(item.value)}
+                {item.unit}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function StatCard({
   label,
   value,
@@ -121,7 +185,7 @@ function StatCard({
   );
 }
 
-function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
+function SectionCard({ title, children }: { title: string; children: ReactNode }) {
   return (
     <Card className="border-border/70">
       <CardHeader className="pb-2">
@@ -267,7 +331,7 @@ export function AdminStatsPanel() {
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="name" tick={{ fontSize: 12 }} />
               <YAxis allowDecimals={false} tick={{ fontSize: 12 }} width={32} />
-              <Tooltip />
+              <RechartsTooltip content={ChartTooltip} />
               <Area
                 type="monotone"
                 dataKey="Exchanges"
@@ -295,7 +359,7 @@ export function AdminStatsPanel() {
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
                 <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12 }} />
                 <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={100} />
-                <Tooltip />
+                <RechartsTooltip content={ChartTooltip} />
                 <Bar dataKey="Exchanges" fill="#1F5EE4" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -315,16 +379,12 @@ export function AdminStatsPanel() {
                   cx="50%"
                   cy="50%"
                   outerRadius={85}
-                  label={({ name, percent }) =>
-                    `${name} ${((percent ?? 0) * 100).toFixed(0)}%`
-                  }
-                  labelLine={false}
                 >
                   {listingTypeChartData.map((_, index) => (
                     <Cell key={index} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip />
+                <RechartsTooltip content={ChartTooltip} />
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
@@ -343,7 +403,7 @@ export function AdminStatsPanel() {
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                 <YAxis allowDecimals={false} tick={{ fontSize: 12 }} width={32} />
-                <Tooltip />
+                <RechartsTooltip content={ChartTooltip} />
                 <Bar dataKey="Exchanges" fill="#6B9FF7" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>

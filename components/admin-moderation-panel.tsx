@@ -16,7 +16,6 @@ import type {
   AdminListingRecord,
   AdminOverviewStats,
   AdminReportRecord,
-  AdminSupportTicketRecord,
   AdminUserRecord,
 } from "@/lib/admin";
 import type { AdminCourse, UniversityOption } from "@/lib/marketplace";
@@ -27,7 +26,6 @@ type AdminModerationPanelProps = {
   listings: AdminListingRecord[];
   overview: AdminOverviewStats;
   reports: AdminReportRecord[];
-  supportTickets: AdminSupportTicketRecord[];
   universities: UniversityOption[];
   users: AdminUserRecord[];
 };
@@ -43,7 +41,6 @@ type AdminTab =
   | "listings"
   | "verification"
   | "reports"
-  | "support"
   | "audit"
   | "catalog";
 
@@ -53,7 +50,6 @@ const tabs: Array<{ id: AdminTab; label: string }> = [
   { id: "listings",    label: "Listings" },
   { id: "verification", label: "Verification" },
   { id: "reports",     label: "Reports" },
-  { id: "support",     label: "Support" },
   { id: "audit",       label: "Audit" },
   { id: "catalog",     label: "Catalog" },
 ];
@@ -110,7 +106,6 @@ export function AdminModerationPanel({
   listings: initialListings,
   overview,
   reports: initialReports,
-  supportTickets: initialSupportTickets,
   universities,
   users: initialUsers,
 }: AdminModerationPanelProps) {
@@ -119,7 +114,6 @@ export function AdminModerationPanel({
   const [users, setUsers] = useState(initialUsers);
   const [listings, setListings] = useState(initialListings);
   const [reports, setReports] = useState(initialReports);
-  const [supportTickets, setSupportTickets] = useState(initialSupportTickets);
   const [auditLogs, setAuditLogs] = useState(initialAuditLogs);
   const [managedUserId, setManagedUserId] = useState<string | null>(null);
   const [pendingKey, setPendingKey] = useState<string | null>(null);
@@ -131,11 +125,9 @@ export function AdminModerationPanel({
   const [listingQuery, setListingQuery] = useState("");
   const [listingVisibilityFilter, setListingVisibilityFilter] = useState("all");
   const [reportStatusFilter, setReportStatusFilter] = useState("all");
-  const [supportStatusFilter, setSupportStatusFilter] = useState("all");
   const [userNotes, setUserNotes] = useState<Record<string, string>>({});
   const [listingNotes, setListingNotes] = useState<Record<string, string>>({});
   const [reportNotes, setReportNotes] = useState<Record<string, string>>({});
-  const [supportNotes, setSupportNotes] = useState<Record<string, string>>({});
   const toastTimeoutRef = useRef<number | null>(null);
   const toastTransitionTimeoutRef = useRef<number | null>(null);
 
@@ -150,10 +142,6 @@ export function AdminModerationPanel({
   useEffect(() => {
     setReports(initialReports);
   }, [initialReports]);
-
-  useEffect(() => {
-    setSupportTickets(initialSupportTickets);
-  }, [initialSupportTickets]);
 
   useEffect(() => {
     setAuditLogs(initialAuditLogs);
@@ -301,13 +289,24 @@ export function AdminModerationPanel({
     [reportStatusFilter, reports],
   );
 
-  const filteredSupportTickets = useMemo(
+  const newestPendingReports = useMemo(
     () =>
-      supportTickets.filter((ticket) =>
-        supportStatusFilter === "all" ? true : ticket.status === supportStatusFilter,
-      ),
-    [supportStatusFilter, supportTickets],
+      reports
+        .filter((report) => report.status === "pending")
+        .slice(0, 5),
+    [reports],
   );
+
+  function openReport(reportId: string) {
+    setReportStatusFilter("pending");
+    setActiveTab("reports");
+
+    window.setTimeout(() => {
+      document
+        .getElementById(`admin-report-${reportId}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
+  }
 
   async function handleJsonResponse(response: Response) {
     const payload = (await response.json().catch(() => ({}))) as {
@@ -316,7 +315,6 @@ export function AdminModerationPanel({
       error?: string;
       listing?: AdminListingRecord;
       report?: AdminReportRecord;
-      ticket?: AdminSupportTicketRecord;
       user?: AdminUserRecord;
     };
 
@@ -498,52 +496,6 @@ export function AdminModerationPanel({
     }
   }
 
-  async function updateSupportTicket(ticketId: string, nextTicket: AdminSupportTicketRecord) {
-    setPendingKey(`support-${ticketId}`);
-
-    try {
-      const response = await fetch(`/api/admin/support/${ticketId}`, {
-        body: JSON.stringify({
-          assignedAdminId: nextTicket.assignedAdmin?.id ?? "",
-          notes: supportNotes[ticketId] ?? "",
-          status: nextTicket.status,
-        }),
-        headers: { "Content-Type": "application/json" },
-        method: "PATCH",
-      });
-
-      const payload = await handleJsonResponse(response);
-      if (payload.ticket) {
-        setSupportTickets((current) =>
-          current.map((ticket) =>
-            ticket.id === ticketId
-              ? {
-                  ...ticket,
-                  ...(payload.ticket as Partial<AdminSupportTicketRecord>),
-                }
-              : ticket,
-          ),
-        );
-      }
-      setSupportNotes((current) => ({ ...current, [ticketId]: "" }));
-      setFeedback({
-        text: payload.message ?? "Support ticket updated.",
-        type: "success",
-      });
-      router.refresh();
-    } catch (error) {
-      setFeedback({
-        text:
-          error instanceof Error
-            ? error.message
-            : "Could not update this support ticket.",
-        type: "error",
-      });
-    } finally {
-      setPendingKey(null);
-    }
-  }
-
   return (
     <>
       {feedback ? (
@@ -580,21 +532,13 @@ export function AdminModerationPanel({
 
       {activeTab === "overview" ? (
         <div className="space-y-8">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <Card className="border-border/70">
               <CardHeader>
                 <CardTitle>Pending reports</CardTitle>
               </CardHeader>
               <CardContent className="text-3xl font-semibold">
                 {overview.pendingReports}
-              </CardContent>
-            </Card>
-            <Card className="border-border/70">
-              <CardHeader>
-                <CardTitle>Open support tickets</CardTitle>
-              </CardHeader>
-              <CardContent className="text-3xl font-semibold">
-                {overview.openSupportTickets}
               </CardContent>
             </Card>
             <Card className="border-border/70">
@@ -631,50 +575,37 @@ export function AdminModerationPanel({
             </Card>
           </div>
 
-          <div className="grid gap-6 xl:grid-cols-2">
+          <div>
             <Card className="border-border/70">
               <CardHeader>
                 <CardTitle>Newest pending reports</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {reports.filter((report) => report.status === "pending").slice(0, 5).map((report) => (
-                  <div key={report.id} className="rounded-xl border border-border/70 p-4">
-                    <p className="text-sm font-medium">
-                      {report.report_type} report
-                    </p>
-                    <p className="text-sm text-muted-foreground">{report.reason}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatDateTime(report.created_at)}
-                    </p>
-                  </div>
-                ))}
-                {reports.every((report) => report.status !== "pending") ? (
-                  <p className="text-sm text-muted-foreground">No pending reports.</p>
-                ) : null}
-              </CardContent>
-            </Card>
-
-            <Card className="border-border/70">
-              <CardHeader>
-                <CardTitle>Newest active support tickets</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {supportTickets
-                  .filter((ticket) => ticket.status === "open" || ticket.status === "in_progress")
-                  .slice(0, 5)
-                  .map((ticket) => (
-                    <div key={ticket.id} className="rounded-xl border border-border/70 p-4">
-                      <p className="text-sm font-medium">{ticket.subject}</p>
-                      <p className="text-sm text-muted-foreground">{ticket.category}</p>
+                {newestPendingReports.map((report) => (
+                  <div
+                    key={report.id}
+                    className="flex flex-col gap-4 rounded-xl border border-border/70 p-4 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">
+                        {report.report_type} report
+                      </p>
+                      <p className="text-sm text-muted-foreground">{report.reason}</p>
                       <p className="text-xs text-muted-foreground">
-                        {formatDateTime(ticket.created_at)}
+                        {formatDateTime(report.created_at)}
                       </p>
                     </div>
-                  ))}
-                {supportTickets.every(
-                  (ticket) => ticket.status !== "open" && ticket.status !== "in_progress",
-                ) ? (
-                  <p className="text-sm text-muted-foreground">No open support tickets.</p>
+                    <PillButton
+                      type="button"
+                      variant="secondary"
+                      onClick={() => openReport(report.id)}
+                    >
+                      View
+                    </PillButton>
+                  </div>
+                ))}
+                {newestPendingReports.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No pending reports.</p>
                 ) : null}
               </CardContent>
             </Card>
@@ -1347,7 +1278,11 @@ export function AdminModerationPanel({
 
           <div className="grid gap-4">
             {filteredReports.map((report) => (
-              <Card key={report.id} className="border-border/70">
+              <Card
+                key={report.id}
+                id={`admin-report-${report.id}`}
+                className="scroll-mt-6 border-border/70"
+              >
                 <CardContent className="space-y-4 p-6">
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div className="space-y-1">
@@ -1500,131 +1435,6 @@ export function AdminModerationPanel({
                         }))
                       }
                     />
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      ) : null}
-
-      {activeTab === "support" ? (
-        <div className="space-y-6">
-          <Card className="border-border/70">
-            <CardContent className="grid gap-4 p-6 md:grid-cols-2">
-              <div className="grid gap-2">
-                <Label htmlFor="support-status-filter">Support status</Label>
-                <select
-                  id="support-status-filter"
-                  className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
-                  value={supportStatusFilter}
-                  onChange={(event) => setSupportStatusFilter(event.target.value)}
-                >
-                  <option value="all">All statuses</option>
-                  <option value="open">Open</option>
-                  <option value="in_progress">In progress</option>
-                  <option value="resolved">Resolved</option>
-                  <option value="closed">Closed</option>
-                </select>
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="grid gap-4">
-            {filteredSupportTickets.map((ticket) => (
-              <Card key={ticket.id} className="border-border/70">
-                <CardContent className="space-y-4 p-6">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <p className="text-lg font-semibold">{ticket.subject}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {ticket.category}
-                      </p>
-                    </div>
-                    <span className="rounded-full bg-secondary px-3 py-1 text-xs">
-                      {ticket.status}
-                    </span>
-                  </div>
-
-                  <div className="grid gap-2 text-sm text-muted-foreground">
-                    <p>User: {formatPersonName(ticket.user)}</p>
-                    <p>Created: {formatDateTime(ticket.created_at)}</p>
-                    <p>{ticket.message}</p>
-                  </div>
-
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="grid gap-2">
-                      <Label>Status</Label>
-                      <select
-                        className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
-                        value={ticket.status}
-                        onChange={(event) =>
-                          setSupportTickets((current) =>
-                            current.map((entry) =>
-                              entry.id === ticket.id
-                                ? {
-                                    ...entry,
-                                    status: event.target.value as AdminSupportTicketRecord["status"],
-                                  }
-                                : entry,
-                            ),
-                          )
-                        }
-                      >
-                        <option value="open">Open</option>
-                        <option value="in_progress">In progress</option>
-                        <option value="resolved">Resolved</option>
-                        <option value="closed">Closed</option>
-                      </select>
-                    </div>
-                    <div className="grid gap-2">
-                      <Label>Assigned admin</Label>
-                      <select
-                        className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
-                        value={ticket.assignedAdmin?.id ?? ""}
-                        onChange={(event) =>
-                          setSupportTickets((current) =>
-                            current.map((entry) =>
-                              entry.id === ticket.id
-                                ? {
-                                    ...entry,
-                                    assignedAdmin:
-                                      activeAdmins.find((admin) => admin.id === event.target.value) ?? null,
-                                  }
-                                : entry,
-                            ),
-                          )
-                        }
-                      >
-                        <option value="">Unassigned</option>
-                        {activeAdmins.map((admin) => (
-                          <option key={admin.id} value={admin.id}>
-                            {formatPersonName(admin)}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <Textarea
-                    placeholder="Optional internal support note."
-                    value={supportNotes[ticket.id] ?? ""}
-                    onChange={(event) =>
-                      setSupportNotes((current) => ({
-                        ...current,
-                        [ticket.id]: event.target.value,
-                      }))
-                    }
-                  />
-
-                  <div className="flex justify-end">
-                    <PillButton
-                      type="button"
-                      disabled={pendingKey === `support-${ticket.id}`}
-                      onClick={() => void updateSupportTicket(ticket.id, ticket)}
-                    >
-                      Save ticket
-                    </PillButton>
                   </div>
                 </CardContent>
               </Card>

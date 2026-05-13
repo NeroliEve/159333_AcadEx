@@ -36,7 +36,6 @@ $$;
 
 alter table if exists public.profiles enable row level security;
 alter table if exists public.reports enable row level security;
-alter table if exists public.support_tickets enable row level security;
 alter table if exists public.admin_action_logs enable row level security;
 
 drop policy if exists "profiles_select_all" on public.profiles;
@@ -69,21 +68,6 @@ using (public.is_active_admin());
 drop policy if exists "reports_update_active_admin_only" on public.reports;
 create policy "reports_update_active_admin_only"
 on public.reports
-for update
-to authenticated
-using (public.is_active_admin())
-with check (public.is_active_admin());
-
-drop policy if exists "support_tickets_select_active_admin_only" on public.support_tickets;
-create policy "support_tickets_select_active_admin_only"
-on public.support_tickets
-for select
-to authenticated
-using (public.is_active_admin());
-
-drop policy if exists "support_tickets_update_active_admin_only" on public.support_tickets;
-create policy "support_tickets_update_active_admin_only"
-on public.support_tickets
 for update
 to authenticated
 using (public.is_active_admin())

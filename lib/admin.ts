@@ -100,20 +100,6 @@ export type AdminReportRecord = Pick<
   reviewedBy: Pick<TableRow<"profiles">, "first_name" | "id" | "last_name" | "username"> | null;
 };
 
-export type AdminSupportTicketRecord = Pick<
-  TableRow<"support_tickets">,
-  | "category"
-  | "created_at"
-  | "id"
-  | "message"
-  | "resolved_at"
-  | "status"
-  | "subject"
-> & {
-  assignedAdmin: Pick<TableRow<"profiles">, "first_name" | "id" | "last_name" | "username"> | null;
-  user: Pick<TableRow<"profiles">, "email" | "first_name" | "id" | "last_name" | "username"> | null;
-};
-
 export type AdminAuditRecord = Pick<
   TableRow<"admin_action_logs">,
   | "action_type"
@@ -129,7 +115,6 @@ export type AdminAuditRecord = Pick<
 export type AdminOverviewStats = {
   activeAdmins: number;
   hiddenListings: number;
-  openSupportTickets: number;
   pendingReports: number;
   suspendedUsers: number;
   unverifiedUsers: number;
@@ -140,7 +125,6 @@ export type AdminWorkspaceData = {
   listings: AdminListingRecord[];
   overview: AdminOverviewStats;
   reports: AdminReportRecord[];
-  supportTickets: AdminSupportTicketRecord[];
   users: AdminUserRecord[];
 };
 
@@ -177,17 +161,6 @@ const ADMIN_REPORT_SELECT = `
   reportedUser:profiles!reports_reported_user_id_fkey(id, email, first_name, last_name, username),
   reporter:profiles!reports_reporter_id_fkey(id, email, first_name, last_name, username),
   reviewedBy:profiles!reports_reviewed_by_fkey(id, first_name, last_name, username)
-`;
-const ADMIN_SUPPORT_TICKET_SELECT = `
-  id,
-  category,
-  created_at,
-  message,
-  resolved_at,
-  status,
-  subject,
-  assignedAdmin:profiles!support_tickets_assigned_admin_id_fkey(id, first_name, last_name, username),
-  user:profiles!support_tickets_user_id_fkey(id, email, first_name, last_name, username)
 `;
 const ADMIN_AUDIT_LOG_SELECT = `
   id,
@@ -308,12 +281,10 @@ export async function getAdminWorkspaceData(
     { data: users, error: usersError },
     { data: listings, error: listingsError },
     { data: reports, error: reportsError },
-    { data: supportTickets, error: supportTicketsError },
     { data: auditLogs, error: auditLogsError },
     { count: suspendedUsersCount, error: suspendedUsersError },
     { count: unverifiedUsersCount, error: unverifiedUsersError },
     { count: pendingReportsCount, error: pendingReportsError },
-    { count: openSupportTicketsCount, error: openSupportTicketsError },
     { count: hiddenListingsCount, error: hiddenListingsError },
     { count: activeAdminsCount, error: activeAdminsError },
   ] = await Promise.all([
@@ -330,11 +301,6 @@ export async function getAdminWorkspaceData(
     supabase
       .from("reports")
       .select(ADMIN_REPORT_SELECT)
-      .order("created_at", { ascending: false })
-      .limit(100),
-    supabase
-      .from("support_tickets")
-      .select(ADMIN_SUPPORT_TICKET_SELECT)
       .order("created_at", { ascending: false })
       .limit(100),
     supabase
@@ -355,10 +321,6 @@ export async function getAdminWorkspaceData(
       .select("id", { count: "exact", head: true })
       .eq("status", "pending"),
     supabase
-      .from("support_tickets")
-      .select("id", { count: "exact", head: true })
-      .in("status", ["open", "in_progress"]),
-    supabase
       .from("listings")
       .select("id", { count: "exact", head: true })
       .not("deleted_at", "is", null),
@@ -373,12 +335,10 @@ export async function getAdminWorkspaceData(
     usersError,
     listingsError,
     reportsError,
-    supportTicketsError,
     auditLogsError,
     suspendedUsersError,
     unverifiedUsersError,
     pendingReportsError,
-    openSupportTicketsError,
     hiddenListingsError,
     activeAdminsError,
   ].find(Boolean);
@@ -429,13 +389,11 @@ export async function getAdminWorkspaceData(
     overview: {
       activeAdmins: activeAdminsCount ?? 0,
       hiddenListings: hiddenListingsCount ?? 0,
-      openSupportTickets: openSupportTicketsCount ?? 0,
       pendingReports: pendingReportsCount ?? 0,
       suspendedUsers: suspendedUsersCount ?? 0,
       unverifiedUsers: unverifiedUsersCount ?? 0,
     },
     reports: reportsWithContext,
-    supportTickets: (supportTickets ?? []) as unknown as AdminSupportTicketRecord[],
     users: (users ?? []) as unknown as AdminUserRecord[],
   };
 }

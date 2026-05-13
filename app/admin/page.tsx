@@ -36,8 +36,8 @@ async function AdminContent() {
             Admin moderation
           </h1>
           <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-            Oversee listings, users, verification, reports, support tickets,
-            audit history, and the shared catalog.
+            Oversee listings, users, verification, reports, audit history,
+            and the shared catalog.
           </p>
         </div>
       </div>
@@ -48,7 +48,6 @@ async function AdminContent() {
         listings={workspace.listings}
         overview={workspace.overview}
         reports={workspace.reports}
-        supportTickets={workspace.supportTickets}
         universities={universities}
         users={workspace.users}
       />

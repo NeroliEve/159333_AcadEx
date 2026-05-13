@@ -635,60 +635,6 @@ export type Database = {
         }
         Relationships: []
       }
-      support_tickets: {
-        Row: {
-          assigned_admin_id: string | null
-          category: Database["public"]["Enums"]["support_ticket_category"]
-          created_at: string
-          id: string
-          message: string
-          resolved_at: string | null
-          status: Database["public"]["Enums"]["support_ticket_status"]
-          subject: string
-          updated_at: string
-          user_id: string | null
-        }
-        Insert: {
-          assigned_admin_id?: string | null
-          category: Database["public"]["Enums"]["support_ticket_category"]
-          created_at?: string
-          id?: string
-          message: string
-          resolved_at?: string | null
-          status?: Database["public"]["Enums"]["support_ticket_status"]
-          subject: string
-          updated_at?: string
-          user_id?: string | null
-        }
-        Update: {
-          assigned_admin_id?: string | null
-          category?: Database["public"]["Enums"]["support_ticket_category"]
-          created_at?: string
-          id?: string
-          message?: string
-          resolved_at?: string | null
-          status?: Database["public"]["Enums"]["support_ticket_status"]
-          subject?: string
-          updated_at?: string
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "support_tickets_assigned_admin_id_fkey"
-            columns: ["assigned_admin_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "support_tickets_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       transactions: {
         Row: {
           agreed_price: number | null
@@ -842,15 +788,6 @@ export type Database = {
       report_status: "pending" | "reviewed" | "resolved" | "dismissed"
       report_type: "user" | "listing" | "conversation" | "message"
       review_role: "buyer" | "seller"
-      support_ticket_category:
-        | "account_issue"
-        | "verification_issue"
-        | "listing_issue"
-        | "transaction_issue"
-        | "report_appeal"
-        | "technical_issue"
-        | "other"
-      support_ticket_status: "open" | "in_progress" | "resolved" | "closed"
       transaction_status: "pending" | "completed" | "cancelled" | "mismatch"
     }
     CompositeTypes: {
@@ -978,16 +915,6 @@ export const Constants = {
       report_status: ["pending", "reviewed", "resolved", "dismissed"],
       report_type: ["user", "listing", "conversation", "message"],
       review_role: ["buyer", "seller"],
-      support_ticket_category: [
-        "account_issue",
-        "verification_issue",
-        "listing_issue",
-        "transaction_issue",
-        "report_appeal",
-        "technical_issue",
-        "other",
-      ],
-      support_ticket_status: ["open", "in_progress", "resolved", "closed"],
       transaction_status: ["pending", "completed", "cancelled", "mismatch"],
     },
   },
