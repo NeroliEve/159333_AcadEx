@@ -63,13 +63,13 @@ async function MyReportsContent() {
         <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">Profile</p>
         <h1 className="text-3xl font-semibold tracking-tight">My reports</h1>
         <p className="text-sm text-muted-foreground">
-          Reports you've submitted, with their current status. Admins review every report.
+          Reports you&apos;ve submitted, with their current status. Admins review every report.
         </p>
       </div>
 
       {reports.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border/70 bg-muted/40 p-8 text-center text-sm text-muted-foreground">
-          You haven't filed any reports.
+          You haven&apos;t filed any reports.
         </div>
       ) : (
         <div className="space-y-3">

@@ -142,6 +142,7 @@ export async function POST(request: Request) {
     offered_listing_id: isTradeRequest ? offeredListingId : null,
     agreed_price: isTradeRequest ? null : listing.price,
     agreed_trade_text: isTradeRequest ? listing.wanted_trade_text : null,
+    payment_status: isTradeRequest ? "not_required" : "unpaid",
     status: "pending",
     reservation_requested_at: new Date().toISOString(),
   });

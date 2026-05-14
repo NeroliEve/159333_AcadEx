@@ -4,6 +4,7 @@ import {
   getMarketplaceSuspendedResponse,
   getViewerAccessContext,
 } from "@/lib/admin";
+import { canCompleteTransaction } from "@/lib/payments";
 
 export async function PATCH(
   request: Request,
@@ -28,7 +29,7 @@ export async function PATCH(
 
   const { data: transaction } = await supabase
     .from("transactions")
-    .select("id, listing_id, offered_listing_id, buyer_id, seller_id, status, reservation_confirmed_at")
+    .select("id, listing_id, offered_listing_id, buyer_id, seller_id, status, reservation_confirmed_at, payment_status")
     .eq("id", id)
     .maybeSingle();
 
@@ -50,6 +51,24 @@ export async function PATCH(
     return NextResponse.json({ error: "Only the seller can perform this action." }, { status: 403 });
   }
 
+  if (action === "complete" && !canCompleteTransaction(transaction)) {
+    return NextResponse.json(
+      { error: "The buyer must complete Stripe payment before this sale can be marked completed." },
+      { status: 400 },
+    );
+  }
+
+  if (
+    action === "cancel" &&
+    !transaction.offered_listing_id &&
+    transaction.payment_status === "paid"
+  ) {
+    return NextResponse.json(
+      { error: "Paid demo transactions cannot be cancelled." },
+      { status: 400 },
+    );
+  }
+
   const now = new Date().toISOString();
   const listingIds = [transaction.listing_id];
   if (transaction.offered_listing_id) listingIds.push(transaction.offered_listing_id);
@@ -57,6 +76,7 @@ export async function PATCH(
   if (action === "accept") {
     const [{ error: txError }, { error: listingError }] = await Promise.all([
       supabase.from("transactions").update({
+        payment_status: transaction.offered_listing_id ? "not_required" : "unpaid",
         status: "pending",
         reservation_confirmed_at: now,
         updated_at: now,

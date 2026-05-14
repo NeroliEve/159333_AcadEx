@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { MarkTransactionsSeen } from "@/components/mark-transactions-seen";
+import { PayTransactionButton } from "@/components/pay-transaction-button";
 import { ReviewForm } from "@/components/review-form";
 import { TransactionActions } from "@/components/transaction-actions";
 import { isMarketplaceSuspended } from "@/lib/admin";
@@ -15,6 +16,7 @@ import {
   type ReviewData,
   type TransactionData,
 } from "@/lib/marketplace";
+import { canCompleteTransaction } from "@/lib/payments";
 
 function transactionStatusBadge(status: TransactionData["status"]) {
   switch (status) {
@@ -26,6 +28,21 @@ function transactionStatusBadge(status: TransactionData["status"]) {
       return "bg-orange-100 text-orange-800";
     default:
       return "bg-yellow-100 text-yellow-800";
+  }
+}
+
+function paymentStatusLabel(status: TransactionData["payment_status"]) {
+  switch (status) {
+    case "checkout_pending":
+      return "Checkout pending";
+    case "failed":
+      return "Payment failed";
+    case "paid":
+      return "Paid";
+    case "unpaid":
+      return "Awaiting payment";
+    default:
+      return "No payment required";
   }
 }
 
@@ -41,6 +58,17 @@ function TransactionRow({
   existingReview: ReviewData | null;
 }) {
   const isSeller = tx.seller_id === viewerId;
+  const isBuyer = tx.buyer_id === viewerId;
+  const isTrade = !!tx.offered_listing_id;
+  const isAccepted = !!tx.reservation_confirmed_at;
+  const canComplete = canCompleteTransaction(tx);
+  const canCancel = !(tx.payment_status === "paid" && !isTrade);
+  const buyerCanPay =
+    isBuyer &&
+    !isTrade &&
+    isAccepted &&
+    tx.status === "pending" &&
+    tx.payment_status !== "paid";
   const otherParty = isSeller ? tx.buyer : tx.seller;
   const otherName = otherParty
     ? `${otherParty.first_name} ${otherParty.last_name}`.trim() || otherParty.username
@@ -88,6 +116,11 @@ function TransactionRow({
           <p className="text-sm font-semibold">
             {tx.agreed_price != null ? formatPrice(tx.agreed_price) : "Price TBC"}
           </p>
+          {!isTrade ? (
+            <p className="text-xs text-muted-foreground">
+              {paymentStatusLabel(tx.payment_status)}
+            </p>
+          ) : null}
           <p className="text-xs text-muted-foreground">
             {new Date(tx.created_at).toLocaleDateString("en-NZ", {
               day: "numeric",
@@ -126,10 +159,32 @@ function TransactionRow({
         </div>
       ) : null}
 
+      {buyerCanPay && !isSuspended ? (
+        <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1">
+              <p className="text-sm font-medium">Seller accepted your request</p>
+              <p className="text-xs text-muted-foreground">
+                Pay with Stripe test checkout to credit the seller&apos;s demo wallet.
+              </p>
+            </div>
+            <PayTransactionButton transactionId={tx.id} />
+          </div>
+        </div>
+      ) : null}
+
+      {isSeller && isAccepted && !isTrade && tx.payment_status !== "paid" ? (
+        <p className="rounded-lg border border-border/70 bg-secondary/40 p-3 text-sm text-muted-foreground">
+          Waiting for the buyer to complete Stripe test payment before this sale can be completed.
+        </p>
+      ) : null}
+
       {tx.status === "pending" && !isSuspended ? (
         <TransactionActions
+          canCancel={canCancel}
+          canComplete={canComplete}
           transactionId={tx.id}
-          isAccepted={!!tx.reservation_confirmed_at}
+          isAccepted={isAccepted}
           isSeller={isSeller}
         />
       ) : null}

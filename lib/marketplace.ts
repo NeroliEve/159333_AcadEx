@@ -529,8 +529,10 @@ export type TransactionData = {
   agreed_price: number | null;
   agreed_trade_text: string | null;
   status: PublicEnum<"transaction_status">;
+  payment_status: PublicEnum<"transaction_payment_status">;
   seller_confirmed_completed: boolean;
   reservation_confirmed_at: string | null;
+  paid_at: string | null;
   completed_at: string | null;
   cancelled_at: string | null;
   created_at: string;
@@ -543,7 +545,7 @@ export type TransactionData = {
 
 const TRANSACTION_SELECT = `
   id, listing_id, offered_listing_id, conversation_id, buyer_id, seller_id, agreed_price, agreed_trade_text,
-  status, seller_confirmed_completed, reservation_confirmed_at,
+  status, payment_status, seller_confirmed_completed, reservation_confirmed_at, paid_at,
   completed_at, cancelled_at, created_at, updated_at,
   listing:listings!transactions_listing_id_fkey(id, title, primary_image_url, price, condition),
   offered_listing:listings!transactions_offered_listing_id_fkey(id, title, primary_image_url, price, condition),

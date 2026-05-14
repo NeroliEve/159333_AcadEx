@@ -272,6 +272,13 @@ export function UserMenu({
                     </span>
                   ) : null}
                 </Link>
+                <Link
+                  href="/profile/wallet"
+                  className="rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                  onClick={() => setIsOpen(false)}
+                >
+                  Wallet
+                </Link>
               </>
             ) : null}
             <Link

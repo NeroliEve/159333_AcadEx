@@ -4,13 +4,21 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 type TransactionActionsProps = {
+  canCancel: boolean;
+  canComplete: boolean;
   transactionId: string;
   isSeller: boolean;
   // Whether the seller has already accepted this request (reservation_confirmed_at is set)
   isAccepted: boolean;
 };
 
-export function TransactionActions({ transactionId, isSeller, isAccepted }: TransactionActionsProps) {
+export function TransactionActions({
+  canCancel,
+  canComplete,
+  transactionId,
+  isSeller,
+  isAccepted,
+}: TransactionActionsProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +59,7 @@ export function TransactionActions({ transactionId, isSeller, isAccepted }: Tran
             Accept request
           </button>
         )}
-        {isSeller && isAccepted && (
+        {isSeller && isAccepted && canComplete && (
           // Once accepted, seller can mark the exchange as done
           <button
             className="inline-flex h-8 items-center justify-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
@@ -62,14 +70,16 @@ export function TransactionActions({ transactionId, isSeller, isAccepted }: Tran
             Mark as completed
           </button>
         )}
-        <button
-          className="inline-flex h-8 items-center justify-center rounded-md border border-input bg-background px-3 text-xs font-medium transition-colors hover:bg-destructive hover:text-destructive-foreground disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={isLoading}
-          onClick={() => handleAction("cancel")}
-          type="button"
-        >
-          Cancel
-        </button>
+        {canCancel ? (
+          <button
+            className="inline-flex h-8 items-center justify-center rounded-md border border-input bg-background px-3 text-xs font-medium transition-colors hover:bg-destructive hover:text-destructive-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={isLoading}
+            onClick={() => handleAction("cancel")}
+            type="button"
+          >
+            Cancel
+          </button>
+        ) : null}
       </div>
       {error ? (
         <p className="text-xs text-destructive">{error}</p>

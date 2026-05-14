@@ -648,12 +648,16 @@ export type Database = {
           id: string
           listing_id: string
           offered_listing_id: string | null
+          paid_at: string | null
+          payment_status: Database["public"]["Enums"]["transaction_payment_status"]
           reservation_confirmed_at: string | null
           reservation_expires_at: string | null
           reservation_requested_at: string
           seller_confirmed_completed: boolean
           seller_id: string
           status: Database["public"]["Enums"]["transaction_status"]
+          stripe_checkout_session_id: string | null
+          stripe_payment_intent_id: string | null
           updated_at: string
         }
         Insert: {
@@ -668,12 +672,16 @@ export type Database = {
           id?: string
           listing_id: string
           offered_listing_id?: string | null
+          paid_at?: string | null
+          payment_status?: Database["public"]["Enums"]["transaction_payment_status"]
           reservation_confirmed_at?: string | null
           reservation_expires_at?: string | null
           reservation_requested_at?: string
           seller_confirmed_completed?: boolean
           seller_id: string
           status?: Database["public"]["Enums"]["transaction_status"]
+          stripe_checkout_session_id?: string | null
+          stripe_payment_intent_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -688,12 +696,16 @@ export type Database = {
           id?: string
           listing_id?: string
           offered_listing_id?: string | null
+          paid_at?: string | null
+          payment_status?: Database["public"]["Enums"]["transaction_payment_status"]
           reservation_confirmed_at?: string | null
           reservation_expires_at?: string | null
           reservation_requested_at?: string
           seller_confirmed_completed?: boolean
           seller_id?: string
           status?: Database["public"]["Enums"]["transaction_status"]
+          stripe_checkout_session_id?: string | null
+          stripe_payment_intent_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -723,6 +735,57 @@ export type Database = {
             columns: ["seller_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wallet_transactions: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string | null
+          id: string
+          seller_id: string
+          source_key: string
+          status: Database["public"]["Enums"]["wallet_transaction_status"]
+          transaction_id: string | null
+          type: Database["public"]["Enums"]["wallet_transaction_type"]
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          seller_id: string
+          source_key: string
+          status?: Database["public"]["Enums"]["wallet_transaction_status"]
+          transaction_id?: string | null
+          type: Database["public"]["Enums"]["wallet_transaction_type"]
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          seller_id?: string
+          source_key?: string
+          status?: Database["public"]["Enums"]["wallet_transaction_status"]
+          transaction_id?: string | null
+          type?: Database["public"]["Enums"]["wallet_transaction_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wallet_transactions_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wallet_transactions_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
             referencedColumns: ["id"]
           },
         ]
@@ -788,7 +851,15 @@ export type Database = {
       report_status: "pending" | "reviewed" | "resolved" | "dismissed"
       report_type: "user" | "listing" | "conversation" | "message"
       review_role: "buyer" | "seller"
+      transaction_payment_status:
+        | "not_required"
+        | "unpaid"
+        | "checkout_pending"
+        | "paid"
+        | "failed"
       transaction_status: "pending" | "completed" | "cancelled" | "mismatch"
+      wallet_transaction_status: "completed"
+      wallet_transaction_type: "sale" | "withdrawal"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -915,7 +986,16 @@ export const Constants = {
       report_status: ["pending", "reviewed", "resolved", "dismissed"],
       report_type: ["user", "listing", "conversation", "message"],
       review_role: ["buyer", "seller"],
+      transaction_payment_status: [
+        "not_required",
+        "unpaid",
+        "checkout_pending",
+        "paid",
+        "failed",
+      ],
       transaction_status: ["pending", "completed", "cancelled", "mismatch"],
+      wallet_transaction_status: ["completed"],
+      wallet_transaction_type: ["sale", "withdrawal"],
     },
   },
 } as const
