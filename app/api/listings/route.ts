@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getMarketplaceSuspendedResponse, getViewerAccessContext } from "@/lib/admin";
+import { isMissingSellerUniversityColumnError } from "@/lib/listing-visibility";
 import type { ListingInsert } from "@/lib/marketplace";
 import { hasEnvVars } from "@/lib/utils";
 
@@ -41,6 +42,13 @@ function getImageUrls(body: Record<string, unknown>) {
   return imageUrl ? [imageUrl] : [];
 }
 
+function bool(value: unknown, fallback = false) {
+  if (typeof value === "boolean") return value;
+  if (typeof value !== "string") return fallback;
+
+  return ["1", "on", "true", "yes"].includes(value.trim().toLowerCase());
+}
+
 export async function POST(request: Request) {
   try {
     if (!hasEnvVars) {
@@ -61,6 +69,7 @@ export async function POST(request: Request) {
     const condition     = str(body.condition);
     const listingType   = str(body.listingType) || "sale_only";
     const wantedTradeText = str(body.wantedTradeText);
+    const showSellerUniversity = bool(body.showSellerUniversity, true);
     const imageUrls     = getImageUrls(body);
     const priceValue    = typeof body.price === "string" || typeof body.price === "number"
       ? String(body.price).trim()
@@ -186,17 +195,31 @@ export async function POST(request: Request) {
       primary_image_url: imageUrls[0] ?? null,
       publisher:        publisher || null,
       seller_id:        userId,
+      show_seller_university: showSellerUniversity,
       study_area_id:    studyAreaId,
       title,
       // only store wanted_trade_text when the listing type involves trading
       wanted_trade_text: listingType !== "sale_only" ? wantedTradeText || null : null,
     };
 
-    const { data: listing, error: listingError } = await supabase
+    let insertResult = await supabase
       .from("listings")
       .insert(listingPayload)
       .select("id")
       .single();
+
+    if (isMissingSellerUniversityColumnError(insertResult.error)) {
+      const legacyListingPayload = { ...listingPayload };
+      delete legacyListingPayload.show_seller_university;
+
+      insertResult = await supabase
+        .from("listings")
+        .insert(legacyListingPayload)
+        .select("id")
+        .single();
+    }
+
+    const { data: listing, error: listingError } = insertResult;
 
     if (listingError) {
       return NextResponse.json<CreateListingResponse>(

@@ -1,4 +1,5 @@
 import type { User } from "@supabase/supabase-js";
+import { cache } from "react";
 
 import { hasEnvVars } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/server";
@@ -11,6 +12,7 @@ import {
   getBuyRequestAttemptState,
   type ExchangeTransactionStatus,
 } from "@/lib/exchange-flow";
+import { isMissingSellerUniversityColumnError } from "@/lib/listing-visibility";
 import { getRecommendedListingsForProfile } from "@/lib/recommendations";
 
 // ─── Shared types ────────────────────────────────────────────────────────────
@@ -81,6 +83,7 @@ type ListingCardBase = Pick<
 > & {
   course: CourseSummary | null;
   seller: ProfileSummary | null;
+  show_seller_university?: boolean | null;
   study_area: StudyAreaSummary | null;
 };
 
@@ -123,11 +126,17 @@ const LISTING_CARD_SELECT = `
   status,
   archived_at,
   primary_image_url,
+  show_seller_university,
   created_at,
   course:courses!listings_course_id_fkey(id, course_code, course_name, university, university_id),
   seller:profiles!listings_seller_id_fkey(id, avatar_url, degree_id, first_name, is_verified, last_name, university, university_id, username, year_level),
   study_area:study_areas!listings_study_area_id_fkey(id, name, slug)
 `;
+
+const LISTING_CARD_SELECT_LEGACY = LISTING_CARD_SELECT.replace(
+  "  show_seller_university,\n",
+  "",
+);
 
 // Anonymous feed omits seller data — no profile info shown to logged-out users
 const LISTING_CARD_SELECT_ANON = `
@@ -142,10 +151,29 @@ const LISTING_CARD_SELECT_ANON = `
   status,
   archived_at,
   primary_image_url,
+  show_seller_university,
   created_at,
   course:courses!listings_course_id_fkey(id, course_code, course_name, university, university_id),
   study_area:study_areas!listings_study_area_id_fkey(id, name, slug)
 `;
+
+const LISTING_CARD_SELECT_ANON_LEGACY = LISTING_CARD_SELECT_ANON.replace(
+  "  show_seller_university,\n",
+  "",
+);
+
+function getListingCardSelect(audience: ListingsFeedAudience, includeVisibility = true) {
+  if (audience === "authenticated") {
+    return includeVisibility ? LISTING_CARD_SELECT : LISTING_CARD_SELECT_LEGACY;
+  }
+
+  return includeVisibility ? LISTING_CARD_SELECT_ANON : LISTING_CARD_SELECT_ANON_LEGACY;
+}
+
+function getListingDetailSelect(includeVisibility = true) {
+  const cardSelect = includeVisibility ? LISTING_CARD_SELECT : LISTING_CARD_SELECT_LEGACY;
+  return `${cardSelect}, seller_id, course_id, isbn, publisher, study_area_id, wanted_trade_text`;
+}
 
 async function attachListingImages(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -207,7 +235,7 @@ async function attachListingImages(
 
 // ─── Viewer ───────────────────────────────────────────────────────────────────
 
-export async function getViewerContext(): Promise<{
+async function loadViewerContext(): Promise<{
   profile: ViewerProfile | null;
   user: User | null;
 }> {
@@ -231,6 +259,8 @@ export async function getViewerContext(): Promise<{
   return { profile, user };
 }
 
+export const getViewerContext = cache(loadViewerContext);
+
 // ─── Listings feed ────────────────────────────────────────────────────────────
 
 export type ListingsFeedFilters = {
@@ -245,12 +275,74 @@ export type ListingsFeedFilters = {
   sellerName?: string;
 };
 
+type BrowseSearchParams =
+  | URLSearchParams
+  | Record<string, string | string[] | undefined>;
+
+export type BrowseListingsData = {
+  courses: CourseOption[];
+  createHref: string;
+  createLabel: string;
+  isSignedIn: boolean;
+  listings: ListingCardData[];
+  savedIds: string[];
+  studyAreas: StudyAreaOption[];
+  universities: UniversityOption[];
+  viewer: Pick<ViewerProfile, "account_status" | "id" | "role"> | null;
+};
+
 type ListingsFeedAudience = "anonymous" | "authenticated";
+
+type ListingsFeedOptions = {
+  viewerId?: string | null;
+};
+
+function getBrowseSearchParam(
+  searchParams: BrowseSearchParams,
+  key: string,
+): string | null {
+  if (searchParams instanceof URLSearchParams) {
+    return searchParams.get(key);
+  }
+
+  const value = searchParams[key];
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
+
+function getBrowseNumberSearchParam(
+  searchParams: BrowseSearchParams,
+  key: string,
+): number | undefined {
+  const value = getBrowseSearchParam(searchParams, key);
+  return value ? Number(value) : undefined;
+}
+
+export function getListingsFeedFilters(
+  searchParams: BrowseSearchParams,
+): ListingsFeedFilters {
+  return {
+    q: getBrowseSearchParam(searchParams, "q") || undefined,
+    condition: getBrowseSearchParam(searchParams, "condition") || undefined,
+    courseId: getBrowseNumberSearchParam(searchParams, "courseId"),
+    listingType: getBrowseSearchParam(searchParams, "listingType") || undefined,
+    studyAreaId: getBrowseNumberSearchParam(searchParams, "studyAreaId"),
+    universityId: getBrowseNumberSearchParam(searchParams, "universityId"),
+    minPrice: getBrowseNumberSearchParam(searchParams, "minPrice"),
+    maxPrice: getBrowseNumberSearchParam(searchParams, "maxPrice"),
+    sellerName: getBrowseSearchParam(searchParams, "sellerName") || undefined,
+  };
+}
+
+export function shouldIncludeBrowseMetadata(searchParams: BrowseSearchParams) {
+  return getBrowseSearchParam(searchParams, "_metadata") !== "0";
+}
 
 export async function getListingsFeed(
   audience: ListingsFeedAudience,
   filters: ListingsFeedFilters = {},
   limit = 24,
+  options: ListingsFeedOptions = {},
 ): Promise<{
   error: string | null;
   listings: ListingCardData[];
@@ -260,98 +352,115 @@ export async function getListingsFeed(
   }
 
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  let viewerId = options.viewerId;
+
+  if (viewerId === undefined) {
+    const { data: { user } } = await supabase.auth.getUser();
+    viewerId = user?.id ?? null;
+  }
 
   let blockedIds: string[] = [];
-  if (user) {
+  if (viewerId) {
     const { data: blocks } = await supabase
       .from("user_blocks")
       .select("blocked_id")
-      .eq("blocker_id", user.id);
+      .eq("blocker_id", viewerId);
     blockedIds = (blocks ?? []).map((row) => row.blocked_id);
   }
 
-  let query = supabase
-    .from("listings")
-    .select(audience === "authenticated" ? LISTING_CARD_SELECT : LISTING_CARD_SELECT_ANON)
-    .in("status", ["available", "pending"])
-    .is("deleted_at", null)
-    .is("archived_at", null);
+  async function runListingsQuery(includeVisibility = true) {
+    let query = supabase
+      .from("listings")
+      .select(getListingCardSelect(audience, includeVisibility))
+      .in("status", ["available", "pending"])
+      .is("deleted_at", null)
+      .is("archived_at", null);
 
-  if (blockedIds.length > 0) {
-    query = query.not("seller_id", "in", `(${blockedIds.join(",")})`);
+    if (blockedIds.length > 0) {
+      query = query.not("seller_id", "in", `(${blockedIds.join(",")})`);
+    }
+
+    if (filters.q) {
+      query = query.or(`title.ilike.%${filters.q}%,author.ilike.%${filters.q}%`);
+    }
+
+    if (filters.condition) {
+      query = query.eq("condition", filters.condition as ListingCondition);
+    }
+
+    if (filters.listingType) {
+      query = query.eq("listing_type", filters.listingType as ListingType);
+    }
+
+    if (filters.studyAreaId) {
+      query = query.eq("study_area_id", filters.studyAreaId);
+    }
+
+    if (filters.courseId) {
+      query = query.eq("course_id", filters.courseId);
+    }
+
+    if (filters.universityId) {
+      // Match listings where the seller is from this university OR the listing's course belongs to this university
+      const [{ data: matchingProfiles }, { data: matchingCourses }] = await Promise.all([
+        supabase.from("profiles").select("id").eq("university_id", filters.universityId),
+        supabase.from("courses").select("id").eq("university_id", filters.universityId),
+      ]);
+
+      const sellerIds = (matchingProfiles ?? []).map((p) => p.id);
+      const courseIds = (matchingCourses ?? []).map((c) => c.id);
+
+      const orParts: string[] = [];
+      if (sellerIds.length > 0) orParts.push(`seller_id.in.(${sellerIds.join(",")})`);
+      if (courseIds.length > 0) orParts.push(`course_id.in.(${courseIds.join(",")})`);
+
+      if (orParts.length === 0) return { data: [], error: null };
+
+      query = query.or(orParts.join(","));
+    }
+
+    if (filters.sellerName) {
+      const { data: matchingProfiles } = await supabase
+        .from("profiles")
+        .select("id")
+        .or(
+          `username.ilike.%${filters.sellerName}%,first_name.ilike.%${filters.sellerName}%,last_name.ilike.%${filters.sellerName}%`,
+        );
+
+      const sellerIds = (matchingProfiles ?? []).map((p) => p.id);
+      if (sellerIds.length === 0) return { data: [], error: null };
+
+      query = query.in("seller_id", sellerIds);
+    }
+
+    if (filters.minPrice !== undefined) {
+      query = query.gte("price", filters.minPrice);
+    }
+
+    if (filters.maxPrice !== undefined) {
+      query = query.lte("price", filters.maxPrice);
+    }
+
+    return query
+      .order("created_at", { ascending: false })
+      .limit(limit);
   }
 
-  if (filters.q) {
-    query = query.or(`title.ilike.%${filters.q}%,author.ilike.%${filters.q}%`);
+  let result = await runListingsQuery();
+  let data: unknown = result.data;
+  let error = result.error;
+
+  if (isMissingSellerUniversityColumnError(error)) {
+    result = await runListingsQuery(false);
+    data = result.data;
+    error = result.error;
   }
-
-  if (filters.condition) {
-    query = query.eq("condition", filters.condition as ListingCondition);
-  }
-
-  if (filters.listingType) {
-    query = query.eq("listing_type", filters.listingType as ListingType);
-  }
-
-  if (filters.studyAreaId) {
-    query = query.eq("study_area_id", filters.studyAreaId);
-  }
-
-  if (filters.courseId) {
-    query = query.eq("course_id", filters.courseId);
-  }
-
-  if (filters.universityId) {
-    // Match listings where the seller is from this university OR the listing's course belongs to this university
-    const [{ data: matchingProfiles }, { data: matchingCourses }] = await Promise.all([
-      supabase.from("profiles").select("id").eq("university_id", filters.universityId),
-      supabase.from("courses").select("id").eq("university_id", filters.universityId),
-    ]);
-
-    const sellerIds = (matchingProfiles ?? []).map((p) => p.id);
-    const courseIds = (matchingCourses ?? []).map((c) => c.id);
-
-    const orParts: string[] = [];
-    if (sellerIds.length > 0) orParts.push(`seller_id.in.(${sellerIds.join(",")})`);
-    if (courseIds.length > 0) orParts.push(`course_id.in.(${courseIds.join(",")})`);
-
-    if (orParts.length === 0) return { error: null, listings: [] };
-
-    query = query.or(orParts.join(","));
-  }
-
-  if (filters.sellerName) {
-    const { data: matchingProfiles } = await supabase
-      .from("profiles")
-      .select("id")
-      .or(
-        `username.ilike.%${filters.sellerName}%,first_name.ilike.%${filters.sellerName}%,last_name.ilike.%${filters.sellerName}%`,
-      );
-
-    const sellerIds = (matchingProfiles ?? []).map((p) => p.id);
-    if (sellerIds.length === 0) return { error: null, listings: [] };
-
-    query = query.in("seller_id", sellerIds);
-  }
-
-  if (filters.minPrice !== undefined) {
-    query = query.gte("price", filters.minPrice);
-  }
-
-  if (filters.maxPrice !== undefined) {
-    query = query.lte("price", filters.maxPrice);
-  }
-
-  const { data, error } = await query
-    .order("created_at", { ascending: false })
-    .limit(limit);
 
   if (error) return { error: error.message, listings: [] };
 
   return {
     error: null,
-    listings: await attachListingImages(supabase, (data ?? []) as unknown as ListingCardBase[]),
+    listings: await attachListingImages(supabase, (data ?? []) as ListingCardBase[]),
   };
 }
 
@@ -387,6 +496,7 @@ export async function getRecommendedListings(
     "authenticated",
     {},
     Math.max(48, limit * 8),
+    { viewerId: profile.id },
   );
 
   if (error) {
@@ -411,15 +521,28 @@ export async function getMyListings(userId: string): Promise<ListingCardData[]> 
   if (!hasEnvVars) return [];
 
   const supabase = await createClient();
-  const { data } = await supabase
+  const result = await supabase
     .from("listings")
     .select(LISTING_CARD_SELECT)
     .eq("seller_id", userId)
     .is("deleted_at", null)
     .is("archived_at", null)
     .order("created_at", { ascending: false });
+  let data: unknown = result.data;
+  const { error } = result;
 
-  return attachListingImages(supabase, (data ?? []) as unknown as ListingCardBase[]);
+  if (isMissingSellerUniversityColumnError(error)) {
+    const legacyResult = await supabase
+      .from("listings")
+      .select(LISTING_CARD_SELECT_LEGACY)
+      .eq("seller_id", userId)
+      .is("deleted_at", null)
+      .is("archived_at", null)
+      .order("created_at", { ascending: false });
+    data = legacyResult.data;
+  }
+
+  return attachListingImages(supabase, (data ?? []) as ListingCardBase[]);
 }
 
 // Listings owned by the user that are still available to offer in a trade.
@@ -464,11 +587,23 @@ export async function getListingById(id: string): Promise<{
   }
 
   const supabase = await createClient();
-  const { data, error } = await supabase
+  let result = await supabase
     .from("listings")
-    .select(`${LISTING_CARD_SELECT}, seller_id, course_id, isbn, publisher, study_area_id, wanted_trade_text`)
+    .select(getListingDetailSelect())
     .eq("id", id)
     .maybeSingle();
+  let data: unknown = result.data;
+  let error = result.error;
+
+  if (isMissingSellerUniversityColumnError(error)) {
+    result = await supabase
+      .from("listings")
+      .select(getListingDetailSelect(false))
+      .eq("id", id)
+      .maybeSingle();
+    data = result.data;
+    error = result.error;
+  }
 
   if (error) return { listing: null, error: error.message };
   if (!data) return { listing: null, error: null };
@@ -483,7 +618,7 @@ export async function getListingById(id: string): Promise<{
 
   return {
     listing: {
-      ...(data as unknown as Omit<ListingDetailData, "images">),
+      ...(data as Omit<ListingDetailData, "images">),
       images: (images ?? []) as ListingImageData[],
     },
     error: null,
@@ -531,7 +666,7 @@ export async function getPublicProfile(username: string): Promise<{
   if (profileError) return { profile: null, error: profileError.message };
   if (!profileData) return { profile: null, error: null };
 
-  const { data: listingsData } = await supabase
+  const listingsResult = await supabase
     .from("listings")
     .select(LISTING_CARD_SELECT)
     .eq("seller_id", profileData.id)
@@ -539,10 +674,24 @@ export async function getPublicProfile(username: string): Promise<{
     .is("deleted_at", null)
     .is("archived_at", null)
     .order("created_at", { ascending: false });
+  let listingsData: unknown = listingsResult.data;
+  const { error: listingsError } = listingsResult;
+
+  if (isMissingSellerUniversityColumnError(listingsError)) {
+    const legacyListingsResult = await supabase
+      .from("listings")
+      .select(LISTING_CARD_SELECT_LEGACY)
+      .eq("seller_id", profileData.id)
+      .in("status", ["available", "pending"])
+      .is("deleted_at", null)
+      .is("archived_at", null)
+      .order("created_at", { ascending: false });
+    listingsData = legacyListingsResult.data;
+  }
 
   const listings = await attachListingImages(
     supabase,
-    (listingsData ?? []) as unknown as ListingCardBase[],
+    (listingsData ?? []) as ListingCardBase[],
   );
 
   return {
@@ -645,6 +794,7 @@ export type TransactionData = {
   agreed_price: number | null;
   agreed_trade_text: string | null;
   status: PublicEnum<"transaction_status">;
+  request_type: PublicEnum<"transaction_request_type">;
   payment_status: PublicEnum<"transaction_payment_status">;
   seller_confirmed_completed: boolean;
   reservation_confirmed_at: string | null;
@@ -665,7 +815,7 @@ export type TransactionData = {
 
 const TRANSACTION_SELECT = `
   id, listing_id, offered_listing_id, conversation_id, buyer_id, seller_id, agreed_price, agreed_trade_text,
-  status, payment_status, seller_confirmed_completed, reservation_confirmed_at, paid_at,
+  status, request_type, payment_status, seller_confirmed_completed, reservation_confirmed_at, paid_at,
   payment_requested_at, payment_requested_by,
   completed_at, cancelled_at, declined_at, request_message, created_at, updated_at,
   listing:listings!transactions_listing_id_fkey(id, title, primary_image_url, price, condition),
@@ -769,7 +919,7 @@ export async function getListingRequestState(
   const transactions = (data ?? []) as unknown as TransactionData[];
   const pendingTransaction = transactions.find((tx) => tx.status === "pending") ?? null;
   const declinedBuyTransactions = transactions.filter(
-    (tx) => tx.status === "declined" && !tx.offered_listing_id,
+    (tx) => tx.status === "declined" && tx.request_type === "buy",
   );
   const latestDeclinedTransaction = declinedBuyTransactions[0] ?? null;
   const attemptState = getBuyRequestAttemptState({
@@ -879,13 +1029,24 @@ export async function getSavedListings(userId: string): Promise<ListingCardData[
   if (!hasEnvVars) return [];
 
   const supabase = await createClient();
-  const { data } = await supabase
+  const result = await supabase
     .from("saved_listings")
     .select(`listing:listings!saved_listings_listing_id_fkey(${LISTING_CARD_SELECT})`)
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
+  let data: unknown = result.data;
+  const { error } = result;
 
-  const listings = (data ?? [])
+  if (isMissingSellerUniversityColumnError(error)) {
+    const legacyResult = await supabase
+      .from("saved_listings")
+      .select(`listing:listings!saved_listings_listing_id_fkey(${LISTING_CARD_SELECT_LEGACY})`)
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+    data = legacyResult.data;
+  }
+
+  const listings = ((data ?? []) as unknown[])
     .map((row) => (row as unknown as { listing: ListingCardBase | null }).listing)
     .filter((l): l is ListingCardBase => l !== null)
     .filter((listing) => listing.status !== "archived" && !listing.archived_at);

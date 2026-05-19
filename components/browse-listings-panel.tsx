@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import { EmptyState } from "@/components/empty-state";
@@ -10,28 +10,13 @@ import { SearchFilterBar } from "@/components/search-filter-bar";
 import { Card, CardContent } from "@/components/ui/card";
 import { PillButton } from "@/components/ui/pill-button";
 import type { ApiResponse } from "@/lib/api";
-import type {
-  CourseOption,
-  ListingCardData,
-  StudyAreaOption,
-  UniversityOption,
-  ViewerProfile,
-} from "@/lib/marketplace";
-
-type BrowseListingsData = {
-  courses: CourseOption[];
-  createHref: string;
-  createLabel: string;
-  isSignedIn: boolean;
-  listings: ListingCardData[];
-  savedIds: string[];
-  studyAreas: StudyAreaOption[];
-  universities: UniversityOption[];
-  viewer: Pick<ViewerProfile, "account_status" | "id" | "role"> | null;
-};
+import type { BrowseListingsData } from "@/lib/marketplace";
 
 type BrowseListingsPanelProps = {
   aiExplanation?: string;
+  initialData?: BrowseListingsData | null;
+  initialError?: string | null;
+  initialQueryString?: string;
 };
 
 function BrowseListingsSkeleton() {
@@ -66,14 +51,59 @@ function BrowseListingsSkeleton() {
   );
 }
 
-export function BrowseListingsPanel({ aiExplanation }: BrowseListingsPanelProps) {
+function mergeBrowseListingsData(
+  current: BrowseListingsData | null,
+  next: BrowseListingsData,
+) {
+  if (!current) return next;
+
+  return {
+    ...next,
+    courses: next.courses.length > 0 ? next.courses : current.courses,
+    studyAreas: next.studyAreas.length > 0 ? next.studyAreas : current.studyAreas,
+    universities:
+      next.universities.length > 0 ? next.universities : current.universities,
+  };
+}
+
+function buildBrowseEndpoint(queryString: string) {
+  const requestParams = new URLSearchParams(queryString);
+  requestParams.set("_metadata", "0");
+  const nextQueryString = requestParams.toString();
+
+  return nextQueryString ? `/api/browse?${nextQueryString}` : "/api/browse";
+}
+
+function normalizeBrowseQueryString(queryString: string) {
+  const searchParams = new URLSearchParams(queryString);
+  searchParams.sort();
+  return searchParams.toString();
+}
+
+export function BrowseListingsPanel({
+  aiExplanation,
+  initialData = null,
+  initialError = null,
+  initialQueryString,
+}: BrowseListingsPanelProps) {
   const searchParams = useSearchParams();
   const queryString = searchParams.toString();
-  const [data, setData] = useState<BrowseListingsData | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const normalizedQueryString = normalizeBrowseQueryString(queryString);
+  const [data, setData] = useState<BrowseListingsData | null>(initialData);
+  const [error, setError] = useState<string | null>(initialError);
+  const [loading, setLoading] = useState(!initialData && !initialError);
+  const lastLoadedQueryRef = useRef<string | null>(
+    initialData || initialError
+      ? normalizeBrowseQueryString(initialQueryString ?? "")
+      : null,
+  );
 
   useEffect(() => {
+    if (lastLoadedQueryRef.current === normalizedQueryString) {
+      setLoading(false);
+      return;
+    }
+
     let cancelled = false;
 
     async function loadListings() {
@@ -81,13 +111,13 @@ export function BrowseListingsPanel({ aiExplanation }: BrowseListingsPanelProps)
       setError(null);
 
       try {
-        const response = await fetch(
-          queryString ? `/api/browse?${queryString}` : "/api/browse",
-          { cache: "no-store" },
-        );
+        const response = await fetch(buildBrowseEndpoint(queryString), {
+          cache: "no-store",
+        });
         const payload = (await response.json()) as ApiResponse<BrowseListingsData>;
 
         if (cancelled) return;
+        lastLoadedQueryRef.current = normalizedQueryString;
 
         if (!response.ok || payload.status === "error") {
           setError(
@@ -96,9 +126,10 @@ export function BrowseListingsPanel({ aiExplanation }: BrowseListingsPanelProps)
           return;
         }
 
-        setData(payload.data);
+        setData((current) => mergeBrowseListingsData(current, payload.data));
       } catch {
         if (!cancelled) {
+          lastLoadedQueryRef.current = normalizedQueryString;
           setError("Could not reach the browse endpoint.");
         }
       } finally {
@@ -113,7 +144,7 @@ export function BrowseListingsPanel({ aiExplanation }: BrowseListingsPanelProps)
     return () => {
       cancelled = true;
     };
-  }, [queryString]);
+  }, [normalizedQueryString, queryString]);
 
   return (
     <>

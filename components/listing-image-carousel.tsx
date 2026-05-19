@@ -1,7 +1,6 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
-
+import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -52,12 +51,15 @@ export function ListingImageCarousel({
         className="block h-full w-full"
       >
         {currentImageUrl ? (
-          <img
+          <Image
             key={currentImageUrl}
             alt={title}
             className={`h-full w-full object-cover ${isLoading ? "opacity-0" : "opacity-100"}`}
+            fill
+            loading="lazy"
             onError={() => setIsLoading(false)}
             onLoad={() => setIsLoading(false)}
+            sizes="(min-width: 1280px) 33vw, (min-width: 768px) 50vw, 100vw"
             src={currentImageUrl}
           />
         ) : (

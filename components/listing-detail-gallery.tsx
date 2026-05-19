@@ -1,7 +1,6 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
-
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 
 import type { ListingImageData } from "@/lib/marketplace";
@@ -63,10 +62,13 @@ export function ListingDetailGallery({
 
   return (
     <div className="space-y-3 p-0">
-      <div className="aspect-[4/3] w-full overflow-hidden bg-muted">
-        <img
+      <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted">
+        <Image
           alt={title}
           className="h-full w-full object-cover"
+          fill
+          priority
+          sizes="(min-width: 1024px) 50vw, 100vw"
           src={activeImageUrl}
         />
       </div>
@@ -88,10 +90,14 @@ export function ListingDetailGallery({
                 onClick={() => setActiveImageUrl(imageUrl)}
                 type="button"
               >
-                <img
+                <Image
                   alt={`${title} thumbnail ${index + 1}`}
                   className="h-20 w-20 object-cover sm:h-24 sm:w-24"
+                  height={96}
+                  loading="lazy"
+                  sizes="(min-width: 640px) 96px, 80px"
                   src={imageUrl}
+                  width={96}
                 />
               </button>
             );

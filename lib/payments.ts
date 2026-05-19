@@ -5,12 +5,15 @@ export type PaymentStatus =
   | "paid"
   | "failed";
 
+export type TransactionRequestType = "buy" | "trade";
+
 export type CheckoutTransaction = {
   agreed_price: number | null;
   buyer_id: string;
   offered_listing_id: string | null;
   payment_status: PaymentStatus;
   payment_requested_at: string | null;
+  request_type: TransactionRequestType;
   reservation_confirmed_at: string | null;
   status: string;
 };
@@ -22,6 +25,7 @@ export type CheckoutEligibility =
 export type SellerPaymentRequestTransaction = {
   offered_listing_id: string | null;
   payment_status: PaymentStatus;
+  request_type: TransactionRequestType;
   reservation_confirmed_at: string | null;
   seller_id: string;
   status: string;
@@ -42,7 +46,7 @@ export function getCheckoutEligibility(
     };
   }
 
-  if (transaction.offered_listing_id) {
+  if (transaction.request_type === "trade") {
     return {
       eligible: false,
       reason: "Trade transactions do not need Stripe payment.",
@@ -98,7 +102,7 @@ export function canRequestSellerPayment(
     };
   }
 
-  if (transaction.offered_listing_id) {
+  if (transaction.request_type === "trade") {
     return {
       eligible: false,
       reason: "Trade transactions do not need Stripe payment.",
@@ -139,6 +143,7 @@ export function canRequestSellerPayment(
 export function canCompleteTransaction(transaction: {
   offered_listing_id: string | null;
   payment_status: PaymentStatus;
+  request_type: TransactionRequestType;
 }) {
-  return !!transaction.offered_listing_id || transaction.payment_status === "paid";
+  return transaction.request_type === "trade" || transaction.payment_status === "paid";
 }

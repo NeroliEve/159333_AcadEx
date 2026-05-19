@@ -11,6 +11,7 @@ import { RequestToTradeButton } from "@/components/request-to-trade-button";
 import { Card, CardContent } from "@/components/ui/card";
 import { isMarketplaceSuspended } from "@/lib/admin";
 import { canViewArchivedListing } from "@/lib/listing-archive";
+import { getVisibleSellerUniversity } from "@/lib/listing-visibility";
 import {
   formatListingCondition,
   formatPrice,
@@ -98,6 +99,7 @@ async function ListingDetailContent({
     listing.listing_type === "trade_only" || listing.listing_type === "sale_or_trade";
   const canBuy = listing.listing_type !== "trade_only";
   const canTrade = isTrade;
+  const sellerUniversity = getVisibleSellerUniversity(listing);
 
   const offerableListings =
     canTrade && user && !isOwner && !isSuspended && listing.status === "available"
@@ -159,9 +161,9 @@ async function ListingDetailContent({
                     {listing.course.course_code}
                   </span>
                 ) : null}
-                {listing.seller?.university ? (
+                {sellerUniversity ? (
                   <span className="rounded-full bg-secondary px-2.5 py-1 text-secondary-foreground">
-                    {listing.seller.university}
+                    {sellerUniversity}
                   </span>
                 ) : null}
                 <span className="rounded-full bg-secondary px-2.5 py-1 capitalize text-secondary-foreground">
@@ -236,7 +238,7 @@ async function ListingDetailContent({
               <div className="space-y-1">
                 <h2 className="text-lg font-semibold tracking-tight">Contact seller</h2>
                 <p className="text-sm leading-6 text-muted-foreground">
-                  Acadex keeps contact inside the app. Send a request to buy to open a text-only conversation for sorting out pickup, payment, or trade details.
+                  Acadex keeps contact inside the app. Send a buy or trade request to start a conversation for sorting out pickup, payment, or swap details.
                 </p>
               </div>
 
@@ -254,8 +256,8 @@ async function ListingDetailContent({
                 <p className="text-muted-foreground">
                   {listing.seller?.is_verified ? "Verified student" : "Student seller"}
                 </p>
-                {listing.seller?.university ? (
-                  <p className="text-muted-foreground">{listing.seller.university}</p>
+                {sellerUniversity ? (
+                  <p className="text-muted-foreground">{sellerUniversity}</p>
                 ) : null}
               </div>
 
@@ -285,7 +287,7 @@ async function ListingDetailContent({
 
                 {!requestState?.pendingTransaction && user && !isOwner && !isSuspended ? (
                   <p className="text-sm text-muted-foreground">
-                    Messaging opens once the seller accepts your request.
+                    Messaging opens after you send a request.
                   </p>
                 ) : user && isSuspended ? (
                   <p className="text-sm text-muted-foreground">

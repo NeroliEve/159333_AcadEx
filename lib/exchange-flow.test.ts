@@ -9,6 +9,7 @@ import {
   getDeclinedRequestNotice,
   getBuyRequestAttemptState,
   isUnacceptedBuyRequest,
+  validateTradeRequestMessage,
   validateBuyRequestMessage,
 } from "@/lib/exchange-flow";
 
@@ -31,6 +32,29 @@ describe("validateBuyRequestMessage", () => {
     expect(validateBuyRequestMessage("  Is this still available?  ")).toEqual({
       ok: true,
       message: "Is this still available?",
+    });
+  });
+});
+
+describe("validateTradeRequestMessage", () => {
+  it("requires a non-empty trade request message", () => {
+    expect(validateTradeRequestMessage("   ")).toEqual({
+      ok: false,
+      error: "Add a short message for the seller.",
+    });
+  });
+
+  it("rejects trade request messages over 500 characters", () => {
+    expect(validateTradeRequestMessage("a".repeat(MAX_BUY_REQUEST_MESSAGE_LENGTH + 1))).toEqual({
+      ok: false,
+      error: "Request messages must be 500 characters or fewer.",
+    });
+  });
+
+  it("accepts and trims a valid trade request message", () => {
+    expect(validateTradeRequestMessage("  Would you consider swapping?  ")).toEqual({
+      ok: true,
+      message: "Would you consider swapping?",
     });
   });
 });
@@ -64,28 +88,30 @@ describe("getBuyRequestAttemptState", () => {
 });
 
 describe("canSendConversationMessage", () => {
-  it("allows chat only after seller acceptance on an active conversation", () => {
+  it("allows chat after seller acceptance on an active conversation", () => {
     expect(
       canSendConversationMessage({
         archivedAt: null,
         transaction: {
           reservationConfirmedAt: "2026-05-14T00:00:00.000Z",
+          requestType: "buy",
           status: "pending",
         },
       }),
     ).toBe(true);
   });
 
-  it("rejects chat while the transaction request is still pending seller acceptance", () => {
+  it("allows chat while a request is still pending seller acceptance", () => {
     expect(
       canSendConversationMessage({
         archivedAt: null,
         transaction: {
           reservationConfirmedAt: null,
+          requestType: "trade",
           status: "pending",
         },
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("rejects chat for archived conversations", () => {
@@ -94,6 +120,7 @@ describe("canSendConversationMessage", () => {
         archivedAt: "2026-05-14T00:00:00.000Z",
         transaction: {
           reservationConfirmedAt: "2026-05-14T00:00:00.000Z",
+          requestType: "buy",
           status: "pending",
         },
       }),
@@ -106,6 +133,7 @@ describe("canSendConversationMessage", () => {
         archivedAt: null,
         transaction: {
           reservationConfirmedAt: "2026-05-14T00:00:00.000Z",
+          requestType: "buy",
           status: "completed",
         },
       }),
@@ -131,6 +159,7 @@ describe("isUnacceptedBuyRequest", () => {
     expect(
       isUnacceptedBuyRequest({
         offeredListingId: null,
+        requestType: "buy",
         reservationConfirmedAt: null,
         status: "pending",
       }),
@@ -139,6 +168,7 @@ describe("isUnacceptedBuyRequest", () => {
     expect(
       isUnacceptedBuyRequest({
         offeredListingId: null,
+        requestType: "buy",
         reservationConfirmedAt: "2026-05-14T00:00:00.000Z",
         status: "pending",
       }),
@@ -147,6 +177,7 @@ describe("isUnacceptedBuyRequest", () => {
     expect(
       isUnacceptedBuyRequest({
         offeredListingId: "trade-listing",
+        requestType: "trade",
         reservationConfirmedAt: null,
         status: "pending",
       }),
@@ -155,6 +186,16 @@ describe("isUnacceptedBuyRequest", () => {
     expect(
       isUnacceptedBuyRequest({
         offeredListingId: null,
+        requestType: "trade",
+        reservationConfirmedAt: null,
+        status: "pending",
+      }),
+    ).toBe(false);
+
+    expect(
+      isUnacceptedBuyRequest({
+        offeredListingId: null,
+        requestType: "buy",
         reservationConfirmedAt: null,
         status: "declined",
       }),
@@ -168,6 +209,7 @@ describe("canCancelAcceptedTransaction", () => {
       canCancelAcceptedTransaction({
         offeredListingId: null,
         paymentStatus: "unpaid",
+        requestType: "buy",
         reservationConfirmedAt: "2026-05-14T00:00:00.000Z",
         status: "pending",
       }),
@@ -179,6 +221,7 @@ describe("canCancelAcceptedTransaction", () => {
       canCancelAcceptedTransaction({
         offeredListingId: null,
         paymentStatus: "unpaid",
+        requestType: "buy",
         reservationConfirmedAt: null,
         status: "pending",
       }),
@@ -190,10 +233,23 @@ describe("canCancelAcceptedTransaction", () => {
       canCancelAcceptedTransaction({
         offeredListingId: null,
         paymentStatus: "paid",
+        requestType: "buy",
         reservationConfirmedAt: "2026-05-14T00:00:00.000Z",
         status: "pending",
       }),
     ).toBe(false);
+  });
+
+  it("allows accepted message-only trade cancellation", () => {
+    expect(
+      canCancelAcceptedTransaction({
+        offeredListingId: null,
+        paymentStatus: "not_required",
+        requestType: "trade",
+        reservationConfirmedAt: "2026-05-14T00:00:00.000Z",
+        status: "pending",
+      }),
+    ).toBe(true);
   });
 });
 

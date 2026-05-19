@@ -10,6 +10,8 @@ export type ExchangeTransactionStatus =
   | "declined"
   | "mismatch";
 
+export type TransactionRequestType = "buy" | "trade";
+
 export type BuyRequestMessageValidation =
   | { ok: true; message: string }
   | { ok: false; error: string };
@@ -30,6 +32,8 @@ export function validateBuyRequestMessage(value: unknown): BuyRequestMessageVali
 
   return { ok: true, message };
 }
+
+export const validateTradeRequestMessage = validateBuyRequestMessage;
 
 export function getBuyRequestAttemptState({
   declinedCount,
@@ -78,6 +82,7 @@ export function canSendConversationMessage({
 }: {
   archivedAt: string | null;
   transaction: {
+    requestType: TransactionRequestType;
     reservationConfirmedAt: string | null;
     status: ExchangeTransactionStatus;
   } | null;
@@ -85,7 +90,6 @@ export function canSendConversationMessage({
   return (
     !archivedAt &&
     !!transaction &&
-    !!transaction.reservationConfirmedAt &&
     (
       transaction.status === "pending" ||
       transaction.status === "completed" ||
@@ -108,25 +112,34 @@ export function getDeclinedRequestNotice({
 
 export function isUnacceptedBuyRequest(transaction: {
   offeredListingId: string | null;
+  requestType: TransactionRequestType;
   reservationConfirmedAt: string | null;
   status: ExchangeTransactionStatus;
 }) {
   return (
     transaction.status === "pending" &&
     !transaction.reservationConfirmedAt &&
-    !transaction.offeredListingId
+    !transaction.offeredListingId &&
+    transaction.requestType === "buy"
   );
 }
 
 export function canCancelAcceptedTransaction(transaction: {
   offeredListingId: string | null;
   paymentStatus: PaymentStatus;
+  requestType: TransactionRequestType;
   reservationConfirmedAt: string | null;
   status: ExchangeTransactionStatus;
 }) {
   if (transaction.status !== "pending") return false;
   if (!transaction.reservationConfirmedAt) return false;
-  if (!transaction.offeredListingId && transaction.paymentStatus === "paid") return false;
+  if (
+    transaction.requestType === "buy" &&
+    !transaction.offeredListingId &&
+    transaction.paymentStatus === "paid"
+  ) {
+    return false;
+  }
 
   return true;
 }

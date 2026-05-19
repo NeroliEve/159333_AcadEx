@@ -12,23 +12,29 @@ import { hasEnvVars } from "@/lib/utils";
 
 type SiteHeaderProps = {
   showAdminBackButton?: boolean;
+  viewerContextPromise?: Promise<Awaited<ReturnType<typeof getViewerContext>>>;
 };
 
 export async function SiteHeader({
   showAdminBackButton = false,
+  viewerContextPromise,
 }: SiteHeaderProps = {}) {
   let isAdmin = false;
   let isSuspended = false;
   let userAvatarUrl: string | null | undefined;
   let userEmail: string | undefined;
+  let userId: string | undefined;
   let userName: string | undefined;
 
   if (hasEnvVars) {
-    const { profile, user } = await getViewerContext();
+    const { profile, user } = viewerContextPromise
+      ? await viewerContextPromise
+      : await getViewerContext();
     isSuspended = isMarketplaceSuspended(profile);
     isAdmin = profile?.role === "admin" && !isSuspended;
     userAvatarUrl = profile?.avatar_url;
     userEmail = user?.email ?? profile?.email ?? undefined;
+    userId = user?.id;
     userName = profile ? getProfileDisplayName(profile, user?.email) : userEmail;
   }
 
@@ -93,6 +99,7 @@ export async function SiteHeader({
               email={userEmail}
               isSuspended={isSuspended}
               name={userName}
+              userId={userId}
             />
           </div>
         ) : (

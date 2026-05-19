@@ -71,7 +71,7 @@ export async function POST(
 
   const { data: transaction } = await supabase
     .from("transactions")
-    .select("id, status, reservation_confirmed_at")
+    .select("id, status, request_type, reservation_confirmed_at")
     .eq("conversation_id", id)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -81,13 +81,14 @@ export async function POST(
     archivedAt: conversation.archived_at,
     transaction: transaction
       ? {
+          requestType: transaction.request_type,
           reservationConfirmedAt: transaction.reservation_confirmed_at,
           status: transaction.status,
         }
       : null,
   })) {
     return NextResponse.json(
-      { error: "Chat opens after the seller accepts and closes when the transaction ends." },
+      { error: "Chat is not available for this conversation." },
       { status: 403 },
     );
   }

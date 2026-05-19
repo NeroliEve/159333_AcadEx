@@ -256,6 +256,7 @@ export type Database = {
           primary_image_url: string | null
           publisher: string | null
           seller_id: string
+          show_seller_university: boolean
           status: Database["public"]["Enums"]["listing_status"]
           study_area_id: number | null
           title: string
@@ -278,6 +279,7 @@ export type Database = {
           primary_image_url?: string | null
           publisher?: string | null
           seller_id: string
+          show_seller_university?: boolean
           status?: Database["public"]["Enums"]["listing_status"]
           study_area_id?: number | null
           title: string
@@ -300,6 +302,7 @@ export type Database = {
           primary_image_url?: string | null
           publisher?: string | null
           seller_id?: string
+          show_seller_university?: boolean
           status?: Database["public"]["Enums"]["listing_status"]
           study_area_id?: number | null
           title?: string
@@ -723,6 +726,7 @@ export type Database = {
           payment_status: Database["public"]["Enums"]["transaction_payment_status"]
           payment_requested_at: string | null
           payment_requested_by: string | null
+          request_type: Database["public"]["Enums"]["transaction_request_type"]
           reservation_confirmed_at: string | null
           reservation_expires_at: string | null
           reservation_requested_at: string
@@ -751,6 +755,7 @@ export type Database = {
           payment_status?: Database["public"]["Enums"]["transaction_payment_status"]
           payment_requested_at?: string | null
           payment_requested_by?: string | null
+          request_type?: Database["public"]["Enums"]["transaction_request_type"]
           reservation_confirmed_at?: string | null
           reservation_expires_at?: string | null
           reservation_requested_at?: string
@@ -779,6 +784,7 @@ export type Database = {
           payment_status?: Database["public"]["Enums"]["transaction_payment_status"]
           payment_requested_at?: string | null
           payment_requested_by?: string | null
+          request_type?: Database["public"]["Enums"]["transaction_request_type"]
           reservation_confirmed_at?: string | null
           reservation_expires_at?: string | null
           reservation_requested_at?: string
@@ -940,6 +946,7 @@ export type Database = {
         | "checkout_pending"
         | "paid"
         | "failed"
+      transaction_request_type: "buy" | "trade"
       transaction_status: "pending" | "completed" | "cancelled" | "declined" | "mismatch"
       wallet_transaction_status: "completed"
       wallet_transaction_type: "sale" | "withdrawal"

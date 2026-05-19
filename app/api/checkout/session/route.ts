@@ -33,6 +33,7 @@ export async function POST(request: Request) {
       offered_listing_id,
       payment_status,
       payment_requested_at,
+      request_type,
       reservation_confirmed_at,
       status,
       listing:listings!transactions_listing_id_fkey(id, title)

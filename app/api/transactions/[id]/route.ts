@@ -44,7 +44,7 @@ export async function PATCH(
 
   const { data: transaction } = await supabase
     .from("transactions")
-    .select("id, listing_id, offered_listing_id, conversation_id, buyer_id, seller_id, status, reservation_confirmed_at, payment_status")
+    .select("id, listing_id, offered_listing_id, conversation_id, buyer_id, seller_id, status, request_type, reservation_confirmed_at, payment_status")
     .eq("id", id)
     .maybeSingle();
 
@@ -98,6 +98,7 @@ export async function PATCH(
   if (action === "cancel" && !canCancelAcceptedTransaction({
     offeredListingId: transaction.offered_listing_id,
     paymentStatus: transaction.payment_status,
+    requestType: transaction.request_type,
     reservationConfirmedAt: transaction.reservation_confirmed_at,
     status: transaction.status,
   })) {
@@ -114,7 +115,7 @@ export async function PATCH(
   if (action === "accept") {
     const [{ error: txError }, { error: listingError }] = await Promise.all([
       supabase.from("transactions").update({
-        payment_status: transaction.offered_listing_id ? "not_required" : "unpaid",
+        payment_status: transaction.request_type === "trade" ? "not_required" : "unpaid",
         payment_requested_at: null,
         payment_requested_by: null,
         status: "pending",

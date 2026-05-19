@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
 
@@ -13,6 +12,14 @@ type UserMenuProps = {
   initialUnseenTransactionCount?: number;
   isSuspended?: boolean;
   name?: string | null;
+  userId?: string | null;
+};
+
+type UserMenuRealtimeFilter = {
+  event: "INSERT" | "UPDATE";
+  filter: string;
+  schema: "public";
+  table: "conversations" | "messages" | "profiles" | "transactions";
 };
 
 function getInitial(name?: string | null, email?: string | null) {
@@ -23,6 +30,80 @@ function formatUnreadCount(count: number) {
   return count > 99 ? "99+" : count.toString();
 }
 
+export function getUserMenuTransactionRealtimeFilters(
+  userId: string,
+): UserMenuRealtimeFilter[] {
+  return [
+    {
+      event: "INSERT",
+      filter: `buyer_id=eq.${userId}`,
+      schema: "public",
+      table: "transactions",
+    },
+    {
+      event: "UPDATE",
+      filter: `buyer_id=eq.${userId}`,
+      schema: "public",
+      table: "transactions",
+    },
+    {
+      event: "INSERT",
+      filter: `seller_id=eq.${userId}`,
+      schema: "public",
+      table: "transactions",
+    },
+    {
+      event: "UPDATE",
+      filter: `seller_id=eq.${userId}`,
+      schema: "public",
+      table: "transactions",
+    },
+    {
+      event: "UPDATE",
+      filter: `id=eq.${userId}`,
+      schema: "public",
+      table: "profiles",
+    },
+  ];
+}
+
+export function getUserMenuMessageRealtimeFilters(
+  userId: string,
+): UserMenuRealtimeFilter[] {
+  return [
+    {
+      event: "UPDATE",
+      filter: `sender_id=neq.${userId}`,
+      schema: "public",
+      table: "messages",
+    },
+    {
+      event: "INSERT",
+      filter: `buyer_id=eq.${userId}`,
+      schema: "public",
+      table: "conversations",
+    },
+    {
+      event: "UPDATE",
+      filter: `buyer_id=eq.${userId}`,
+      schema: "public",
+      table: "conversations",
+    },
+    {
+      event: "INSERT",
+      filter: `seller_id=eq.${userId}`,
+      schema: "public",
+      table: "conversations",
+    },
+    {
+      event: "UPDATE",
+      filter: `seller_id=eq.${userId}`,
+      schema: "public",
+      table: "conversations",
+    },
+  ];
+}
+
 export function UserMenu({
   avatarUrl,
   email,
@@ -30,8 +111,8 @@ export function UserMenu({
   initialUnseenTransactionCount = 0,
   isSuspended = false,
   name,
+  userId,
 }: UserMenuProps) {
-  const pathname = usePathname();
   const menuRef = useRef<HTMLDivElement>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(initialUnreadCount);
@@ -46,22 +127,13 @@ export function UserMenu({
   }, [initialUnseenTransactionCount]);
 
   useEffect(() => {
-    if (isSuspended) {
+    if (isSuspended || !userId) {
       setUnseenTxCount(0);
       return;
     }
     let isMounted = true;
     const supabase = createClient();
-    const channel = supabase
-      .channel(`user-menu-transactions-${Math.random().toString(36).slice(2)}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "transactions" },
-        () => {
-          void refreshTxCount();
-        },
-      )
-      .subscribe();
+    const channel = supabase.channel(`user-menu-transactions-${userId}`);
 
     async function refreshTxCount() {
       try {
@@ -77,13 +149,20 @@ export function UserMenu({
       }
     }
 
+    for (const filter of getUserMenuTransactionRealtimeFilters(userId)) {
+      channel.on("postgres_changes", filter, () => {
+        void refreshTxCount();
+      });
+    }
+
+    channel.subscribe();
     void refreshTxCount();
 
     return () => {
       isMounted = false;
       void supabase.removeChannel(channel);
     };
-  }, [isSuspended, pathname]);
+  }, [isSuspended, userId]);
 
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
@@ -97,30 +176,14 @@ export function UserMenu({
   }, []);
 
   useEffect(() => {
-    if (isSuspended) {
+    if (isSuspended || !userId) {
       setUnreadCount(0);
       return;
     }
 
     let isMounted = true;
     const supabase = createClient();
-    const channel = supabase
-      .channel(`user-menu-unread-${Math.random().toString(36).slice(2)}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "messages" },
-        () => {
-          void refreshUnreadCount();
-        },
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "conversations" },
-        () => {
-          void refreshUnreadCount();
-        },
-      )
-      .subscribe();
+    const channel = supabase.channel(`user-menu-unread-${userId}`);
 
     async function refreshUnreadCount() {
       try {
@@ -146,52 +209,20 @@ export function UserMenu({
       }
     }
 
+    for (const filter of getUserMenuMessageRealtimeFilters(userId)) {
+      channel.on("postgres_changes", filter, () => {
+        void refreshUnreadCount();
+      });
+    }
+
+    channel.subscribe();
     void refreshUnreadCount();
 
     return () => {
       isMounted = false;
       void supabase.removeChannel(channel);
     };
-  }, [isSuspended]);
-
-  useEffect(() => {
-    if (isSuspended) {
-      setUnreadCount(0);
-      return;
-    }
-
-    let isMounted = true;
-
-    async function refreshUnreadCount() {
-      try {
-        const response = await fetch("/api/messages/unread-count", {
-          cache: "no-store",
-        });
-
-        if (!response.ok) {
-          if (response.status === 401 && isMounted) {
-            setUnreadCount(0);
-          }
-          return;
-        }
-
-        const data = (await response.json()) as { count?: number };
-        if (isMounted) {
-          setUnreadCount(typeof data.count === "number" ? data.count : 0);
-        }
-      } catch {
-        if (isMounted) {
-          setUnreadCount(0);
-        }
-      }
-    }
-
-    void refreshUnreadCount();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [isOpen, isSuspended, pathname]);
+  }, [isSuspended, userId]);
 
   async function logout() {
     const supabase = createClient();

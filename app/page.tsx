@@ -61,22 +61,22 @@ function LandingDecorations() {
       <DecorativeAsset
         name="acadex-student"
         sizes="(min-width: 1536px) 384px, (min-width: 1280px) 320px, 0px"
-        className="absolute left-[-4.5rem] top-[15vh] aspect-square w-80 rotate-[-8deg] 2xl:left-[3vw] 2xl:top-[13vh] 2xl:w-96"
+        className="absolute left-[-4.5rem] top-[34vh] aspect-square w-80 rotate-[-8deg] 2xl:left-[3vw] 2xl:top-[31vh] 2xl:w-96"
       />
       <DecorativeAsset
         name="acadex-phone"
         sizes="(min-width: 1536px) 320px, (min-width: 1280px) 256px, 0px"
-        className="absolute left-[-2.5rem] top-[51vh] aspect-square w-64 rotate-[5deg] 2xl:left-[7vw] 2xl:top-[54vh] 2xl:w-80"
+        className="absolute left-[-2.5rem] top-[68vh] aspect-square w-64 rotate-[5deg] 2xl:left-[7vw] 2xl:top-[69vh] 2xl:w-80"
       />
       <DecorativeAsset
         name="acadex-laptop"
         sizes="(min-width: 1536px) 384px, (min-width: 1280px) 320px, 0px"
-        className="absolute right-[-5rem] top-[19vh] aspect-square w-80 rotate-[6deg] 2xl:right-[4vw] 2xl:top-[17vh] 2xl:w-96"
+        className="absolute right-[-5rem] top-[38vh] aspect-square w-80 rotate-[6deg] 2xl:right-[4vw] 2xl:top-[35vh] 2xl:w-96"
       />
       <DecorativeAsset
         name="acadex-exchange"
         sizes="(min-width: 1536px) 352px, (min-width: 1280px) 288px, 0px"
-        className="absolute right-[-2.5rem] top-[56vh] aspect-square w-72 rotate-[-4deg] 2xl:right-[8vw] 2xl:top-[57vh] 2xl:w-88"
+        className="absolute right-[-2.5rem] top-[72vh] aspect-square w-72 rotate-[-4deg] 2xl:right-[8vw] 2xl:top-[73vh] 2xl:w-88"
       />
     </div>
   );

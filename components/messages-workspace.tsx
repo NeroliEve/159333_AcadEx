@@ -412,11 +412,12 @@ export function MessagesWorkspace({
   const transaction = conversation.transaction;
   const isSeller = conversation.seller_id === viewerId;
   const isBuyer = conversation.buyer_id === viewerId;
-  const isTrade = !!transaction?.offered_listing_id;
+  const isTrade = transaction?.request_type === "trade";
   const chatCanSend = canSendConversationMessage({
     archivedAt: conversation.archived_at,
     transaction: transaction
       ? {
+          requestType: transaction.request_type,
           reservationConfirmedAt: transaction.reservation_confirmed_at,
           status: transaction.status,
         }
@@ -431,6 +432,7 @@ export function MessagesWorkspace({
   const canCancel = !!transaction && canCancelAcceptedTransaction({
     offeredListingId: transaction.offered_listing_id,
     paymentStatus: transaction.payment_status,
+    requestType: transaction.request_type,
     reservationConfirmedAt: transaction.reservation_confirmed_at,
     status: transaction.status,
   });
@@ -565,12 +567,6 @@ export function MessagesWorkspace({
                       </Link>
                     </div>
                   </div>
-                ) : null}
-
-                {requestIsPending && !isSeller ? (
-                  <p className="mt-3 text-xs text-muted-foreground">
-                    You cannot send follow-up messages until the seller accepts.
-                  </p>
                 ) : null}
 
                 {declinedNotice ? (
@@ -756,7 +752,7 @@ export function MessagesWorkspace({
                   Conversation is read-only
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Chat opens after seller acceptance and closes when the conversation is archived.
+                  Chat is available while a request is active and closes when the conversation is archived.
                 </p>
                 {error ? (
                   <p className="text-xs text-destructive">{error}</p>

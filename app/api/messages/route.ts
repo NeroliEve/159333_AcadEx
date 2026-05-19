@@ -17,10 +17,15 @@ export async function GET() {
       return NextResponse.json(apiError("Messaging is disabled."), { status: 403 });
     }
 
+    const [summaries, archivedSummaries] = await Promise.all([
+      getMyConversationSummaries(user.id),
+      getMyConversationSummaries(user.id, { archived: true }),
+    ]);
+
     return NextResponse.json(
       apiSuccess({
-        archivedSummaries: await getMyConversationSummaries(user.id, { archived: true }),
-        summaries: await getMyConversationSummaries(user.id),
+        archivedSummaries,
+        summaries,
         viewerId: user.id,
       }),
     );

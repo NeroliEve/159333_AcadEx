@@ -86,8 +86,9 @@ function MessagesSidebar() {
 
     void loadSummaries();
     intervalId = window.setInterval(() => {
+      if (document.visibilityState === "hidden") return;
       void loadSummaries();
-    }, 5000);
+    }, 30000);
 
     return () => {
       cancelled = true;
@@ -103,6 +104,7 @@ function MessagesSidebar() {
     const isActive = pathname === `/messages/${summary.id}`;
     const isBuyRequest = !!summary.transaction && isUnacceptedBuyRequest({
       offeredListingId: summary.transaction.offered_listing_id,
+      requestType: summary.transaction.request_type,
       reservationConfirmedAt: summary.transaction.reservation_confirmed_at,
       status: summary.transaction.status,
     });

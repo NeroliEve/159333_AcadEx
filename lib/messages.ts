@@ -35,6 +35,7 @@ export type ConversationTransaction = {
   payment_status: TableRow<"transactions">["payment_status"];
   payment_requested_at: string | null;
   payment_requested_by: string | null;
+  request_type: TableRow<"transactions">["request_type"];
   reservation_confirmed_at: string | null;
   request_message: string | null;
   seller_id: string;
@@ -67,6 +68,8 @@ type ConversationRow = Pick<
   listing: ConversationListing | null;
   seller: ConversationParticipant | null;
 };
+
+type UnreadMessageRow = Pick<TableRow<"messages">, "conversation_id" | "id">;
 
 export type ConversationSummary = ConversationRow & {
   latestMessage: ConversationMessage | null;
@@ -130,6 +133,7 @@ const CONVERSATION_TRANSACTION_SELECT = `
   payment_status,
   payment_requested_at,
   payment_requested_by,
+  request_type,
   reservation_confirmed_at,
   request_message,
   seller_id,
@@ -150,6 +154,7 @@ const LEGACY_CONVERSATION_TRANSACTION_SELECT = `
   offered_listing_id,
   paid_at,
   payment_status,
+  request_type,
   reservation_confirmed_at,
   request_message,
   seller_id,
@@ -182,6 +187,43 @@ function buildMessageMaps(
         (unreadCounts.get(message.conversation_id) ?? 0) + 1,
       );
     }
+  }
+
+  return { latestByConversation, unreadCounts };
+}
+
+function buildLatestMessagesFilter(conversations: ConversationRow[]) {
+  return conversations
+    .filter((conversation) => !!conversation.last_message_at)
+    .map(
+      (conversation) =>
+        `and(conversation_id.eq.${conversation.id},created_at.eq.${conversation.last_message_at})`,
+    )
+    .join(",");
+}
+
+function buildSummaryMessageMaps(
+  latestMessages: ConversationMessage[],
+  unreadMessages: UnreadMessageRow[],
+) {
+  const latestByConversation = new Map<string, ConversationMessage>();
+  const unreadCounts = new Map<string, number>();
+
+  for (const message of latestMessages) {
+    const current = latestByConversation.get(message.conversation_id);
+    if (
+      !current ||
+      Date.parse(message.created_at) > Date.parse(current.created_at)
+    ) {
+      latestByConversation.set(message.conversation_id, message);
+    }
+  }
+
+  for (const message of unreadMessages) {
+    unreadCounts.set(
+      message.conversation_id,
+      (unreadCounts.get(message.conversation_id) ?? 0) + 1,
+    );
   }
 
   return { latestByConversation, unreadCounts };
@@ -297,17 +339,32 @@ export async function getMyConversationSummaries(
 
   const conversationRows = sortConversations(filteredRows);
   const conversationIds = conversationRows.map((conversation) => conversation.id);
-  const { data: messageData } = await supabase
-    .from("messages")
-    .select(MESSAGE_SELECT)
-    .in("conversation_id", conversationIds)
-    .order("created_at", { ascending: false });
+  const latestMessagesFilter = buildLatestMessagesFilter(conversationRows);
+  const latestMessagesPromise = latestMessagesFilter
+    ? supabase
+        .from("messages")
+        .select(MESSAGE_SELECT)
+        .or(latestMessagesFilter)
+    : Promise.resolve({ data: [], error: null });
 
-  const messages = (messageData ?? []) as unknown as ConversationMessage[];
-  const { latestByConversation, unreadCounts } = buildMessageMaps(messages, viewerId);
-  const transactionByConversation = await getLatestTransactionsByConversation(
-    supabase,
-    conversationIds,
+  const [
+    { data: latestMessageData },
+    { data: unreadMessageData },
+    transactionByConversation,
+  ] = await Promise.all([
+    latestMessagesPromise,
+    supabase
+      .from("messages")
+      .select("id, conversation_id")
+      .in("conversation_id", conversationIds)
+      .eq("is_read", false)
+      .neq("sender_id", viewerId),
+    getLatestTransactionsByConversation(supabase, conversationIds),
+  ]);
+
+  const { latestByConversation, unreadCounts } = buildSummaryMessageMaps(
+    (latestMessageData ?? []) as unknown as ConversationMessage[],
+    (unreadMessageData ?? []) as unknown as UnreadMessageRow[],
   );
 
   return conversationRows.map((conversation) =>

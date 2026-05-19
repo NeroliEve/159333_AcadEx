@@ -50,7 +50,7 @@ function TransactionRow({
   viewerId: string;
 }) {
   const isSeller = tx.seller_id === viewerId;
-  const isTrade = !!tx.offered_listing_id;
+  const isTrade = tx.request_type === "trade";
   const otherParty = isSeller ? tx.buyer : tx.seller;
   const otherName = otherParty
     ? `${otherParty.first_name} ${otherParty.last_name}`.trim() || otherParty.username
@@ -187,6 +187,9 @@ async function ProfileTransactionsContent() {
       <div className="space-y-6">
         <div className="space-y-4">
           <h2 className="text-base font-semibold tracking-tight">Buying</h2>
+          <h3 className="text-sm font-medium text-muted-foreground">
+            Items you&apos;ve bought or offered to buy, including trades. The most recent activity is shown first.
+          </h3>
           {transactions.buying.length === 0 ? (
             <p className="text-sm text-muted-foreground">No purchases yet.</p>
           ) : (
@@ -205,6 +208,9 @@ async function ProfileTransactionsContent() {
 
         <div className="space-y-4">
           <h2 className="text-base font-semibold tracking-tight">Selling</h2>
+          <h3 className="text-sm font-medium text-muted-foreground">
+            Items you&apos;ve listed for sale or offered to sell, including trades. The most recent activity is shown first.
+          </h3>
           {transactions.selling.length === 0 ? (
             <p className="text-sm text-muted-foreground">No sales yet.</p>
           ) : (

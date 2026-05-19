@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { validateTradeRequestMessage } from "@/lib/exchange-flow";
+
 type OfferableListing = {
   id: string;
   title: string;
@@ -43,12 +45,14 @@ export function RequestToTradeButton({
   );
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit() {
-    if (!selectedId) {
-      setError("Pick one of your listings to offer.");
+    const validation = validateTradeRequestMessage(message);
+    if (!validation.ok) {
+      setError(validation.error);
       return;
     }
 
@@ -58,7 +62,12 @@ export function RequestToTradeButton({
     const res = await fetch("/api/transactions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ listingId, offeredListingId: selectedId }),
+      body: JSON.stringify({
+        listingId,
+        offeredListingId: selectedId,
+        requestMessage: validation.message,
+        requestType: "trade",
+      }),
     });
 
     const json = await res.json();
@@ -69,10 +78,17 @@ export function RequestToTradeButton({
       return;
     }
 
+    const nextConversationId = json.conversationId ?? null;
     setIsPending(true);
-    setActiveConversationId(json.conversationId ?? null);
+    setActiveConversationId(nextConversationId);
     setIsModalOpen(false);
     setIsLoading(false);
+
+    if (nextConversationId) {
+      router.push(`/messages/${nextConversationId}`);
+      return;
+    }
+
     router.refresh();
   }
 
@@ -82,8 +98,8 @@ export function RequestToTradeButton({
         <div className="inline-flex h-10 w-full items-center justify-center rounded-md bg-secondary px-4 text-sm font-medium text-secondary-foreground">
           Trade request sent
         </div>
-        <p className="text-xs text-muted-foreground text-center">
-          The seller has been notified. Chat opens after they accept.
+        <p className="text-center text-xs text-muted-foreground">
+          Continue the conversation with the seller in messages.
         </p>
         {activeConversationId ? (
           <Link
@@ -93,23 +109,6 @@ export function RequestToTradeButton({
             Open conversation
           </Link>
         ) : null}
-      </div>
-    );
-  }
-
-  if (offerableListings.length === 0) {
-    return (
-      <div className="space-y-1">
-        <button
-          className="inline-flex h-10 w-full items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground opacity-50 cursor-not-allowed"
-          disabled
-          type="button"
-        >
-          Request to trade
-        </button>
-        <p className="text-xs text-muted-foreground text-center">
-          Create a listing of your own first so you have a book to offer.
-        </p>
       </div>
     );
   }
@@ -129,45 +128,80 @@ export function RequestToTradeButton({
           <div className="absolute inset-0" onClick={() => !isLoading && setIsModalOpen(false)} />
           <div className="relative z-10 max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-border/70 bg-background shadow-2xl">
             <div className="border-b border-border/70 px-6 py-5">
-              <h2 className="text-lg font-semibold tracking-tight">Pick a book to offer</h2>
+              <h2 className="text-lg font-semibold tracking-tight">Send trade request</h2>
               <p className="text-sm text-muted-foreground">
-                The seller will see this listing as your trade offer. If they accept, both books are reserved until completion.
+                Write a short message to start discussing a swap with the seller.
               </p>
             </div>
 
-            <div className="grid gap-2 px-6 py-4">
-              {offerableListings.map((entry) => {
-                const isSelected = entry.id === selectedId;
-                return (
+            <div className="space-y-4 px-6 py-4">
+              <label className="space-y-2 text-sm font-medium">
+                <span>Message</span>
+                <textarea
+                  className="min-h-28 w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-normal outline-none transition-colors placeholder:text-muted-foreground focus:border-primary"
+                  disabled={isLoading}
+                  maxLength={500}
+                  onChange={(event) => setMessage(event.target.value)}
+                  placeholder="Tell the seller what you would like to trade or ask what they are looking for."
+                  value={message}
+                />
+              </label>
+
+              {offerableListings.length > 0 ? (
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-sm font-medium">Attach one of your listings</p>
+                    <p className="text-xs text-muted-foreground">
+                      Optional. You can also arrange the trade in chat.
+                    </p>
+                  </div>
+
                   <button
-                    key={entry.id}
                     type="button"
-                    onClick={() => setSelectedId(entry.id)}
-                    className={`flex items-center gap-3 rounded-lg border p-3 text-left transition-colors ${
-                      isSelected
+                    onClick={() => setSelectedId(null)}
+                    className={`w-full rounded-lg border p-3 text-left text-sm transition-colors ${
+                      selectedId === null
                         ? "border-primary bg-primary/5"
                         : "border-border/70 hover:bg-accent"
                     }`}
                   >
-                    <div className="h-14 w-12 shrink-0 overflow-hidden rounded-md bg-secondary/40">
-                      {entry.primary_image_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          alt={entry.title}
-                          src={entry.primary_image_url}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : null}
-                    </div>
-                    <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
-                      <span className="truncate text-sm font-medium">{entry.title}</span>
-                      <span className="shrink-0 text-xs text-muted-foreground">
-                        {formatOfferPrice(entry)}
-                      </span>
-                    </div>
+                    No listing attached
                   </button>
-                );
-              })}
+
+                  {offerableListings.map((entry) => {
+                    const isSelected = entry.id === selectedId;
+                    return (
+                      <button
+                        key={entry.id}
+                        type="button"
+                        onClick={() => setSelectedId(entry.id)}
+                        className={`flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors ${
+                          isSelected
+                            ? "border-primary bg-primary/5"
+                            : "border-border/70 hover:bg-accent"
+                        }`}
+                      >
+                        <div className="h-14 w-12 shrink-0 overflow-hidden rounded-md bg-secondary/40">
+                          {entry.primary_image_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              alt={entry.title}
+                              src={entry.primary_image_url}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : null}
+                        </div>
+                        <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
+                          <span className="truncate text-sm font-medium">{entry.title}</span>
+                          <span className="shrink-0 text-xs text-muted-foreground">
+                            {formatOfferPrice(entry)}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
             </div>
 
             {error ? (
@@ -186,10 +220,10 @@ export function RequestToTradeButton({
               <button
                 type="button"
                 onClick={handleSubmit}
-                disabled={isLoading || !selectedId}
+                disabled={isLoading || !message.trim()}
                 className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {isLoading ? "Sending…" : "Send trade request"}
+                {isLoading ? "Sending..." : "Send trade request"}
               </button>
             </div>
           </div>

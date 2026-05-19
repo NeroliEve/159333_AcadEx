@@ -6,6 +6,7 @@ import {
 } from "@/lib/admin";
 import {
   BUY_REQUEST_DECLINE_LIMIT,
+  validateTradeRequestMessage,
   validateBuyRequestMessage,
 } from "@/lib/exchange-flow";
 
@@ -20,10 +21,11 @@ export async function POST(request: Request) {
     return getMarketplaceSuspendedResponse("request exchanges");
   }
 
-  const { listingId, offeredListingId, requestMessage } = (await request.json()) as {
+  const { listingId, offeredListingId, requestMessage, requestType: rawRequestType } = (await request.json()) as {
     listingId?: string;
     offeredListingId?: string | null;
     requestMessage?: string | null;
+    requestType?: "buy" | "trade";
   };
 
   if (!listingId) {
@@ -46,23 +48,28 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "This listing is no longer available." }, { status: 400 });
   }
 
-  const isTradeRequest = !!offeredListingId;
-  const buyMessageValidation = isTradeRequest
-    ? null
+  const requestType = rawRequestType ?? (offeredListingId ? "trade" : "buy");
+  if (requestType !== "buy" && requestType !== "trade") {
+    return NextResponse.json({ error: "Invalid request type." }, { status: 400 });
+  }
+
+  const isTradeRequest = requestType === "trade";
+  const messageValidation = isTradeRequest
+    ? validateTradeRequestMessage(requestMessage)
     : validateBuyRequestMessage(requestMessage);
 
-  if (buyMessageValidation && !buyMessageValidation.ok) {
-    return NextResponse.json({ error: buyMessageValidation.error }, { status: 400 });
+  if (!messageValidation.ok) {
+    return NextResponse.json({ error: messageValidation.error }, { status: 400 });
   }
 
   if (isTradeRequest && listing.listing_type === "sale_only") {
     return NextResponse.json({ error: "This listing is not open to trades." }, { status: 400 });
   }
   if (!isTradeRequest && listing.listing_type === "trade_only") {
-    return NextResponse.json({ error: "This listing is trade-only — you must offer a book." }, { status: 400 });
+    return NextResponse.json({ error: "This listing is trade-only - send a trade request." }, { status: 400 });
   }
 
-  if (isTradeRequest) {
+  if (isTradeRequest && offeredListingId) {
     const { data: offered } = await supabase
       .from("listings")
       .select("archived_at, id, seller_id, status, deleted_at")
@@ -104,7 +111,7 @@ export async function POST(request: Request) {
       .eq("listing_id", listingId)
       .eq("buyer_id", userId)
       .eq("status", "declined")
-      .is("offered_listing_id", null);
+      .eq("request_type", "buy");
 
     if ((declinedBuyCount ?? 0) >= BUY_REQUEST_DECLINE_LIMIT) {
       return NextResponse.json(
@@ -172,11 +179,12 @@ export async function POST(request: Request) {
     buyer_id: userId,
     seller_id: listing.seller_id,
     conversation_id: conversationId,
-    offered_listing_id: isTradeRequest ? offeredListingId : null,
+    offered_listing_id: isTradeRequest ? offeredListingId ?? null : null,
     agreed_price: isTradeRequest ? null : listing.price,
     agreed_trade_text: isTradeRequest ? listing.wanted_trade_text : null,
     payment_status: isTradeRequest ? "not_required" : "unpaid",
-    request_message: buyMessageValidation?.message ?? null,
+    request_message: messageValidation.message,
+    request_type: requestType,
     status: "pending",
     reservation_requested_at: new Date().toISOString(),
   }).select("id").single();
@@ -188,9 +196,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const messageContent = isTradeRequest
-    ? "Trade request sent."
-    : buyMessageValidation?.message;
+  const messageContent = messageValidation.message;
 
   if (messageContent) {
     await supabase.from("messages").insert({

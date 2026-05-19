@@ -20,6 +20,7 @@ import { createClient } from "@/lib/supabase/client";
 
 type CreateListingFormProps = {
   courses: CourseOption[];
+  profileUniversity?: string | null;
   studyAreas: StudyAreaOption[];
 };
 
@@ -50,7 +51,7 @@ function FieldError({ message }: { message?: string }) {
   return <p className="text-sm text-destructive">{message}</p>;
 }
 
-export function CreateListingForm({ courses, studyAreas }: CreateListingFormProps) {
+export function CreateListingForm({ courses, profileUniversity, studyAreas }: CreateListingFormProps) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [isRefreshing, startTransition] = useTransition();
@@ -326,6 +327,38 @@ export function CreateListingForm({ courses, studyAreas }: CreateListingFormProp
                   ? "Choose the course this book is most relevant to."
                   : "No courses have been added yet. An admin will add courses soon."}
               </p>
+            </div>
+
+            <div className="grid gap-3 rounded-lg border border-border/70 bg-secondary/30 p-4 md:col-span-2">
+              <input type="hidden" name="showSellerUniversity" value="false" />
+              <label htmlFor="showSellerUniversity" className="flex items-start gap-3">
+                <input
+                  id="showSellerUniversity"
+                  name="showSellerUniversity"
+                  type="checkbox"
+                  value="true"
+                  defaultChecked={!!profileUniversity}
+                  disabled={!profileUniversity}
+                  className="mt-1 h-4 w-4 rounded border-input"
+                />
+                <span className="space-y-1">
+                  <span className="block text-sm font-medium text-foreground">
+                    Show university on this listing
+                  </span>
+                  <span className="block text-sm leading-6 text-muted-foreground">
+                    {profileUniversity
+                      ? `Your listing will display ${profileUniversity}. You can change your university on your `
+                      : "Add a university on your "}
+                    <Link
+                      href="/profile/edit"
+                      className="font-medium underline underline-offset-2 transition-colors hover:text-foreground"
+                    >
+                      profile
+                    </Link>
+                    .
+                  </span>
+                </span>
+              </label>
             </div>
 
             {/* Only shown when seller wants to trade — placed after course so layout stays stable */}

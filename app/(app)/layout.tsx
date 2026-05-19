@@ -8,6 +8,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
+type ViewerContext = Awaited<ReturnType<typeof getViewerContext>>;
+
 function HeaderFallback() {
   return (
     <header className="border-b border-border bg-background">
@@ -31,12 +33,14 @@ function MainFallback() {
 
 async function ProfileCompletionGate({
   children,
+  viewerContextPromise,
 }: Readonly<{
   children: React.ReactNode;
+  viewerContextPromise: Promise<ViewerContext>;
 }>) {
   const [requestHeaders, { profile }] = await Promise.all([
     headers(),
-    getViewerContext(),
+    viewerContextPromise,
   ]);
   const pathname = requestHeaders.get("x-pathname") ?? "";
   const isCompletingProfile = pathname.startsWith("/profile/edit");
@@ -57,13 +61,17 @@ export default function AppLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const viewerContextPromise = getViewerContext();
+
   return (
     <div className="min-h-screen bg-background">
       <Suspense fallback={<HeaderFallback />}>
-        <SiteHeader />
+        <SiteHeader viewerContextPromise={viewerContextPromise} />
       </Suspense>
       <Suspense fallback={<MainFallback />}>
-        <ProfileCompletionGate>{children}</ProfileCompletionGate>
+        <ProfileCompletionGate viewerContextPromise={viewerContextPromise}>
+          {children}
+        </ProfileCompletionGate>
       </Suspense>
     </div>
   );

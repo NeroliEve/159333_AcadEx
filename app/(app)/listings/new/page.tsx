@@ -71,15 +71,13 @@ async function CreateListingPageContent() {
           Add the essentials and publish quickly. Listings are currently focused
           on book sales, not trade flows.
         </p>
-        <p className="text-sm text-muted-foreground">
-          Selling as{" "}
-          <span className="font-medium text-foreground">
-            {profile?.university || user.email}
-          </span>
-        </p>
       </div>
 
-      <CreateListingForm courses={courses} studyAreas={studyAreas} />
+      <CreateListingForm
+        courses={courses}
+        profileUniversity={profile?.university}
+        studyAreas={studyAreas}
+      />
     </section>
   );
 }

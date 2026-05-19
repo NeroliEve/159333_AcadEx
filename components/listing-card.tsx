@@ -1,11 +1,11 @@
-/* eslint-disable @next/next/no-img-element */
-
+import Image from "next/image";
 import Link from "next/link";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { ListingImageCarousel } from "@/components/listing-image-carousel";
 import { ListingManageMenu } from "@/components/listing-manage-menu";
 import { SaveButton } from "@/components/save-button";
+import { getVisibleSellerUniversity } from "@/lib/listing-visibility";
 import type { ListingCardData } from "@/lib/marketplace";
 
 type ListingCardProps = {
@@ -83,6 +83,7 @@ export function ListingCard({
   isSaved = false,
 }: ListingCardProps) {
   const sellerName = getProfileDisplayName(listing.seller);
+  const sellerUniversity = getVisibleSellerUniversity(listing);
   const canUseMarketplace = viewerAccountStatus !== "suspended";
   const isOwner =
     canUseMarketplace &&
@@ -143,9 +144,9 @@ export function ListingCard({
                   {listing.course.course_code}
                 </span>
               ) : null}
-              {listing.seller?.university ? (
+              {sellerUniversity ? (
                 <span className="rounded-full bg-secondary px-2.5 py-1 text-secondary-foreground">
-                  {listing.seller.university}
+                  {sellerUniversity}
                 </span>
               ) : null}
               {listing.status !== "available" ? (
@@ -167,10 +168,13 @@ export function ListingCard({
               <div className="flex min-w-0 items-center gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border/70 bg-secondary">
                   {listing.seller?.avatar_url ? (
-                    <img
+                    <Image
                       alt={`${sellerName}'s profile picture`}
                       className="h-full w-full object-cover"
+                      height={40}
+                      loading="lazy"
                       src={listing.seller.avatar_url}
+                      width={40}
                     />
                   ) : (
                     <span className="text-sm font-semibold text-muted-foreground">

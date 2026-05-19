@@ -5,37 +5,14 @@ import { isMarketplaceSuspended } from "@/lib/admin";
 import {
   getCourseOptions,
   getListingsFeed,
+  getListingsFeedFilters,
   getSavedListingIds,
   getStudyAreaOptions,
   getUniversityOptions,
   getViewerContext,
-  type ListingsFeedFilters,
+  shouldIncludeBrowseMetadata,
 } from "@/lib/marketplace";
 import { hasEnvVars } from "@/lib/utils";
-
-function getFilters(url: URL): ListingsFeedFilters {
-  return {
-    q: url.searchParams.get("q") || undefined,
-    condition: url.searchParams.get("condition") || undefined,
-    courseId: url.searchParams.get("courseId")
-      ? Number(url.searchParams.get("courseId"))
-      : undefined,
-    listingType: url.searchParams.get("listingType") || undefined,
-    studyAreaId: url.searchParams.get("studyAreaId")
-      ? Number(url.searchParams.get("studyAreaId"))
-      : undefined,
-    universityId: url.searchParams.get("universityId")
-      ? Number(url.searchParams.get("universityId"))
-      : undefined,
-    minPrice: url.searchParams.get("minPrice")
-      ? Number(url.searchParams.get("minPrice"))
-      : undefined,
-    maxPrice: url.searchParams.get("maxPrice")
-      ? Number(url.searchParams.get("maxPrice"))
-      : undefined,
-    sellerName: url.searchParams.get("sellerName") || undefined,
-  };
-}
 
 export async function GET(request: Request) {
   try {
@@ -47,13 +24,20 @@ export async function GET(request: Request) {
 
     const url = new URL(request.url);
     const { profile, user } = await getViewerContext();
-    const filters = getFilters(url);
-    const [{ listings, error }, courses, universities, studyAreas, savedIds] =
+    const filters = getListingsFeedFilters(url.searchParams);
+    const metadataPromise = shouldIncludeBrowseMetadata(url.searchParams)
+      ? Promise.all([
+          getCourseOptions(),
+          getUniversityOptions(true),
+          getStudyAreaOptions(),
+        ])
+      : Promise.resolve([[], [], []] as const);
+    const [{ listings, error }, [courses, universities, studyAreas], savedIds] =
       await Promise.all([
-        getListingsFeed(user ? "authenticated" : "anonymous", filters),
-        getCourseOptions(),
-        getUniversityOptions(true),
-        getStudyAreaOptions(),
+        getListingsFeed(user ? "authenticated" : "anonymous", filters, 24, {
+          viewerId: user?.id ?? null,
+        }),
+        metadataPromise,
         user ? getSavedListingIds(user.id) : Promise.resolve([]),
       ]);
 

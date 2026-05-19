@@ -22,6 +22,7 @@ describe("getCheckoutEligibility", () => {
     offered_listing_id: null,
     payment_status: "unpaid",
     payment_requested_at: null,
+    request_type: "buy",
     reservation_confirmed_at: "2026-05-14T00:00:00.000Z",
     status: "pending",
   } as const;
@@ -64,7 +65,19 @@ describe("getCheckoutEligibility", () => {
   it("rejects checkout for trade transactions", () => {
     expect(
       getCheckoutEligibility(
-        { ...acceptedSale, offered_listing_id: "listing-2", payment_status: "not_required" },
+        { ...acceptedSale, offered_listing_id: "listing-2", payment_status: "not_required", request_type: "trade" },
+        "buyer-1",
+      ),
+    ).toEqual({
+      eligible: false,
+      reason: "Trade transactions do not need Stripe payment.",
+    });
+  });
+
+  it("rejects checkout for message-only trade transactions", () => {
+    expect(
+      getCheckoutEligibility(
+        { ...acceptedSale, payment_status: "not_required", request_type: "trade" },
         "buyer-1",
       ),
     ).toEqual({
@@ -78,6 +91,7 @@ describe("canRequestSellerPayment", () => {
   const acceptedSale = {
     offered_listing_id: null,
     payment_status: "unpaid",
+    request_type: "buy",
     reservation_confirmed_at: "2026-05-14T00:00:00.000Z",
     seller_id: "seller-1",
     status: "pending",
@@ -119,6 +133,18 @@ describe("canRequestSellerPayment", () => {
       reason: "This transaction has already been paid.",
     });
   });
+
+  it("rejects payment requests for message-only trade transactions", () => {
+    expect(
+      canRequestSellerPayment(
+        { ...acceptedSale, payment_status: "not_required", request_type: "trade" },
+        "seller-1",
+      ),
+    ).toEqual({
+      eligible: false,
+      reason: "Trade transactions do not need Stripe payment.",
+    });
+  });
 });
 
 describe("canCompleteTransaction", () => {
@@ -127,6 +153,7 @@ describe("canCompleteTransaction", () => {
       canCompleteTransaction({
         offered_listing_id: null,
         payment_status: "paid",
+        request_type: "buy",
       }),
     ).toBe(true);
   });
@@ -136,6 +163,7 @@ describe("canCompleteTransaction", () => {
       canCompleteTransaction({
         offered_listing_id: null,
         payment_status: "unpaid",
+        request_type: "buy",
       }),
     ).toBe(false);
   });
@@ -145,6 +173,17 @@ describe("canCompleteTransaction", () => {
       canCompleteTransaction({
         offered_listing_id: "listing-2",
         payment_status: "not_required",
+        request_type: "trade",
+      }),
+    ).toBe(true);
+  });
+
+  it("allows completed handover for message-only trade transactions without payment", () => {
+    expect(
+      canCompleteTransaction({
+        offered_listing_id: null,
+        payment_status: "not_required",
+        request_type: "trade",
       }),
     ).toBe(true);
   });
