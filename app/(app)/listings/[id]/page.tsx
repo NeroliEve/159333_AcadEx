@@ -122,7 +122,7 @@ async function ListingDetailContent({
         <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">Listing details</p>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-1">
-            <h1 className="text-3xl font-semibold tracking-tight">{listing.title}</h1>
+            <h1 className="break-words text-3xl font-semibold tracking-tight">{listing.title}</h1>
             {listing.author ? (
               <p className="text-sm text-muted-foreground">by {listing.author}</p>
             ) : null}
@@ -184,29 +184,29 @@ async function ListingDetailContent({
               {(listing.edition || listing.isbn || listing.publisher || listing.course?.course_name) ? (
                 <div className="space-y-3">
                   <h2 className="text-base font-semibold tracking-tight">Book details</h2>
-                  <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
+                  <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm sm:gap-x-6">
                     {listing.edition ? (
                       <>
                         <dt className="text-muted-foreground">Edition</dt>
-                        <dd>{listing.edition}</dd>
+                        <dd className="break-words">{listing.edition}</dd>
                       </>
                     ) : null}
                     {listing.publisher ? (
                       <>
                         <dt className="text-muted-foreground">Publisher</dt>
-                        <dd>{listing.publisher}</dd>
+                        <dd className="break-words">{listing.publisher}</dd>
                       </>
                     ) : null}
                     {listing.isbn ? (
                       <>
                         <dt className="text-muted-foreground">ISBN</dt>
-                        <dd className="font-mono text-xs">{listing.isbn}</dd>
+                        <dd className="break-words font-mono text-xs">{listing.isbn}</dd>
                       </>
                     ) : null}
                     {listing.course?.course_name ? (
                       <>
                         <dt className="text-muted-foreground">Course</dt>
-                        <dd>
+                        <dd className="break-words">
                           {listing.course.course_code
                             ? `${listing.course.course_code} · ${listing.course.course_name}`
                             : listing.course.course_name}

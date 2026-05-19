@@ -6,6 +6,7 @@ import {
   logAdminAction,
   requireModerationNote,
 } from "@/lib/admin";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 const USER_RETURN_SELECT =
   "account_status, avatar_url, bio, email, first_name, id, is_verified, last_name, role, suspended_at, university, university_id, updated_at, username";
@@ -137,7 +138,8 @@ export async function PATCH(
       );
     }
 
-    const { data: updatedUser, error: updateError } = await supabase
+    const adminSupabase = createAdminClient();
+    const { data: updatedUser, error: updateError } = await adminSupabase
       .from("profiles")
       .update({
         account_status: accountStatus,

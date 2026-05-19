@@ -13,7 +13,7 @@ type ViewerContext = Awaited<ReturnType<typeof getViewerContext>>;
 function HeaderFallback() {
   return (
     <header className="border-b border-border bg-background">
-      <div className="flex h-16 w-full items-center justify-between gap-4 px-16">
+      <div className="flex h-16 w-full items-center justify-between gap-4 px-4 sm:px-6 lg:px-16">
         <Link href="/" className="inline-flex items-center">
           <BrandTitle priority />
         </Link>
@@ -25,7 +25,7 @@ function HeaderFallback() {
 
 function MainFallback() {
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-col px-6 py-12">
+    <main className="mx-auto flex w-full max-w-5xl flex-col px-4 py-8 sm:px-6 sm:py-12">
       <div className="h-72 animate-pulse rounded-2xl border border-border/70 bg-muted/40" />
     </main>
   );
@@ -50,7 +50,7 @@ async function ProfileCompletionGate({
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-col px-6 py-12">
+    <main className="mx-auto flex w-full max-w-5xl flex-col px-4 py-8 sm:px-6 sm:py-12">
       {children}
     </main>
   );

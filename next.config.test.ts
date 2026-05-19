@@ -3,6 +3,10 @@ import { describe, expect, it } from "vitest";
 import nextConfig from "@/next.config";
 
 describe("next image configuration", () => {
+  it("allows the local network dev origin used by mobile devices", () => {
+    expect(nextConfig.allowedDevOrigins).toContain("192.168.1.7");
+  });
+
   it("allows Supabase Storage image URLs", () => {
     expect(nextConfig.images?.remotePatterns).toEqual(
       expect.arrayContaining([

@@ -217,11 +217,32 @@ function MessagesShellInner({ children }: { children: React.ReactNode }) {
         </p>
       </div>
 
+      <MessagesModerationNotice />
+
       <div className="grid gap-6 xl:grid-cols-[320px_1fr]">
         <MessagesSidebar />
         {children}
       </div>
     </div>
+  );
+}
+
+export function MessagesModerationNotice() {
+  return (
+    <section
+      aria-label="Chat moderation notice"
+      className="rounded-lg border border-amber-300/70 bg-amber-50 px-4 py-3 text-amber-950 shadow-sm dark:border-amber-500/40 dark:bg-amber-950/30 dark:text-amber-100"
+    >
+      <p className="text-sm font-semibold">
+        Chats may be reviewed by admins
+      </p>
+      <p className="mt-1 text-sm leading-6">
+        Acadex admins can read conversations to support safety and moderation.
+        Please avoid sharing sensitive, private, or confidential details such as
+        passwords, payment information, ID numbers, home addresses, or anything
+        you would not want stored in chat.
+      </p>
+    </section>
   );
 }
 

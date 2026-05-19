@@ -113,7 +113,7 @@ async function LandingContent() {
   }
 
   return (
-    <main className="relative z-10 mx-auto flex w-full max-w-7xl flex-col gap-10 px-6 py-10 sm:py-14">
+    <main className="relative z-10 mx-auto flex w-full max-w-7xl flex-col gap-10 px-4 py-8 sm:px-6 sm:py-14">
       <section className="relative isolate mx-auto flex min-h-[520px] w-full max-w-7xl items-center justify-center overflow-hidden text-center">
         <div className="relative z-10 mx-auto flex w-full max-w-3xl flex-col items-center gap-6">
           <h1 className="max-w-3xl text-balance text-4xl font-bold tracking-tight text-foreground sm:text-5xl md:text-6xl">
@@ -157,8 +157,8 @@ async function LandingContent() {
       </section>
 
       <section className="w-full">
-        <div className="mx-auto drop-shadow-lg flex min-h-[420px] w-full max-w-6xl items-center justify-center rounded-2xl border border-border bg-card/40 px-6 py-10 sm:min-h-[460px]">
-          <p className="text-center text-4xl font-bold tracking-tight text-foreground">
+        <div className="mx-auto flex min-h-[420px] w-full max-w-6xl items-center justify-center rounded-2xl border border-border bg-card/40 px-4 py-10 drop-shadow-lg sm:min-h-[460px] sm:px-6">
+          <p className="text-center text-2xl font-bold tracking-tight text-foreground sm:text-4xl">
             preview of platform goes here
           </p>
         </div>

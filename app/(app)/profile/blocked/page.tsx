@@ -40,9 +40,9 @@ async function BlockedUsersContent() {
             return (
               <div
                 key={entry.blocked_id}
-                className="flex items-center justify-between gap-4 rounded-xl border border-border/70 bg-card p-4"
+                className="flex flex-col gap-4 rounded-xl border border-border/70 bg-card p-4 sm:flex-row sm:items-center sm:justify-between"
               >
-                <div className="flex items-center gap-3">
+                <div className="flex min-w-0 items-center gap-3 self-stretch sm:self-auto">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border/70 bg-secondary/40">
                     {profile.avatar_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -53,10 +53,10 @@ async function BlockedUsersContent() {
                       </span>
                     )}
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <Link
                       href={`/profile/${profile.username}`}
-                      className="text-sm font-medium underline underline-offset-2 transition-colors hover:text-foreground"
+                      className="block truncate text-sm font-medium underline underline-offset-2 transition-colors hover:text-foreground"
                     >
                       {displayName}
                     </Link>

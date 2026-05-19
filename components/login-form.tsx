@@ -15,6 +15,10 @@ import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { useState } from "react";
 
+export function normalizeLoginEmail(value: string) {
+  return value.trim().toLowerCase();
+}
+
 export function LoginForm({
   className,
   ...props
@@ -32,7 +36,7 @@ export function LoginForm({
 
     try {
       const { error } = await supabase.auth.signInWithPassword({
-        email,
+        email: normalizeLoginEmail(email),
         password,
       });
       if (error) throw error;
@@ -62,8 +66,13 @@ export function LoginForm({
                 <Input
                   id="email"
                   type="email"
+                  autoCapitalize="none"
+                  autoComplete="email"
+                  autoCorrect="off"
+                  inputMode="email"
                   placeholder="m@example.com"
                   required
+                  spellCheck={false}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />

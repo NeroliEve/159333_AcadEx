@@ -153,7 +153,7 @@ export function BrowseListingsPanel({
           <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-2">
               <p className="text-lg font-semibold">
-                Browse first, sign in when you&apos;re ready to sell.
+                Browse first, sign in when you&apos;re ready to buy or sell.
               </p>
               <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
                 The feed is open so students can see what&apos;s available.

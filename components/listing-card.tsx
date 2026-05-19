@@ -117,8 +117,8 @@ export function ListingCard({
 
           <div className="flex flex-1 flex-col gap-4 p-5">
             <div className="flex items-start justify-between gap-4">
-              <div className="space-y-1">
-                <h3 className="text-lg font-semibold leading-tight">
+              <div className="min-w-0 space-y-1">
+                <h3 className="break-words text-lg font-semibold leading-tight">
                   <Link
                     href={`/listings/${listing.id}`}
                     className="transition-colors hover:text-[#1F5EE4]"

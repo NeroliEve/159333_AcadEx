@@ -88,7 +88,7 @@ function CreateListingPageFallback() {
       <div className="space-y-3">
         <div className="h-4 w-28 animate-pulse rounded bg-muted" />
         <div className="h-10 w-64 animate-pulse rounded bg-muted" />
-        <div className="h-4 w-96 animate-pulse rounded bg-muted" />
+        <div className="h-4 w-96 max-w-full animate-pulse rounded bg-muted" />
       </div>
       <div className="h-[640px] animate-pulse rounded-2xl border border-border/70 bg-muted/40" />
     </section>

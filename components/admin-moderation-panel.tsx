@@ -143,6 +143,10 @@ type AdminWorkspacePayload = {
   users?: AdminUserRecord[];
 };
 
+function buildUserBaselines(users: AdminUserRecord[]) {
+  return new Map(users.map((user) => [user.id, user]));
+}
+
 export function AdminModerationPanel({
   auditLogs: initialAuditLogs = emptyAuditLogs,
   courses: initialCourses = emptyCourses,
@@ -162,6 +166,9 @@ export function AdminModerationPanel({
   const [activeTab, setActiveTab] = useState<AdminTab>(urlTab);
   const [overviewData, setOverviewData] = useState(initialOverview);
   const [users, setUsers] = useState(initialUsers);
+  const [userBaselinesById, setUserBaselinesById] = useState(() =>
+    buildUserBaselines(initialUsers),
+  );
   const [listings, setListings] = useState(initialListings);
   const [reports, setReports] = useState(initialReports);
   const [auditLogs, setAuditLogs] = useState(initialAuditLogs);
@@ -224,6 +231,7 @@ export function AdminModerationPanel({
 
   useEffect(() => {
     setUsers(initialUsers);
+    setUserBaselinesById(buildUserBaselines(initialUsers));
   }, [initialUsers]);
 
   useEffect(() => {
@@ -292,6 +300,7 @@ export function AdminModerationPanel({
         }
         if (payload.data.users) {
           setUsers(payload.data.users);
+          setUserBaselinesById(buildUserBaselines(payload.data.users));
         }
         if (payload.data.listings) {
           setListings(payload.data.listings);
@@ -428,10 +437,6 @@ export function AdminModerationPanel({
     () => users.filter((user) => !user.is_verified),
     [users],
   );
-  const initialUsersById = useMemo(
-    () => new Map(initialUsers.map((user) => [user.id, user])),
-    [initialUsers],
-  );
   const managedUser = useMemo(
     () => users.find((user) => user.id === managedUserId) ?? null,
     [managedUserId, users],
@@ -541,7 +546,7 @@ export function AdminModerationPanel({
     if (!currentUser) return;
 
     const mergedUser = { ...currentUser, ...nextUser };
-    const baselineUser = initialUsersById.get(userId) ?? currentUser;
+    const baselineUser = userBaselinesById.get(userId) ?? currentUser;
     const notes = userNotes[userId]?.trim() ?? "";
     const hasProfileChanges =
       baselineUser.first_name !== mergedUser.first_name ||
@@ -604,9 +609,15 @@ export function AdminModerationPanel({
 
       const payload = await handleJsonResponse(response);
       if (payload.user) {
+        const updatedUser = payload.user as AdminUserRecord;
         setUsers((current) =>
-          current.map((user) => (user.id === userId ? (payload.user as AdminUserRecord) : user)),
+          current.map((user) => (user.id === userId ? updatedUser : user)),
         );
+        setUserBaselinesById((current) => {
+          const next = new Map(current);
+          next.set(userId, updatedUser);
+          return next;
+        });
       }
       setUserNotes((current) => ({ ...current, [userId]: "" }));
       if (options?.closeOnSuccess) {
@@ -979,7 +990,7 @@ export function AdminModerationPanel({
       ) : null}
 
       {managedUser ? (() => {
-        const baselineUser = initialUsersById.get(managedUser.id) ?? managedUser;
+        const baselineUser = userBaselinesById.get(managedUser.id) ?? managedUser;
         const noteRequired =
           baselineUser.role !== managedUser.role ||
           baselineUser.account_status !== managedUser.account_status ||

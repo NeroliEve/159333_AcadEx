@@ -18,7 +18,8 @@ export function GoBackButton() {
 
   return (
     <PillButton size="sm" variant="secondary" onClick={goBack}>
-      Go back
+      <span className="sm:hidden">Back</span>
+      <span className="hidden sm:inline">Go back</span>
     </PillButton>
   );
 }

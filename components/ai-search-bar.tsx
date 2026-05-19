@@ -65,15 +65,19 @@ export function AiSearchBar() {
         </span>
       </div>
 
-      <form onSubmit={handleSubmit} className="flex gap-2">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-2 sm:flex-row">
         <Input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder='e.g. "cheap first year programming book for Massey"'
           disabled={loading}
-          className="flex-1"
+          className="min-w-0 flex-1"
         />
-        <PillButton type="submit" disabled={loading || !query.trim()}>
+        <PillButton
+          type="submit"
+          disabled={loading || !query.trim()}
+          className="w-full sm:w-auto"
+        >
           {loading ? "Searching..." : "Ask AI"}
         </PillButton>
       </form>

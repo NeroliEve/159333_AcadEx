@@ -3,166 +3,41 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
+import {
+  formatHeaderNotificationCount,
+  getHeaderMessageRealtimeFilters,
+  getHeaderTransactionRealtimeFilters,
+} from "@/components/header-notifications";
 import { createClient } from "@/lib/supabase/client";
 
 type UserMenuProps = {
   avatarUrl?: string | null;
   email?: string | null;
-  initialUnreadCount?: number;
-  initialUnseenTransactionCount?: number;
   isSuspended?: boolean;
   name?: string | null;
+  unreadCount?: number;
+  unseenTransactionCount?: number;
   userId?: string | null;
-};
-
-type UserMenuRealtimeFilter = {
-  event: "INSERT" | "UPDATE";
-  filter: string;
-  schema: "public";
-  table: "conversations" | "messages" | "profiles" | "transactions";
 };
 
 function getInitial(name?: string | null, email?: string | null) {
   return (name?.trim().charAt(0) || email?.trim().charAt(0) || "A").toUpperCase();
 }
 
-function formatUnreadCount(count: number) {
-  return count > 99 ? "99+" : count.toString();
-}
-
-export function getUserMenuTransactionRealtimeFilters(
-  userId: string,
-): UserMenuRealtimeFilter[] {
-  return [
-    {
-      event: "INSERT",
-      filter: `buyer_id=eq.${userId}`,
-      schema: "public",
-      table: "transactions",
-    },
-    {
-      event: "UPDATE",
-      filter: `buyer_id=eq.${userId}`,
-      schema: "public",
-      table: "transactions",
-    },
-    {
-      event: "INSERT",
-      filter: `seller_id=eq.${userId}`,
-      schema: "public",
-      table: "transactions",
-    },
-    {
-      event: "UPDATE",
-      filter: `seller_id=eq.${userId}`,
-      schema: "public",
-      table: "transactions",
-    },
-    {
-      event: "UPDATE",
-      filter: `id=eq.${userId}`,
-      schema: "public",
-      table: "profiles",
-    },
-  ];
-}
-
-export function getUserMenuMessageRealtimeFilters(
-  userId: string,
-): UserMenuRealtimeFilter[] {
-  return [
-    {
-      event: "UPDATE",
-      filter: `sender_id=neq.${userId}`,
-      schema: "public",
-      table: "messages",
-    },
-    {
-      event: "INSERT",
-      filter: `buyer_id=eq.${userId}`,
-      schema: "public",
-      table: "conversations",
-    },
-    {
-      event: "UPDATE",
-      filter: `buyer_id=eq.${userId}`,
-      schema: "public",
-      table: "conversations",
-    },
-    {
-      event: "INSERT",
-      filter: `seller_id=eq.${userId}`,
-      schema: "public",
-      table: "conversations",
-    },
-    {
-      event: "UPDATE",
-      filter: `seller_id=eq.${userId}`,
-      schema: "public",
-      table: "conversations",
-    },
-  ];
-}
+export const getUserMenuTransactionRealtimeFilters =
+  getHeaderTransactionRealtimeFilters;
+export const getUserMenuMessageRealtimeFilters = getHeaderMessageRealtimeFilters;
 
 export function UserMenu({
   avatarUrl,
   email,
-  initialUnreadCount = 0,
-  initialUnseenTransactionCount = 0,
   isSuspended = false,
   name,
-  userId,
+  unreadCount = 0,
+  unseenTransactionCount = 0,
 }: UserMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [isOpen, setIsOpen] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(initialUnreadCount);
-  const [unseenTxCount, setUnseenTxCount] = useState(initialUnseenTransactionCount);
-
-  useEffect(() => {
-    setUnreadCount(initialUnreadCount);
-  }, [initialUnreadCount]);
-
-  useEffect(() => {
-    setUnseenTxCount(initialUnseenTransactionCount);
-  }, [initialUnseenTransactionCount]);
-
-  useEffect(() => {
-    if (isSuspended || !userId) {
-      setUnseenTxCount(0);
-      return;
-    }
-    let isMounted = true;
-    const supabase = createClient();
-    const channel = supabase.channel(`user-menu-transactions-${userId}`);
-
-    async function refreshTxCount() {
-      try {
-        const response = await fetch("/api/transactions/unseen-count", { cache: "no-store" });
-        if (!response.ok) {
-          if (response.status === 401 && isMounted) setUnseenTxCount(0);
-          return;
-        }
-        const data = (await response.json()) as { count?: number };
-        if (isMounted) setUnseenTxCount(typeof data.count === "number" ? data.count : 0);
-      } catch {
-        if (isMounted) setUnseenTxCount(0);
-      }
-    }
-
-    for (const filter of getUserMenuTransactionRealtimeFilters(userId)) {
-      channel.on("postgres_changes", filter, () => {
-        void refreshTxCount();
-      });
-    }
-
-    channel.subscribe();
-    void refreshTxCount();
-
-    return () => {
-      isMounted = false;
-      void supabase.removeChannel(channel);
-    };
-  }, [isSuspended, userId]);
 
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
@@ -174,55 +49,6 @@ export function UserMenu({
     document.addEventListener("pointerdown", handlePointerDown);
     return () => document.removeEventListener("pointerdown", handlePointerDown);
   }, []);
-
-  useEffect(() => {
-    if (isSuspended || !userId) {
-      setUnreadCount(0);
-      return;
-    }
-
-    let isMounted = true;
-    const supabase = createClient();
-    const channel = supabase.channel(`user-menu-unread-${userId}`);
-
-    async function refreshUnreadCount() {
-      try {
-        const response = await fetch("/api/messages/unread-count", {
-          cache: "no-store",
-        });
-
-        if (!response.ok) {
-          if (response.status === 401 && isMounted) {
-            setUnreadCount(0);
-          }
-          return;
-        }
-
-        const data = (await response.json()) as { count?: number };
-        if (isMounted) {
-          setUnreadCount(typeof data.count === "number" ? data.count : 0);
-        }
-      } catch {
-        if (isMounted) {
-          setUnreadCount(0);
-        }
-      }
-    }
-
-    for (const filter of getUserMenuMessageRealtimeFilters(userId)) {
-      channel.on("postgres_changes", filter, () => {
-        void refreshUnreadCount();
-      });
-    }
-
-    channel.subscribe();
-    void refreshUnreadCount();
-
-    return () => {
-      isMounted = false;
-      void supabase.removeChannel(channel);
-    };
-  }, [isSuspended, userId]);
 
   async function logout() {
     const supabase = createClient();
@@ -255,7 +81,7 @@ export function UserMenu({
         )}
         {unreadCount > 0 ? (
           <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
-            {formatUnreadCount(unreadCount)}
+            {formatHeaderNotificationCount(unreadCount)}
           </span>
         ) : null}
       </button>
@@ -287,7 +113,7 @@ export function UserMenu({
                   <span>Messages</span>
                   {unreadCount > 0 ? (
                     <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
-                      {formatUnreadCount(unreadCount)}
+                      {formatHeaderNotificationCount(unreadCount)}
                     </span>
                   ) : null}
                 </Link>
@@ -297,9 +123,9 @@ export function UserMenu({
                   onClick={() => setIsOpen(false)}
                 >
                   <span>Transactions</span>
-                  {unseenTxCount > 0 ? (
+                  {unseenTransactionCount > 0 ? (
                     <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
-                      {formatUnreadCount(unseenTxCount)}
+                      {formatHeaderNotificationCount(unseenTransactionCount)}
                     </span>
                   ) : null}
                 </Link>

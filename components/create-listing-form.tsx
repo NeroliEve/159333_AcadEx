@@ -343,7 +343,7 @@ export function CreateListingForm({ courses, profileUniversity, studyAreas }: Cr
                 />
                 <span className="space-y-1">
                   <span className="block text-sm font-medium text-foreground">
-                    Show university on this listing
+                    Show your university on this listing
                   </span>
                   <span className="block text-sm leading-6 text-muted-foreground">
                     {profileUniversity

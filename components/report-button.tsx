@@ -88,7 +88,7 @@ export function ReportButton({
       {isOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-8">
           <div className="absolute inset-0" onClick={() => !isLoading && closeModal()} />
-          <div className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-border/70 bg-background shadow-2xl">
+          <div className="relative z-10 max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl border border-border/70 bg-background shadow-2xl">
             <div className="border-b border-border/70 px-6 py-5">
               <h2 className="text-lg font-semibold tracking-tight">
                 {isSubmitted ? "Report submitted" : `Report this ${targetKind}`}
@@ -119,7 +119,7 @@ export function ReportButton({
                     </label>
                     <select
                       id="report-reason"
-                      className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
+                      className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
                       value={reason}
                       onChange={(event) => setReason(event.target.value)}
                     >
@@ -139,7 +139,7 @@ export function ReportButton({
                     <textarea
                       id="report-description"
                       rows={4}
-                      className="rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+                      className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
                       value={description}
                       onChange={(event) => setDescription(event.target.value)}
                       placeholder="Add any extra detail that helps moderators understand the issue."
