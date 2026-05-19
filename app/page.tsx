@@ -1,5 +1,6 @@
 import { SiteHeader } from "@/components/site-header";
 import { PillButton } from "@/components/ui/pill-button";
+import Image from "next/image";
 import Link from "next/link";
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
@@ -11,11 +12,73 @@ const featureItems = [
   "Save money on course materials",
 ];
 
+type DecorativeAssetProps = {
+  className: string;
+  name: string;
+  sizes: string;
+};
+
 function HeaderFallback() {
   return (
     <header className="border-b border-border bg-background">
       <div className="h-16 w-full animate-pulse bg-muted/40" />
     </header>
+  );
+}
+
+function DecorativeAsset({ className, name, sizes }: DecorativeAssetProps) {
+  return (
+    <div
+      aria-hidden="true"
+      className={`pointer-events-none ${className}`}
+    >
+      <Image
+        src={`/assets/${name}.png`}
+        alt=""
+        fill
+        sizes={sizes}
+        unoptimized
+        className="object-contain mix-blend-multiply dark:hidden"
+      />
+      <Image
+        src={`/assets/${name}-dark.png`}
+        alt=""
+        fill
+        sizes={sizes}
+        unoptimized
+        className="hidden object-contain mix-blend-screen dark:block"
+      />
+    </div>
+  );
+}
+
+function LandingDecorations() {
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none fixed inset-0 z-0 hidden overflow-hidden xl:block"
+    >
+      <DecorativeAsset
+        name="acadex-student"
+        sizes="(min-width: 1536px) 384px, (min-width: 1280px) 320px, 0px"
+        className="absolute left-[-4.5rem] top-[15vh] aspect-square w-80 rotate-[-8deg] 2xl:left-[3vw] 2xl:top-[13vh] 2xl:w-96"
+      />
+      <DecorativeAsset
+        name="acadex-phone"
+        sizes="(min-width: 1536px) 320px, (min-width: 1280px) 256px, 0px"
+        className="absolute left-[-2.5rem] top-[51vh] aspect-square w-64 rotate-[5deg] 2xl:left-[7vw] 2xl:top-[54vh] 2xl:w-80"
+      />
+      <DecorativeAsset
+        name="acadex-laptop"
+        sizes="(min-width: 1536px) 384px, (min-width: 1280px) 320px, 0px"
+        className="absolute right-[-5rem] top-[19vh] aspect-square w-80 rotate-[6deg] 2xl:right-[4vw] 2xl:top-[17vh] 2xl:w-96"
+      />
+      <DecorativeAsset
+        name="acadex-exchange"
+        sizes="(min-width: 1536px) 352px, (min-width: 1280px) 288px, 0px"
+        className="absolute right-[-2.5rem] top-[56vh] aspect-square w-72 rotate-[-4deg] 2xl:right-[8vw] 2xl:top-[57vh] 2xl:w-88"
+      />
+    </div>
   );
 }
 
@@ -50,26 +113,27 @@ async function LandingContent() {
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-6 py-10 sm:py-14">
-      <section className="mx-auto flex w-full max-w-4xl flex-col items-center gap-6 text-center">
-        <h1 className="max-w-4xl text-balance text-4xl font-bold tracking-tight text-foreground sm:text-5xl md:text-6xl">
-          The student marketplace for textbooks and study books
-        </h1>
+    <main className="relative z-10 mx-auto flex w-full max-w-7xl flex-col gap-10 px-6 py-10 sm:py-14">
+      <section className="relative isolate mx-auto flex min-h-[520px] w-full max-w-7xl items-center justify-center overflow-hidden text-center">
+        <div className="relative z-10 mx-auto flex w-full max-w-3xl flex-col items-center gap-6">
+          <h1 className="max-w-3xl text-balance text-4xl font-bold tracking-tight text-foreground sm:text-5xl md:text-6xl">
+            The student marketplace for textbooks and study books
+          </h1>
 
-        <p className="max-w-3xl text-base leading-7 text-foreground/80 sm:text-lg">
-          Find affordable uni books, list the ones you no longer need, and exchange with students near you.
-        </p>
+          <p className="max-w-3xl text-base leading-7 text-foreground/80 sm:text-lg">
+            Find affordable uni books, list the ones you no longer need, and exchange with students near you.
+          </p>
 
-        <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-base text-foreground/90">
-          {featureItems.map((item) => (
-            <div key={item} className="inline-flex items-center gap-2">
-              <CheckBadge />
-              <span>{item}</span>
-            </div>
-          ))}
-        </div>
+          <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-base text-foreground/90">
+            {featureItems.map((item) => (
+              <div key={item} className="inline-flex items-center gap-2">
+                <CheckBadge />
+                <span>{item}</span>
+              </div>
+            ))}
+          </div>
 
-        <div className="flex flex-col items-center gap-2">
+          <div className="flex flex-col items-center gap-2">
           {isSignedIn ? (
             <PillButton asChild size="sm" className="px-5 text-base font-semibold">
               <Link href="/home">Continue to Acadex →</Link>
@@ -88,6 +152,7 @@ async function LandingContent() {
               </p>
             </>
           )}
+          </div>
         </div>
       </section>
 
@@ -104,16 +169,18 @@ async function LandingContent() {
 
 export default async function Home() {
   return (
-    <div className="min-h-screen bg-background">
-      <Suspense fallback={<HeaderFallback />}>
-        <SiteHeader />
-      </Suspense>
+    <div className="relative isolate min-h-screen bg-background dark:bg-black">
+      <LandingDecorations />
 
-      <Suspense fallback={<div className="mx-auto w-full max-w-6xl px-6 py-10 animate-pulse" />}>
-        <LandingContent />
-      </Suspense>
+      <div className="relative z-10">
+        <Suspense fallback={<HeaderFallback />}>
+          <SiteHeader />
+        </Suspense>
+
+        <Suspense fallback={<div className="mx-auto w-full max-w-6xl px-6 py-10 animate-pulse" />}>
+          <LandingContent />
+        </Suspense>
+      </div>
     </div>
   );
 }
-
-

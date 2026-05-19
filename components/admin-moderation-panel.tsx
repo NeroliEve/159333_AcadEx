@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { AdminDashboard } from "@/components/admin-dashboard";
 import { AdminStatsPanel } from "@/components/admin-stats-panel";
@@ -11,6 +11,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { PillButton } from "@/components/ui/pill-button";
+import {
+  adminTabStorageKey,
+  adminTabs as tabs,
+  buildAdminTabHref,
+  parseAdminTab,
+  type AdminTab,
+} from "@/lib/admin-tabs";
 import type {
   AdminAuditRecord,
   AdminListingRecord,
@@ -18,41 +25,30 @@ import type {
   AdminReportRecord,
   AdminUserRecord,
 } from "@/lib/admin";
-import type { AdminCourse, UniversityOption } from "@/lib/marketplace";
+import type { ApiResponse } from "@/lib/api";
+import type {
+  AdminCourse,
+  AdminDegree,
+  StudyAreaOption,
+  UniversityOption,
+} from "@/lib/marketplace";
 
 type AdminModerationPanelProps = {
-  auditLogs: AdminAuditRecord[];
-  courses: AdminCourse[];
-  listings: AdminListingRecord[];
-  overview: AdminOverviewStats;
-  reports: AdminReportRecord[];
-  universities: UniversityOption[];
-  users: AdminUserRecord[];
+  auditLogs?: AdminAuditRecord[];
+  courses?: AdminCourse[];
+  degrees?: AdminDegree[];
+  listings?: AdminListingRecord[];
+  overview?: AdminOverviewStats;
+  reports?: AdminReportRecord[];
+  studyAreas?: StudyAreaOption[];
+  universities?: UniversityOption[];
+  users?: AdminUserRecord[];
 };
 
 type FeedbackState = {
   text: string;
   type: "error" | "success";
 } | null;
-
-type AdminTab =
-  | "overview"
-  | "users"
-  | "listings"
-  | "verification"
-  | "reports"
-  | "audit"
-  | "catalog";
-
-const tabs: Array<{ id: AdminTab; label: string }> = [
-  { id: "overview",    label: "Overview" },
-  { id: "users",       label: "Users" },
-  { id: "listings",    label: "Listings" },
-  { id: "verification", label: "Verification" },
-  { id: "reports",     label: "Reports" },
-  { id: "audit",       label: "Audit" },
-  { id: "catalog",     label: "Catalog" },
-];
 
 function formatDateTime(value: string | null | undefined) {
   if (!value) return "Not set";
@@ -100,21 +96,98 @@ function getBadgeClassName(tone: "default" | "success" | "warning") {
   return "rounded-full border border-border/70 bg-secondary/70 px-3 py-1 text-foreground";
 }
 
+function getAdminTabLoadingLabel(tab: AdminTab) {
+  switch (tab) {
+    case "audit":
+      return "Loading audit logs...";
+    case "catalog":
+      return "Loading catalog...";
+    case "listings":
+      return "Loading listings...";
+    case "overview":
+      return "Loading reports...";
+    case "reports":
+      return "Loading reports...";
+    case "users":
+      return "Loading users...";
+  }
+}
+
+const emptyOverview: AdminOverviewStats = {
+  activeAdmins: 0,
+  hiddenListings: 0,
+  pendingReports: 0,
+  suspendedUsers: 0,
+  unverifiedUsers: 0,
+};
+
+const emptyAuditLogs: AdminAuditRecord[] = [];
+const emptyCourses: AdminCourse[] = [];
+const emptyDegrees: AdminDegree[] = [];
+const emptyListings: AdminListingRecord[] = [];
+const emptyReports: AdminReportRecord[] = [];
+const emptyStudyAreas: StudyAreaOption[] = [];
+const emptyUniversities: UniversityOption[] = [];
+const emptyUsers: AdminUserRecord[] = [];
+
+type AdminWorkspacePayload = {
+  auditLogs?: AdminAuditRecord[];
+  courses?: AdminCourse[];
+  degrees?: AdminDegree[];
+  listings?: AdminListingRecord[];
+  newestPendingReports?: AdminReportRecord[];
+  overview?: AdminOverviewStats;
+  reports?: AdminReportRecord[];
+  studyAreas?: StudyAreaOption[];
+  universities?: UniversityOption[];
+  users?: AdminUserRecord[];
+};
+
 export function AdminModerationPanel({
-  auditLogs: initialAuditLogs,
-  courses,
-  listings: initialListings,
-  overview,
-  reports: initialReports,
-  universities,
-  users: initialUsers,
+  auditLogs: initialAuditLogs = emptyAuditLogs,
+  courses: initialCourses = emptyCourses,
+  degrees: initialDegrees = emptyDegrees,
+  listings: initialListings = emptyListings,
+  overview: initialOverview = emptyOverview,
+  reports: initialReports = emptyReports,
+  studyAreas: initialStudyAreas = emptyStudyAreas,
+  universities: initialUniversities = emptyUniversities,
+  users: initialUsers = emptyUsers,
 }: AdminModerationPanelProps) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<AdminTab>("overview");
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const tabSearchParam = searchParams.get("tab");
+  const urlTab = parseAdminTab(tabSearchParam);
+  const [activeTab, setActiveTab] = useState<AdminTab>(urlTab);
+  const [overviewData, setOverviewData] = useState(initialOverview);
   const [users, setUsers] = useState(initialUsers);
   const [listings, setListings] = useState(initialListings);
   const [reports, setReports] = useState(initialReports);
   const [auditLogs, setAuditLogs] = useState(initialAuditLogs);
+  const [courses, setCourses] = useState(initialCourses);
+  const [degrees, setDegrees] = useState(initialDegrees);
+  const [studyAreas, setStudyAreas] = useState(initialStudyAreas);
+  const [universities, setUniversities] = useState(initialUniversities);
+  const [loadedTabs, setLoadedTabs] = useState<Set<AdminTab>>(
+    () =>
+      new Set(
+        [
+          initialReports.length > 0 ? "overview" : null,
+          initialUsers.length > 0 ? "users" : null,
+          initialListings.length > 0 ? "listings" : null,
+          initialAuditLogs.length > 0 ? "audit" : null,
+          initialCourses.length > 0 ||
+          initialDegrees.length > 0 ||
+          initialStudyAreas.length > 0 ||
+          initialUniversities.length > 0
+            ? "catalog"
+            : null,
+        ].filter(Boolean) as AdminTab[],
+      ),
+  );
+  const [loadingTab, setLoadingTab] = useState<AdminTab | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [managedUserId, setManagedUserId] = useState<string | null>(null);
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<FeedbackState>(null);
@@ -132,6 +205,24 @@ export function AdminModerationPanel({
   const toastTransitionTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
+    setActiveTab(urlTab);
+  }, [urlTab, tabSearchParam]);
+
+  useEffect(() => {
+    if (tabSearchParam) return;
+
+    const storedTab = parseAdminTab(window.localStorage.getItem(adminTabStorageKey));
+    if (storedTab === "overview") return;
+
+    setActiveTab(storedTab);
+    window.history.replaceState(
+      null,
+      "",
+      buildAdminTabHref(pathname, searchParams.toString(), storedTab),
+    );
+  }, [pathname, searchParams, tabSearchParam]);
+
+  useEffect(() => {
     setUsers(initialUsers);
   }, [initialUsers]);
 
@@ -146,6 +237,102 @@ export function AdminModerationPanel({
   useEffect(() => {
     setAuditLogs(initialAuditLogs);
   }, [initialAuditLogs]);
+
+  useEffect(() => {
+    setOverviewData(initialOverview);
+  }, [initialOverview]);
+
+  useEffect(() => {
+    setCourses(initialCourses);
+  }, [initialCourses]);
+
+  useEffect(() => {
+    setDegrees(initialDegrees);
+  }, [initialDegrees]);
+
+  useEffect(() => {
+    setStudyAreas(initialStudyAreas);
+  }, [initialStudyAreas]);
+
+  useEffect(() => {
+    setUniversities(initialUniversities);
+  }, [initialUniversities]);
+
+  useEffect(() => {
+    if (loadedTabs.has(activeTab)) return;
+
+    let cancelled = false;
+
+    async function loadTabData() {
+      setLoadingTab(activeTab);
+      setLoadError(null);
+
+      try {
+        const response = await fetch(`/api/admin/workspace?tab=${activeTab}`, {
+          cache: "no-store",
+        });
+        const payload = (await response.json()) as ApiResponse<AdminWorkspacePayload>;
+
+        if (cancelled) return;
+
+        if (!response.ok || payload.status === "error") {
+          setLoadError(
+            payload.status === "error"
+              ? payload.message
+              : "Could not load admin data.",
+          );
+          return;
+        }
+
+        if (payload.data.overview) {
+          setOverviewData(payload.data.overview);
+        }
+        if (payload.data.newestPendingReports) {
+          setReports(payload.data.newestPendingReports);
+        }
+        if (payload.data.users) {
+          setUsers(payload.data.users);
+        }
+        if (payload.data.listings) {
+          setListings(payload.data.listings);
+        }
+        if (payload.data.reports) {
+          setReports(payload.data.reports);
+        }
+        if (payload.data.auditLogs) {
+          setAuditLogs(payload.data.auditLogs);
+        }
+        if (payload.data.courses) {
+          setCourses(payload.data.courses);
+        }
+        if (payload.data.degrees) {
+          setDegrees(payload.data.degrees);
+        }
+        if (payload.data.studyAreas) {
+          setStudyAreas(payload.data.studyAreas);
+        }
+        if (payload.data.universities) {
+          setUniversities(payload.data.universities);
+        }
+
+        setLoadedTabs((current) => new Set(current).add(activeTab));
+      } catch {
+        if (!cancelled) {
+          setLoadError("Could not reach the admin workspace endpoint.");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingTab(null);
+        }
+      }
+    }
+
+    void loadTabData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, loadedTabs]);
 
   useEffect(() => {
     if (!feedback) {
@@ -273,7 +460,18 @@ export function AdminModerationPanel({
         return false;
       }
 
-      if (listingVisibilityFilter === "visible" && listing.deleted_at) {
+      if (
+        listingVisibilityFilter === "visible" &&
+        (listing.deleted_at || listing.status === "archived" || listing.archived_at)
+      ) {
+        return false;
+      }
+
+      if (
+        listingVisibilityFilter === "archived" &&
+        listing.status !== "archived" &&
+        !listing.archived_at
+      ) {
         return false;
       }
 
@@ -296,16 +494,25 @@ export function AdminModerationPanel({
         .slice(0, 5),
     [reports],
   );
+  const isActiveTabLoading = loadingTab === activeTab;
 
   function openReport(reportId: string) {
     setReportStatusFilter("pending");
-    setActiveTab("reports");
+    selectTab("reports");
 
     window.setTimeout(() => {
       document
         .getElementById(`admin-report-${reportId}`)
         ?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 0);
+  }
+
+  function selectTab(tab: AdminTab) {
+    const href = buildAdminTabHref(pathname, searchParams.toString(), tab);
+
+    setActiveTab(tab);
+    window.localStorage.setItem(adminTabStorageKey, tab);
+    window.history.replaceState(null, "", href);
   }
 
   async function handleJsonResponse(response: Response) {
@@ -521,14 +728,34 @@ export function AdminModerationPanel({
         {tabs.map((tab) => (
           <PillButton
             key={tab.id}
-            type="button"
+            asChild
             variant={activeTab === tab.id ? "primary" : "secondary"}
-            onClick={() => setActiveTab(tab.id)}
           >
-            {tab.label}
+            <a
+              href={buildAdminTabHref(pathname, searchParams.toString(), tab.id)}
+              aria-current={activeTab === tab.id ? "page" : undefined}
+              onClick={(event) => {
+                event.preventDefault();
+                selectTab(tab.id);
+              }}
+            >
+              {tab.label}
+            </a>
           </PillButton>
         ))}
       </div>
+
+      {loadError ? (
+        <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          {loadError}
+        </div>
+      ) : null}
+
+      {isActiveTabLoading ? (
+        <div className="flex h-24 items-center px-5 text-sm text-muted-foreground animate-pulse rounded-xl border border-border/70 bg-muted/40">
+          {getAdminTabLoadingLabel(activeTab)}
+        </div>
+      ) : null}
 
       {activeTab === "overview" ? (
         <div className="space-y-8">
@@ -538,7 +765,7 @@ export function AdminModerationPanel({
                 <CardTitle>Pending reports</CardTitle>
               </CardHeader>
               <CardContent className="text-3xl font-semibold">
-                {overview.pendingReports}
+                {overviewData.pendingReports}
               </CardContent>
             </Card>
             <Card className="border-border/70">
@@ -546,7 +773,7 @@ export function AdminModerationPanel({
                 <CardTitle>Suspended users</CardTitle>
               </CardHeader>
               <CardContent className="text-3xl font-semibold">
-                {overview.suspendedUsers}
+                {overviewData.suspendedUsers}
               </CardContent>
             </Card>
             <Card className="border-border/70">
@@ -554,7 +781,7 @@ export function AdminModerationPanel({
                 <CardTitle>Unverified users</CardTitle>
               </CardHeader>
               <CardContent className="text-3xl font-semibold">
-                {overview.unverifiedUsers}
+                {overviewData.unverifiedUsers}
               </CardContent>
             </Card>
             <Card className="border-border/70">
@@ -562,7 +789,7 @@ export function AdminModerationPanel({
                 <CardTitle>Hidden listings</CardTitle>
               </CardHeader>
               <CardContent className="text-3xl font-semibold">
-                {overview.hiddenListings}
+                {overviewData.hiddenListings}
               </CardContent>
             </Card>
             <Card className="border-border/70">
@@ -570,7 +797,7 @@ export function AdminModerationPanel({
                 <CardTitle>Active admins</CardTitle>
               </CardHeader>
               <CardContent className="text-3xl font-semibold">
-                {overview.activeAdmins}
+                {overviewData.activeAdmins}
               </CardContent>
             </Card>
           </div>
@@ -604,7 +831,9 @@ export function AdminModerationPanel({
                     </PillButton>
                   </div>
                 ))}
-                {newestPendingReports.length === 0 ? (
+                {isActiveTabLoading ? (
+                  <p className="text-sm text-muted-foreground">Loading reports...</p>
+                ) : newestPendingReports.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No pending reports.</p>
                 ) : null}
               </CardContent>
@@ -670,7 +899,11 @@ export function AdminModerationPanel({
           </Card>
 
           <div className="overflow-hidden rounded-2xl border border-border/70">
-            {filteredUsers.map((user, index) => (
+            {isActiveTabLoading ? (
+              <div className="px-5 py-6 text-sm text-muted-foreground">
+                Loading users...
+              </div>
+            ) : filteredUsers.map((user, index) => (
               <div
                 key={user.id}
                 className={`flex flex-col gap-4 bg-background px-5 py-4 lg:flex-row lg:items-center lg:justify-between ${
@@ -736,7 +969,7 @@ export function AdminModerationPanel({
                 </div>
               </div>
             ))}
-            {filteredUsers.length === 0 ? (
+            {!isActiveTabLoading && filteredUsers.length === 0 ? (
               <div className="px-5 py-6 text-sm text-muted-foreground">
                 No users match the current filters.
               </div>
@@ -1085,12 +1318,14 @@ export function AdminModerationPanel({
                   <option value="all">All listings</option>
                   <option value="visible">Visible only</option>
                   <option value="hidden">Hidden only</option>
+                  <option value="archived">Archived only</option>
                 </select>
               </div>
               <div className="rounded-xl border border-border/70 bg-secondary/30 px-4 py-3 text-sm">
                 <p className="font-medium">{filteredListings.length} listings shown</p>
                 <p className="text-muted-foreground">
-                  {filteredListings.filter((listing) => listing.deleted_at).length} hidden
+                  {filteredListings.filter((listing) => listing.deleted_at).length} hidden /{" "}
+                  {filteredListings.filter((listing) => listing.status === "archived" || listing.archived_at).length} archived
                 </p>
               </div>
             </CardContent>
@@ -1166,7 +1401,6 @@ export function AdminModerationPanel({
                         >
                           <option value="available">Available</option>
                           <option value="pending">Pending</option>
-                          <option value="sold">Sold</option>
                           <option value="archived">Archived</option>
                         </select>
                       </div>
@@ -1243,7 +1477,13 @@ export function AdminModerationPanel({
                 </CardContent>
               </Card>
             ))}
-            {filteredListings.length === 0 ? (
+            {isActiveTabLoading ? (
+              <Card className="border-border/70 md:col-span-2 xl:col-span-3">
+                <CardContent className="p-6 text-sm text-muted-foreground">
+                  Loading listings...
+                </CardContent>
+              </Card>
+            ) : filteredListings.length === 0 ? (
               <Card className="border-border/70 md:col-span-2 xl:col-span-3">
                 <CardContent className="p-6 text-sm text-muted-foreground">
                   No listings match the current filters.
@@ -1474,7 +1714,13 @@ export function AdminModerationPanel({
       ) : null}
 
       {activeTab === "catalog" ? (
-        <AdminDashboard courses={courses} universities={universities} />
+        <AdminDashboard
+          courses={courses}
+          degrees={degrees}
+          isLoading={isActiveTabLoading}
+          studyAreas={studyAreas}
+          universities={universities}
+        />
       ) : null}
       </div>
     </>

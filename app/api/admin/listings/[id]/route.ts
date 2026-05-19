@@ -5,6 +5,7 @@ import {
   logAdminAction,
   requireModerationNote,
 } from "@/lib/admin";
+import { getListingStatusUpdate } from "@/lib/listing-archive";
 
 type ListingResponse = {
   listing?: Record<string, unknown>;
@@ -12,7 +13,7 @@ type ListingResponse = {
   status: "error" | "success";
 };
 
-const validStatuses = ["available", "pending", "sold", "archived"] as const;
+const validStatuses = ["available", "pending", "archived"] as const;
 
 export async function PATCH(
   request: Request,
@@ -67,13 +68,13 @@ export async function PATCH(
         ? { deleted_at: new Date().toISOString() }
         : action === "restore"
           ? { deleted_at: null }
-          : { status: nextStatus as (typeof validStatuses)[number] };
+          : getListingStatusUpdate(nextStatus as (typeof validStatuses)[number], new Date().toISOString());
 
     const { data: listing, error } = await supabase
       .from("listings")
       .update(updates)
       .eq("id", id)
-      .select("deleted_at, id, status, title")
+      .select("archived_at, deleted_at, id, status, title")
       .single();
 
     if (error || !listing) {

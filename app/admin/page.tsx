@@ -2,14 +2,10 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 
 import { AdminModerationPanel } from "@/components/admin-moderation-panel";
-import { getAdminContext, getAdminWorkspaceData } from "@/lib/admin";
-import {
-  getAdminCourses,
-  getUniversityOptions,
-} from "@/lib/marketplace";
+import { getAdminContext } from "@/lib/admin";
 
 async function AdminContent() {
-  const { isAdmin, supabase, userId } = await getAdminContext();
+  const { isAdmin, userId } = await getAdminContext();
 
   if (!userId) {
     redirect("/auth/login");
@@ -18,12 +14,6 @@ async function AdminContent() {
   if (!isAdmin) {
     redirect("/home");
   }
-
-  const [workspace, courses, universities] = await Promise.all([
-    getAdminWorkspaceData(supabase),
-    getAdminCourses(),
-    getUniversityOptions(true),
-  ]);
 
   return (
     <section className="flex flex-col gap-10">
@@ -42,15 +32,7 @@ async function AdminContent() {
         </div>
       </div>
 
-      <AdminModerationPanel
-        auditLogs={workspace.auditLogs}
-        courses={courses}
-        listings={workspace.listings}
-        overview={workspace.overview}
-        reports={workspace.reports}
-        universities={universities}
-        users={workspace.users}
-      />
+      <AdminModerationPanel />
     </section>
   );
 }

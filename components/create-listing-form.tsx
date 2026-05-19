@@ -222,7 +222,7 @@ export function CreateListingForm({ courses, studyAreas }: CreateListingFormProp
               <p>{state.message}</p>
               {state.status === "success" ? (
                 <PillButton asChild size="sm" variant="secondary">
-                  <Link href="/home">Browse listings</Link>
+                  <Link href="/browse">Browse listings</Link>
                 </PillButton>
               ) : null}
             </div>

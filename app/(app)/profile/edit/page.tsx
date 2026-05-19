@@ -5,16 +5,25 @@ import { Suspense } from "react";
 import { AccountSecurityForm } from "@/components/account-security-form";
 import { EditProfileForm } from "@/components/edit-profile-form";
 import { PillButton } from "@/components/ui/pill-button";
-import { getUniversityOptions, getViewerContext } from "@/lib/marketplace";
+import { getDegreeOptions, getUniversityOptions, getViewerContext } from "@/lib/marketplace";
 
-async function ProfileEditContent() {
+type ProfileEditContentProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+async function ProfileEditContent({ searchParams }: ProfileEditContentProps) {
   const { user, profile } = await getViewerContext();
 
   if (!user) {
     redirect("/auth/login");
   }
 
-  const universities = await getUniversityOptions(true);
+  const params = await searchParams;
+  const isCompletionRequired = params.complete === "1";
+  const [degrees, universities] = await Promise.all([
+    getDegreeOptions(),
+    getUniversityOptions(true),
+  ]);
 
   return (
     <section className="flex flex-col gap-10">
@@ -27,7 +36,9 @@ async function ProfileEditContent() {
             Edit your profile
           </h1>
           <p className="text-sm text-muted-foreground">
-            Update your public details and account security settings.
+            {isCompletionRequired
+              ? "Add your academic details so Acadex can show relevant listings."
+              : "Update your public details and account security settings."}
           </p>
         </div>
 
@@ -38,7 +49,13 @@ async function ProfileEditContent() {
         ) : null}
       </div>
 
-      <EditProfileForm key={profile?.id} profile={profile} universities={universities} />
+      <EditProfileForm
+        degrees={degrees}
+        isCompletionRequired={isCompletionRequired}
+        key={profile?.id}
+        profile={profile}
+        universities={universities}
+      />
       <AccountSecurityForm email={user.email ?? profile?.email ?? ""} />
     </section>
   );
@@ -59,10 +76,10 @@ function ProfileEditFallback() {
   );
 }
 
-export default function ProfileEditPage() {
+export default function ProfileEditPage({ searchParams }: ProfileEditContentProps) {
   return (
     <Suspense fallback={<ProfileEditFallback />}>
-      <ProfileEditContent />
+      <ProfileEditContent searchParams={searchParams} />
     </Suspense>
   );
 }

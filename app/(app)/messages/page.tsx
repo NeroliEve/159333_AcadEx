@@ -18,7 +18,7 @@ async function MessagesIndexContent() {
     return (
       <section>
         <EmptyState
-          actionHref="/home"
+          actionHref="/browse"
           actionLabel="Browse listings"
           description="Conversations start after a buyer opens a transaction request. Once you have one, the thread will appear here for text-only messaging."
           eyebrow="Messages"
@@ -35,6 +35,7 @@ function MessagesIndexFallback() {
   return (
     <section className="space-y-6">
       <div className="space-y-2">
+        <p className="text-sm text-muted-foreground">Loading messages</p>
         <div className="h-4 w-24 animate-pulse rounded bg-muted" />
         <div className="h-8 w-56 animate-pulse rounded bg-muted" />
       </div>

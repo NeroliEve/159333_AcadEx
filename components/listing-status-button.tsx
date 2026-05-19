@@ -2,16 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { getSellerListingStatusOptions } from "@/lib/listing-archive";
 import type { PublicEnum } from "@/lib/supabase/database.types";
 
 type ListingStatus = PublicEnum<"listing_status">;
-
-const statusOptions: Record<ListingStatus, ListingStatus[]> = {
-  available: ["pending", "sold", "archived"],
-  pending: ["available", "sold", "archived"],
-  sold: ["available", "archived"],
-  archived: ["available"],
-};
 
 const statusLabels: Record<ListingStatus, string> = {
   available: "Available",
@@ -58,7 +52,7 @@ export function ListingStatusButton({
       className="text-xs rounded border border-input bg-transparent px-2 py-1 shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
     >
       <option value={currentStatus}>{statusLabels[currentStatus]}</option>
-      {statusOptions[currentStatus].map((s) => (
+      {getSellerListingStatusOptions(currentStatus).map((s) => (
         <option key={s} value={s}>
           {statusLabels[s]}
         </option>

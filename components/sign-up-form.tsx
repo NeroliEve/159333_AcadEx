@@ -12,17 +12,27 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import type { DegreeOption, UniversityOption } from "@/lib/marketplace";
+import { YEAR_LEVEL_OPTIONS } from "@/lib/profile-validation";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 export function SignUpForm({
+  degrees,
+  universities,
   className,
   ...props
-}: React.ComponentPropsWithoutRef<"div">) {
+}: React.ComponentPropsWithoutRef<"div"> & {
+  degrees: DegreeOption[];
+  universities: UniversityOption[];
+}) {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [username, setUsername] = useState("");
+  const [universityId, setUniversityId] = useState("");
+  const [degreeId, setDegreeId] = useState("");
+  const [yearLevel, setYearLevel] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [repeatPassword, setRepeatPassword] = useState("");
@@ -42,21 +52,37 @@ export function SignUpForm({
       return;
     }
 
+    if (!universityId || !degreeId || !yearLevel) {
+      setError("Choose your university, degree, and year level.");
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/confirm?next=/home`,
           data: {
             first_name: firstName,
             last_name: lastName,
             username,
+            university_id: universityId,
+            degree_id: degreeId,
+            year_level: yearLevel,
           },
         },
       });
       if (error) throw error;
-      router.push("/auth/sign-up-success");
+
+      if (!data.session) {
+        throw new Error(
+          "Email confirmation is still enabled in Supabase. Disable Confirm email in the Email auth provider settings.",
+        );
+      }
+
+      router.push("/home");
+      router.refresh();
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred");
     } finally {
@@ -111,6 +137,57 @@ export function SignUpForm({
                 <p className="text-sm text-muted-foreground">
                   This is how you&apos;ll appear on listings.
                 </p>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="university">University</Label>
+                <select
+                  id="university"
+                  required
+                  value={universityId}
+                  onChange={(e) => setUniversityId(e.target.value)}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  <option value="">Select your university</option>
+                  {universities.map((university) => (
+                    <option key={university.id} value={university.id}>
+                      {university.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="degree">Degree</Label>
+                <select
+                  id="degree"
+                  required
+                  value={degreeId}
+                  onChange={(e) => setDegreeId(e.target.value)}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  <option value="">Select your degree</option>
+                  {degrees.map((degree) => (
+                    <option key={degree.id} value={degree.id}>
+                      {degree.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="year-level">Year level</Label>
+                <select
+                  id="year-level"
+                  required
+                  value={yearLevel}
+                  onChange={(e) => setYearLevel(e.target.value)}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  <option value="">Select your year level</option>
+                  {YEAR_LEVEL_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="email">Email</Label>

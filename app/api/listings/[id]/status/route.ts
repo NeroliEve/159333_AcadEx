@@ -4,13 +4,14 @@ import {
   getMarketplaceSuspendedResponse,
   getViewerAccessContext,
 } from "@/lib/admin";
+import { getListingStatusUpdate } from "@/lib/listing-archive";
 
 type StatusResponse = {
   message?: string;
   status: "error" | "success";
 };
 
-const validStatuses = ["available", "pending", "sold", "archived"] as const;
+const validStatuses = ["available", "pending", "archived"] as const;
 
 export async function PATCH(
   request: Request,
@@ -66,7 +67,7 @@ export async function PATCH(
 
     const { error } = await supabase
       .from("listings")
-      .update({ status: newStatus as (typeof validStatuses)[number] })
+      .update(getListingStatusUpdate(newStatus as (typeof validStatuses)[number], new Date().toISOString()))
       .eq("id", id);
 
     if (error) {

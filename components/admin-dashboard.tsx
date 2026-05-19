@@ -15,10 +15,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PillButton } from "@/components/ui/pill-button";
-import type { AdminCourse, UniversityOption } from "@/lib/marketplace";
+import type {
+  AdminCourse,
+  AdminDegree,
+  StudyAreaOption,
+  UniversityOption,
+} from "@/lib/marketplace";
 
 type AdminDashboardProps = {
   courses: AdminCourse[];
+  degrees: AdminDegree[];
+  isLoading?: boolean;
+  studyAreas: StudyAreaOption[];
   universities: UniversityOption[];
 };
 
@@ -34,6 +42,14 @@ type EditableCourse = {
   university_id: number | null;
 };
 
+type EditableDegree = {
+  id: number;
+  is_active: boolean;
+  name: string;
+  slug: string;
+  study_area_id: number;
+};
+
 type EditableUniversity = {
   id: number;
   is_active: boolean;
@@ -41,10 +57,13 @@ type EditableUniversity = {
   slug: string;
 };
 
-type CatalogSection = "courses" | "universities";
+type CatalogSection = "courses" | "degrees" | "universities";
 
 export function AdminDashboard({
   courses: initialCourses,
+  degrees: initialDegrees,
+  isLoading = false,
+  studyAreas,
   universities: initialUniversities,
 }: AdminDashboardProps) {
   const router = useRouter();
@@ -54,6 +73,15 @@ export function AdminDashboard({
       course_name: course.course_name,
       id: course.id,
       university_id: course.university_id,
+    })),
+  );
+  const [degrees, setDegrees] = useState<EditableDegree[]>(
+    initialDegrees.map((degree) => ({
+      id: degree.id,
+      is_active: degree.is_active,
+      name: degree.name,
+      slug: degree.slug,
+      study_area_id: degree.study_area_id,
     })),
   );
   const [universities, setUniversities] = useState<EditableUniversity[]>(
@@ -69,14 +97,20 @@ export function AdminDashboard({
     course_name: "",
     university_id: "",
   });
+  const [degreeDraft, setDegreeDraft] = useState({
+    name: "",
+    study_area_id: "",
+  });
   const [universityDraft, setUniversityDraft] = useState("");
   const [courseState, setCourseState] = useState<RequestState>(null);
+  const [degreeState, setDegreeState] = useState<RequestState>(null);
   const [universityState, setUniversityState] = useState<RequestState>(null);
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isToastVisible, setIsToastVisible] = useState(false);
   const [catalogSection, setCatalogSection] = useState<CatalogSection>("universities");
   const [courseQuery, setCourseQuery] = useState("");
+  const [degreeQuery, setDegreeQuery] = useState("");
   const [universityQuery, setUniversityQuery] = useState("");
   const toastTimeoutRef = useRef<number | null>(null);
   const toastTransitionTimeoutRef = useRef<number | null>(null);
@@ -85,9 +119,17 @@ export function AdminDashboard({
     () => [...universities].sort((a, b) => a.name.localeCompare(b.name)),
     [universities],
   );
+  const sortedStudyAreas = useMemo(
+    () => [...studyAreas].sort((a, b) => a.name.localeCompare(b.name)),
+    [studyAreas],
+  );
   const sortedCourses = useMemo(
     () => [...courses].sort((a, b) => a.course_code.localeCompare(b.course_code)),
     [courses],
+  );
+  const sortedDegrees = useMemo(
+    () => [...degrees].sort((a, b) => a.name.localeCompare(b.name)),
+    [degrees],
   );
   const filteredUniversities = useMemo(() => {
     const query = universityQuery.trim().toLowerCase();
@@ -113,6 +155,52 @@ export function AdminDashboard({
         : true;
     });
   }, [courseQuery, sortedCourses, sortedUniversities]);
+  const filteredDegrees = useMemo(() => {
+    const query = degreeQuery.trim().toLowerCase();
+
+    return sortedDegrees.filter((degree) => {
+      const studyAreaName =
+        sortedStudyAreas.find((studyArea) => studyArea.id === degree.study_area_id)?.name ?? "";
+
+      return query
+        ? [degree.name, degree.slug, studyAreaName].join(" ").toLowerCase().includes(query)
+        : true;
+    });
+  }, [degreeQuery, sortedDegrees, sortedStudyAreas]);
+
+  useEffect(() => {
+    setCourses(
+      initialCourses.map((course) => ({
+        course_code: course.course_code,
+        course_name: course.course_name,
+        id: course.id,
+        university_id: course.university_id,
+      })),
+    );
+  }, [initialCourses]);
+
+  useEffect(() => {
+    setDegrees(
+      initialDegrees.map((degree) => ({
+        id: degree.id,
+        is_active: degree.is_active,
+        name: degree.name,
+        slug: degree.slug,
+        study_area_id: degree.study_area_id,
+      })),
+    );
+  }, [initialDegrees]);
+
+  useEffect(() => {
+    setUniversities(
+      initialUniversities.map((university) => ({
+        id: university.id,
+        is_active: university.is_active,
+        name: university.name,
+        slug: university.slug,
+      })),
+    );
+  }, [initialUniversities]);
 
   useEffect(() => {
     if (!toastMessage) {
@@ -419,6 +507,128 @@ export function AdminDashboard({
     }
   }
 
+  async function createDegree(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setDegreeState(null);
+    setPendingKey("create-degree");
+
+    try {
+      const response = await fetch("/api/admin/degrees", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: degreeDraft.name,
+          studyAreaId: degreeDraft.study_area_id,
+        }),
+      });
+      const data = (await response.json()) as {
+        degree?: EditableDegree;
+        message?: string;
+        status: "error" | "success";
+      };
+
+      if (data.status === "error" || !data.degree) {
+        setError(setDegreeState, data.message ?? "Could not create the degree.");
+        return;
+      }
+
+      setDegrees((current) =>
+        [...current, data.degree!].sort((a, b) => a.name.localeCompare(b.name)),
+      );
+      setDegreeDraft({ name: "", study_area_id: "" });
+      setDegreeState(null);
+      setToastMessage(data.message ?? "Degree added.");
+      router.refresh();
+    } catch {
+      setError(setDegreeState, "Could not reach the degree endpoint.");
+    } finally {
+      setPendingKey(null);
+    }
+  }
+
+  async function updateDegree(id: number) {
+    const degree = degrees.find((item) => item.id === id);
+    if (!degree) return;
+
+    setDegreeState(null);
+    setPendingKey(`degree-save-${id}`);
+
+    try {
+      const response = await fetch(`/api/admin/degrees/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          isActive: degree.is_active,
+          name: degree.name,
+          studyAreaId: degree.study_area_id,
+        }),
+      });
+      const data = (await response.json()) as {
+        degree?: EditableDegree;
+        message?: string;
+        status: "error" | "success";
+      };
+
+      if (data.status === "error" || !data.degree) {
+        setError(setDegreeState, data.message ?? "Could not update the degree.");
+        return;
+      }
+
+      setDegrees((current) =>
+        current
+          .map((item) => (item.id === id ? data.degree! : item))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      );
+      setDegreeState(null);
+      setToastMessage(data.message ?? "Degree updated.");
+      router.refresh();
+    } catch {
+      setError(setDegreeState, "Could not reach the degree endpoint.");
+    } finally {
+      setPendingKey(null);
+    }
+  }
+
+  async function deactivateDegree(id: number) {
+    const degree = degrees.find((item) => item.id === id);
+    if (!degree) return;
+
+    const confirmed = window.confirm(
+      `Deactivate ${degree.name}? Existing profiles keep their degree, but it will no longer appear for new selections.`,
+    );
+    if (!confirmed) return;
+
+    setDegreeState(null);
+    setPendingKey(`degree-delete-${id}`);
+
+    try {
+      const response = await fetch(`/api/admin/degrees/${id}`, {
+        method: "DELETE",
+      });
+      const data = (await response.json()) as {
+        degree?: EditableDegree;
+        message?: string;
+        status: "error" | "success";
+      };
+
+      if (data.status === "error" || !data.degree) {
+        setError(setDegreeState, data.message ?? "Could not deactivate the degree.");
+        return;
+      }
+
+      setDegrees((current) =>
+        current.map((item) => (item.id === id ? data.degree! : item)),
+      );
+      setDegreeState(null);
+      setToastMessage(data.message ?? "Degree deactivated.");
+      router.refresh();
+    } catch {
+      setError(setDegreeState, "Could not reach the degree endpoint.");
+    } finally {
+      setPendingKey(null);
+    }
+  }
+
   return (
     <>
       {toastMessage ? (
@@ -443,12 +653,12 @@ export function AdminDashboard({
                 <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">
                   Catalog library
                 </p>
-                <h2 className="text-2xl font-semibold tracking-tight">Managed courses and universities</h2>
+                <h2 className="text-2xl font-semibold tracking-tight">Managed academic catalog</h2>
                 <p className="text-sm text-muted-foreground">
-                  Browse, search, create, and update the academic catalog without scrolling through long forms.
+                  Browse, search, create, and update universities, courses, and degrees without scrolling through long forms.
                 </p>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-3">
                 <div className="rounded-xl border border-border/70 bg-secondary/30 px-4 py-3 text-sm">
                   <p className="font-medium">{sortedUniversities.length} universities</p>
                   <p className="text-muted-foreground">{filteredUniversities.length} currently shown</p>
@@ -456,6 +666,10 @@ export function AdminDashboard({
                 <div className="rounded-xl border border-border/70 bg-secondary/30 px-4 py-3 text-sm">
                   <p className="font-medium">{sortedCourses.length} courses</p>
                   <p className="text-muted-foreground">{filteredCourses.length} currently shown</p>
+                </div>
+                <div className="rounded-xl border border-border/70 bg-secondary/30 px-4 py-3 text-sm">
+                  <p className="font-medium">{sortedDegrees.length} degrees</p>
+                  <p className="text-muted-foreground">{filteredDegrees.length} currently shown</p>
                 </div>
               </div>
             </div>
@@ -474,6 +688,13 @@ export function AdminDashboard({
                 onClick={() => setCatalogSection("courses")}
               >
                 Courses
+              </PillButton>
+              <PillButton
+                type="button"
+                variant={catalogSection === "degrees" ? "primary" : "secondary"}
+                onClick={() => setCatalogSection("degrees")}
+              >
+                Degrees
               </PillButton>
             </div>
           </CardContent>
@@ -577,7 +798,11 @@ export function AdminDashboard({
                     </div>
                   </div>
                 ))}
-                {filteredUniversities.length === 0 ? (
+                {isLoading ? (
+                  <div className="rounded-2xl border border-border/70 px-5 py-6 text-sm text-muted-foreground md:col-span-2 xl:col-span-3">
+                    Loading universities...
+                  </div>
+                ) : filteredUniversities.length === 0 ? (
                   <div className="rounded-2xl border border-border/70 px-5 py-6 text-sm text-muted-foreground md:col-span-2 xl:col-span-3">
                     No universities match the current search.
                   </div>
@@ -779,9 +1004,227 @@ export function AdminDashboard({
                     </div>
                   );
                 })}
-                {filteredCourses.length === 0 ? (
+                {isLoading ? (
+                  <div className="rounded-2xl border border-border/70 px-5 py-6 text-sm text-muted-foreground md:col-span-2 xl:col-span-3">
+                    Loading courses...
+                  </div>
+                ) : filteredCourses.length === 0 ? (
                   <div className="rounded-2xl border border-border/70 px-5 py-6 text-sm text-muted-foreground md:col-span-2 xl:col-span-3">
                     No courses match the current search.
+                  </div>
+                ) : null}
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {catalogSection === "degrees" ? (
+          <Card className="border-border/70">
+            <CardHeader>
+              <CardTitle>Degrees</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {degreeState?.status === "error" ? (
+                <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                  {degreeState.message}
+                </div>
+              ) : null}
+
+              <div className="grid gap-4 xl:grid-cols-[1.4fr_1fr]">
+                <form
+                  onSubmit={createDegree}
+                  className="grid gap-4 rounded-2xl border border-border/70 bg-secondary/15 p-5 lg:grid-cols-[1.4fr_1.2fr_auto] lg:items-end"
+                >
+                  <div className="grid gap-2">
+                    <Label htmlFor="newDegreeName">Degree name</Label>
+                    <Input
+                      id="newDegreeName"
+                      value={degreeDraft.name}
+                      onChange={(event) =>
+                        setDegreeDraft((current) => ({
+                          ...current,
+                          name: event.target.value,
+                        }))
+                      }
+                      placeholder="Bachelor of Computer Science"
+                      required
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="newDegreeStudyAreaId">Study area</Label>
+                    <select
+                      id="newDegreeStudyAreaId"
+                      value={degreeDraft.study_area_id}
+                      onChange={(event) =>
+                        setDegreeDraft((current) => ({
+                          ...current,
+                          study_area_id: event.target.value,
+                        }))
+                      }
+                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      required
+                    >
+                      <option value="">Select a study area</option>
+                      {sortedStudyAreas.map((studyArea) => (
+                        <option key={studyArea.id} value={studyArea.id}>
+                          {studyArea.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <PillButton
+                    type="submit"
+                    disabled={pendingKey === "create-degree"}
+                  >
+                    {pendingKey === "create-degree" ? "Adding..." : "Add degree"}
+                  </PillButton>
+                </form>
+
+                <div className="grid gap-2 rounded-2xl border border-border/70 p-5">
+                  <Label htmlFor="degree-query">Search degrees</Label>
+                  <Input
+                    id="degree-query"
+                    value={degreeQuery}
+                    onChange={(event) => setDegreeQuery(event.target.value)}
+                    placeholder="Name, slug, or study area"
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    {filteredDegrees.length} of {sortedDegrees.length} degrees shown
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {filteredDegrees.map((degree) => {
+                  const linkedStudyArea =
+                    sortedStudyAreas.find((studyArea) => studyArea.id === degree.study_area_id)?.name ??
+                    "No study area";
+
+                  return (
+                    <div
+                      key={degree.id}
+                      className="grid gap-4 rounded-2xl border border-border/70 p-5"
+                    >
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap gap-2 text-xs">
+                          <span
+                            className={
+                              degree.is_active
+                                ? "rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-emerald-900"
+                                : "rounded-full border border-border/70 bg-secondary/50 px-3 py-1 text-muted-foreground"
+                            }
+                          >
+                            {degree.is_active ? "active" : "inactive"}
+                          </span>
+                          <span className="rounded-full border border-border/70 bg-secondary/50 px-3 py-1 text-muted-foreground">
+                            {linkedStudyArea}
+                          </span>
+                          <span className="rounded-full border border-border/70 bg-secondary/50 px-3 py-1 text-muted-foreground">
+                            slug: {degree.slug}
+                          </span>
+                        </div>
+
+                        <div className="grid gap-3">
+                          <div className="grid gap-2">
+                            <Label htmlFor={`degree-name-${degree.id}`}>Name</Label>
+                            <Input
+                              id={`degree-name-${degree.id}`}
+                              value={degree.name}
+                              onChange={(event) =>
+                                setDegrees((current) =>
+                                  current.map((item) =>
+                                    item.id === degree.id
+                                      ? { ...item, name: event.target.value }
+                                      : item,
+                                  ),
+                                )
+                              }
+                            />
+                          </div>
+                          <div className="grid gap-2">
+                            <Label htmlFor={`degree-study-area-${degree.id}`}>Study area</Label>
+                            <select
+                              id={`degree-study-area-${degree.id}`}
+                              value={degree.study_area_id.toString()}
+                              onChange={(event) =>
+                                setDegrees((current) =>
+                                  current.map((item) =>
+                                    item.id === degree.id
+                                      ? {
+                                          ...item,
+                                          study_area_id: Number(event.target.value),
+                                        }
+                                      : item,
+                                  ),
+                                )
+                              }
+                              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                            >
+                              {sortedStudyAreas.map((studyArea) => (
+                                <option key={studyArea.id} value={studyArea.id}>
+                                  {studyArea.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="grid gap-2">
+                            <Label htmlFor={`degree-status-${degree.id}`}>Status</Label>
+                            <select
+                              id={`degree-status-${degree.id}`}
+                              value={degree.is_active ? "active" : "inactive"}
+                              onChange={(event) =>
+                                setDegrees((current) =>
+                                  current.map((item) =>
+                                    item.id === degree.id
+                                      ? {
+                                          ...item,
+                                          is_active: event.target.value === "active",
+                                        }
+                                      : item,
+                                  ),
+                                )
+                              }
+                              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                            >
+                              <option value="active">Active</option>
+                              <option value="inactive">Inactive</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <PillButton
+                          type="button"
+                          variant="secondary"
+                          disabled={pendingKey === `degree-save-${degree.id}`}
+                          onClick={() => updateDegree(degree.id)}
+                        >
+                          {pendingKey === `degree-save-${degree.id}` ? "Saving..." : "Save"}
+                        </PillButton>
+                        <PillButton
+                          type="button"
+                          disabled={
+                            pendingKey === `degree-delete-${degree.id}` ||
+                            !degree.is_active
+                          }
+                          onClick={() => deactivateDegree(degree.id)}
+                        >
+                          {pendingKey === `degree-delete-${degree.id}`
+                            ? "Deactivating..."
+                            : "Deactivate"}
+                        </PillButton>
+                      </div>
+                    </div>
+                  );
+                })}
+                {isLoading ? (
+                  <div className="rounded-2xl border border-border/70 px-5 py-6 text-sm text-muted-foreground md:col-span-2 xl:col-span-3">
+                    Loading degrees...
+                  </div>
+                ) : filteredDegrees.length === 0 ? (
+                  <div className="rounded-2xl border border-border/70 px-5 py-6 text-sm text-muted-foreground md:col-span-2 xl:col-span-3">
+                    No degrees match the current search.
                   </div>
                 ) : null}
               </div>

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  canRequestSellerPayment,
   canCompleteTransaction,
   getCheckoutEligibility,
   nzdToMinorUnits,
@@ -20,12 +21,23 @@ describe("getCheckoutEligibility", () => {
     buyer_id: "buyer-1",
     offered_listing_id: null,
     payment_status: "unpaid",
+    payment_requested_at: null,
     reservation_confirmed_at: "2026-05-14T00:00:00.000Z",
     status: "pending",
   } as const;
 
-  it("allows the buyer to pay an accepted unpaid sale transaction", () => {
+  it("rejects checkout until the seller requests payment", () => {
     expect(getCheckoutEligibility(acceptedSale, "buyer-1")).toEqual({
+      eligible: false,
+      reason: "The seller must request payment before the buyer can pay.",
+    });
+  });
+
+  it("allows the buyer to pay after the seller requests payment", () => {
+    expect(getCheckoutEligibility(
+      { ...acceptedSale, payment_requested_at: "2026-05-14T01:00:00.000Z" },
+      "buyer-1",
+    )).toEqual({
       eligible: true,
     });
   });
@@ -58,6 +70,53 @@ describe("getCheckoutEligibility", () => {
     ).toEqual({
       eligible: false,
       reason: "Trade transactions do not need Stripe payment.",
+    });
+  });
+});
+
+describe("canRequestSellerPayment", () => {
+  const acceptedSale = {
+    offered_listing_id: null,
+    payment_status: "unpaid",
+    reservation_confirmed_at: "2026-05-14T00:00:00.000Z",
+    seller_id: "seller-1",
+    status: "pending",
+  } as const;
+
+  it("allows the seller to request payment for an accepted unpaid sale", () => {
+    expect(canRequestSellerPayment(acceptedSale, "seller-1")).toEqual({
+      eligible: true,
+    });
+  });
+
+  it("rejects payment requests from anyone except the seller", () => {
+    expect(canRequestSellerPayment(acceptedSale, "buyer-1")).toEqual({
+      eligible: false,
+      reason: "Only the seller can request payment.",
+    });
+  });
+
+  it("rejects payment requests before seller acceptance", () => {
+    expect(
+      canRequestSellerPayment(
+        { ...acceptedSale, reservation_confirmed_at: null },
+        "seller-1",
+      ),
+    ).toEqual({
+      eligible: false,
+      reason: "Accept the request before asking the buyer to pay.",
+    });
+  });
+
+  it("rejects payment requests for paid transactions", () => {
+    expect(
+      canRequestSellerPayment(
+        { ...acceptedSale, payment_status: "paid" },
+        "seller-1",
+      ),
+    ).toEqual({
+      eligible: false,
+      reason: "This transaction has already been paid.",
     });
   });
 });

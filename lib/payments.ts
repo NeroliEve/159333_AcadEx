@@ -10,6 +10,7 @@ export type CheckoutTransaction = {
   buyer_id: string;
   offered_listing_id: string | null;
   payment_status: PaymentStatus;
+  payment_requested_at: string | null;
   reservation_confirmed_at: string | null;
   status: string;
 };
@@ -17,6 +18,14 @@ export type CheckoutTransaction = {
 export type CheckoutEligibility =
   | { eligible: true }
   | { eligible: false; reason: string };
+
+export type SellerPaymentRequestTransaction = {
+  offered_listing_id: string | null;
+  payment_status: PaymentStatus;
+  reservation_confirmed_at: string | null;
+  seller_id: string;
+  status: string;
+};
 
 export function nzdToMinorUnits(amount: number) {
   return Math.round(amount * 100);
@@ -54,6 +63,13 @@ export function getCheckoutEligibility(
     };
   }
 
+  if (!transaction.payment_requested_at) {
+    return {
+      eligible: false,
+      reason: "The seller must request payment before the buyer can pay.",
+    };
+  }
+
   if (transaction.payment_status === "paid") {
     return {
       eligible: false,
@@ -65,6 +81,55 @@ export function getCheckoutEligibility(
     return {
       eligible: false,
       reason: "This listing does not have a payable price.",
+    };
+  }
+
+  return { eligible: true };
+}
+
+export function canRequestSellerPayment(
+  transaction: SellerPaymentRequestTransaction,
+  viewerId: string,
+): CheckoutEligibility {
+  if (transaction.seller_id !== viewerId) {
+    return {
+      eligible: false,
+      reason: "Only the seller can request payment.",
+    };
+  }
+
+  if (transaction.offered_listing_id) {
+    return {
+      eligible: false,
+      reason: "Trade transactions do not need Stripe payment.",
+    };
+  }
+
+  if (transaction.status !== "pending") {
+    return {
+      eligible: false,
+      reason: "Only active transactions can request payment.",
+    };
+  }
+
+  if (!transaction.reservation_confirmed_at) {
+    return {
+      eligible: false,
+      reason: "Accept the request before asking the buyer to pay.",
+    };
+  }
+
+  if (transaction.payment_status === "paid") {
+    return {
+      eligible: false,
+      reason: "This transaction has already been paid.",
+    };
+  }
+
+  if (transaction.payment_status === "checkout_pending") {
+    return {
+      eligible: false,
+      reason: "The buyer already has a checkout in progress.",
     };
   }
 

@@ -14,17 +14,30 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import type { UniversityOption, ViewerProfile } from "@/lib/marketplace";
+import type { DegreeOption, UniversityOption, ViewerProfile } from "@/lib/marketplace";
+import {
+  getRemoveProfilePictureDialogCopy,
+  hasUnsavedProfileChanges,
+  type ProfileAvatarIntent,
+} from "@/lib/profile-form-state";
+import { YEAR_LEVEL_OPTIONS } from "@/lib/profile-validation";
 import { createClient } from "@/lib/supabase/client";
 
 type EditProfileFormProps = {
+  degrees: DegreeOption[];
+  isCompletionRequired?: boolean;
   profile: (ViewerProfile & { bio?: string | null }) | null;
   universities: UniversityOption[];
 };
 
 const MAX_AVATAR_SIZE_BYTES = 1024 * 1024;
+const UNSAVED_CHANGES_CONFIRM_MESSAGE =
+  "You have unsaved profile changes. Leave without saving changes?";
+const removePictureDialogCopy = getRemoveProfilePictureDialogCopy();
 
 export function EditProfileForm({
+  degrees,
+  isCompletionRequired = false,
   profile,
   universities,
 }: EditProfileFormProps) {
@@ -32,14 +45,94 @@ export function EditProfileForm({
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState(profile?.avatar_url ?? "");
+  const [avatarIntent, setAvatarIntent] = useState<ProfileAvatarIntent>("keep");
   const [selectedAvatarFile, setSelectedAvatarFile] = useState<File | null>(null);
+  const [isRemoveAvatarDialogOpen, setIsRemoveAvatarDialogOpen] = useState(false);
   const [message, setMessage] = useState<{
     text: string;
     type: "success" | "error";
   } | null>(null);
   const [isToastVisible, setIsToastVisible] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const hasUnsavedChangesRef = useRef(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const avatarObjectUrlRef = useRef<string | null>(null);
   const successTimeoutRef = useRef<number | null>(null);
   const toastTransitionTimeoutRef = useRef<number | null>(null);
+
+  function clearAvatarObjectUrl() {
+    if (avatarObjectUrlRef.current) {
+      URL.revokeObjectURL(avatarObjectUrlRef.current);
+      avatarObjectUrlRef.current = null;
+    }
+  }
+
+  function resetAvatarInput() {
+    if (avatarInputRef.current) {
+      avatarInputRef.current.value = "";
+    }
+  }
+
+  function setUnsavedChanges(isDirty: boolean) {
+    hasUnsavedChangesRef.current = isDirty;
+  }
+
+  function getCurrentFormValues() {
+    const formData = new FormData(formRef.current ?? undefined);
+
+    return {
+      bio: String(formData.get("bio") ?? ""),
+      degreeId: String(formData.get("degreeId") ?? ""),
+      firstName: String(formData.get("firstName") ?? ""),
+      lastName: String(formData.get("lastName") ?? ""),
+      universityId: String(formData.get("universityId") ?? ""),
+      username: String(formData.get("username") ?? ""),
+      yearLevel: String(formData.get("yearLevel") ?? ""),
+    };
+  }
+
+  function updateUnsavedChanges(options?: {
+    avatarIntent?: ProfileAvatarIntent;
+    hasSelectedAvatarFile?: boolean;
+  }) {
+    setUnsavedChanges(
+      hasUnsavedProfileChanges({
+        avatarIntent: options?.avatarIntent ?? avatarIntent,
+        formValues: getCurrentFormValues(),
+        hasSelectedAvatarFile:
+          options?.hasSelectedAvatarFile ?? Boolean(selectedAvatarFile),
+        profile: {
+          avatarUrl: profile?.avatar_url ?? null,
+          bio: profile?.bio ?? null,
+          degreeId: profile?.degree_id ?? null,
+          firstName: profile?.first_name ?? null,
+          lastName: profile?.last_name ?? null,
+          universityId: profile?.university_id ?? null,
+          username: profile?.username ?? null,
+          yearLevel: profile?.year_level ?? null,
+        },
+      }),
+    );
+  }
+
+  function handleRemoveAvatar() {
+    setIsRemoveAvatarDialogOpen(true);
+  }
+
+  function confirmRemoveAvatar() {
+    clearAvatarObjectUrl();
+    resetAvatarInput();
+    setSelectedAvatarFile(null);
+    setAvatarIntent("remove");
+    setAvatarPreviewUrl("");
+    setIsRemoveAvatarDialogOpen(false);
+    setMessage(null);
+    updateUnsavedChanges({ avatarIntent: "remove", hasSelectedAvatarFile: false });
+  }
+
+  function cancelRemoveAvatar() {
+    setIsRemoveAvatarDialogOpen(false);
+  }
 
   useEffect(() => {
     const clearMessage = () => {
@@ -66,8 +159,28 @@ export function EditProfileForm({
       if (successTimeoutRef.current) {
         window.clearTimeout(successTimeoutRef.current);
       }
+
+      clearAvatarObjectUrl();
     };
   }, []);
+
+  useEffect(() => {
+    if (!isRemoveAvatarDialogOpen) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsRemoveAvatarDialogOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isRemoveAvatarDialogOpen]);
 
   useEffect(() => {
     const clearMessage = () => {
@@ -111,6 +224,15 @@ export function EditProfileForm({
         nextUrl.hash === current.hash;
 
       if (!isSameLocation) {
+        if (
+          hasUnsavedChangesRef.current &&
+          !window.confirm(UNSAVED_CHANGES_CONFIRM_MESSAGE)
+        ) {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
+
         clearMessage();
       }
     };
@@ -129,13 +251,35 @@ export function EditProfileForm({
   }, []);
 
   useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!hasUnsavedChangesRef.current) {
+        return;
+      }
+
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, []);
+
+  useEffect(() => {
     if (pathname !== "/profile/edit") {
       setMessage(null);
     }
   }, [pathname]);
 
   useEffect(() => {
+    clearAvatarObjectUrl();
+    resetAvatarInput();
+    setSelectedAvatarFile(null);
+    setAvatarIntent("keep");
     setAvatarPreviewUrl(profile?.avatar_url ?? "");
+    setUnsavedChanges(false);
   }, [profile?.avatar_url]);
 
   useEffect(() => {
@@ -198,6 +342,10 @@ export function EditProfileForm({
     try {
       let avatarUrl = profile?.avatar_url ?? "";
 
+      if (avatarIntent === "remove") {
+        avatarUrl = "";
+      }
+
       if (selectedAvatarFile) {
         if (!profile?.id) {
           setMessage({ text: "Your profile is not ready for avatar uploads yet.", type: "error" });
@@ -242,6 +390,8 @@ export function EditProfileForm({
           lastName: formData.get("lastName"),
           username: formData.get("username"),
           universityId: formData.get("universityId"),
+          degreeId: formData.get("degreeId"),
+          yearLevel: formData.get("yearLevel"),
           bio: formData.get("bio"),
         }),
       });
@@ -250,8 +400,12 @@ export function EditProfileForm({
       setMessage({ text: data.message, type: data.status });
 
       if (data.status === "success") {
+        clearAvatarObjectUrl();
+        resetAvatarInput();
         setSelectedAvatarFile(null);
+        setAvatarIntent("keep");
         setAvatarPreviewUrl(avatarUrl);
+        setUnsavedChanges(false);
         router.refresh();
       }
     } catch {
@@ -263,6 +417,59 @@ export function EditProfileForm({
 
   return (
     <>
+      {isRemoveAvatarDialogOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              cancelRemoveAvatar();
+            }
+          }}
+        >
+          <div
+            aria-describedby="remove-avatar-dialog-description"
+            aria-labelledby="remove-avatar-dialog-title"
+            aria-modal="true"
+            className="w-full max-w-md rounded-lg border border-border/70 bg-background p-6 shadow-xl"
+            role="dialog"
+          >
+            <div className="space-y-2">
+              <h2
+                id="remove-avatar-dialog-title"
+                className="text-lg font-semibold tracking-tight"
+              >
+                {removePictureDialogCopy.title}
+              </h2>
+              <p
+                id="remove-avatar-dialog-description"
+                className="text-sm leading-6 text-muted-foreground"
+              >
+                {removePictureDialogCopy.body}
+              </p>
+            </div>
+
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <PillButton
+                className="w-full sm:w-auto"
+                onClick={cancelRemoveAvatar}
+                type="button"
+                variant="secondary"
+              >
+                {removePictureDialogCopy.cancelLabel}
+              </PillButton>
+              <PillButton
+                className="w-full sm:w-auto"
+                onClick={confirmRemoveAvatar}
+                type="button"
+              >
+                {removePictureDialogCopy.confirmLabel}
+              </PillButton>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {message?.type === "success" && (
         <div
           className={`fixed bottom-6 right-6 z-50 max-w-[calc(100vw-3rem)] rounded-full border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900 shadow-lg shadow-emerald-950/10 backdrop-blur transition-all duration-200 ease-out motion-reduce:transition-none ${
@@ -279,9 +486,13 @@ export function EditProfileForm({
 
       <Card className="border-border/70">
         <CardHeader className="space-y-3">
-          <CardTitle className="text-2xl">Your details</CardTitle>
+          <CardTitle className="text-2xl">
+            {isCompletionRequired ? "Complete your academic profile" : "Your details"}
+          </CardTitle>
           <CardDescription>
-            Update your profile details.
+            {isCompletionRequired
+              ? "Choose your university, degree, and year level before using the marketplace."
+              : "Update your profile details."}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -291,7 +502,12 @@ export function EditProfileForm({
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form
+            ref={formRef}
+            onInput={() => updateUnsavedChanges()}
+            onSubmit={handleSubmit}
+            className="space-y-6"
+          >
           <div className="grid gap-6 md:grid-cols-2">
             <div className="grid gap-3 md:col-span-2">
               <Label htmlFor="avatar">Profile picture</Label>
@@ -315,6 +531,7 @@ export function EditProfileForm({
                   <Input
                     id="avatar"
                     name="avatar"
+                    ref={avatarInputRef}
                     type="file"
                     accept="image/*"
                     onChange={(event) => {
@@ -322,33 +539,60 @@ export function EditProfileForm({
                       setSelectedAvatarFile(file);
 
                       if (!file) {
+                        clearAvatarObjectUrl();
+                        setAvatarIntent("keep");
                         setAvatarPreviewUrl(profile?.avatar_url ?? "");
+                        updateUnsavedChanges({ avatarIntent: "keep", hasSelectedAvatarFile: false });
                         return;
                       }
 
                       if (!file.type.startsWith("image/")) {
                         setMessage({ text: "Only image files are supported for profile pictures.", type: "error" });
                         event.target.value = "";
+                        clearAvatarObjectUrl();
                         setSelectedAvatarFile(null);
+                        setAvatarIntent("keep");
                         setAvatarPreviewUrl(profile?.avatar_url ?? "");
+                        updateUnsavedChanges({ avatarIntent: "keep", hasSelectedAvatarFile: false });
                         return;
                       }
 
                       if (file.size > MAX_AVATAR_SIZE_BYTES) {
                         setMessage({ text: "Profile pictures must be 1MB or smaller.", type: "error" });
                         event.target.value = "";
+                        clearAvatarObjectUrl();
                         setSelectedAvatarFile(null);
+                        setAvatarIntent("keep");
                         setAvatarPreviewUrl(profile?.avatar_url ?? "");
+                        updateUnsavedChanges({ avatarIntent: "keep", hasSelectedAvatarFile: false });
                         return;
                       }
 
+                      clearAvatarObjectUrl();
+                      const objectUrl = URL.createObjectURL(file);
+                      avatarObjectUrlRef.current = objectUrl;
                       setMessage(null);
-                      setAvatarPreviewUrl(URL.createObjectURL(file));
+                      setAvatarIntent("replace");
+                      setAvatarPreviewUrl(objectUrl);
+                      updateUnsavedChanges({ avatarIntent: "replace", hasSelectedAvatarFile: true });
                     }}
                   />
                   <p className="text-sm text-muted-foreground">
                     Max size is 1MB. Only image files are supported.
                   </p>
+                  {avatarPreviewUrl ? (
+                    <div>
+                      <PillButton
+                        className="h-9 px-4"
+                        disabled={isSubmitting}
+                        onClick={handleRemoveAvatar}
+                        type="button"
+                        variant="secondary"
+                      >
+                        Remove
+                      </PillButton>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -390,11 +634,51 @@ export function EditProfileForm({
                 name="universityId"
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 defaultValue={profile?.university_id?.toString() ?? ""}
+                onChange={() => updateUnsavedChanges()}
+                required
               >
                 <option value="">Select your university</option>
                 {universities.map((university) => (
                   <option key={university.id} value={university.id}>
                     {university.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="degreeId">Degree</Label>
+              <select
+                id="degreeId"
+                name="degreeId"
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                defaultValue={profile?.degree_id?.toString() ?? ""}
+                onChange={() => updateUnsavedChanges()}
+                required
+              >
+                <option value="">Select your degree</option>
+                {degrees.map((degree) => (
+                  <option key={degree.id} value={degree.id}>
+                    {degree.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="yearLevel">Year level</Label>
+              <select
+                id="yearLevel"
+                name="yearLevel"
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                defaultValue={profile?.year_level ?? ""}
+                onChange={() => updateUnsavedChanges()}
+                required
+              >
+                <option value="">Select your year level</option>
+                {YEAR_LEVEL_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
                   </option>
                 ))}
               </select>

@@ -10,11 +10,13 @@ import { RequestToBuyButton } from "@/components/request-to-buy-button";
 import { RequestToTradeButton } from "@/components/request-to-trade-button";
 import { Card, CardContent } from "@/components/ui/card";
 import { isMarketplaceSuspended } from "@/lib/admin";
+import { canViewArchivedListing } from "@/lib/listing-archive";
 import {
   formatListingCondition,
   formatPrice,
-  getExistingTransaction,
+  getListingRequestState,
   getListingById,
+  getListingTransactionParticipantIds,
   getMyAvailableListings,
   getProfileDisplayName,
   getViewerContext,
@@ -69,14 +71,28 @@ async function ListingDetailContent({
 
   if (error || !listing) notFound();
 
-  const existingTransaction = user && user.id !== listing.seller_id
-    ? await getExistingTransaction(id, user.id)
+  const requestState = user && user.id !== listing.seller_id
+    ? await getListingRequestState(id, user.id)
     : null;
 
   const sellerName = getProfileDisplayName(listing.seller);
   const isSuspended = isMarketplaceSuspended(profile);
   const isOwner = user?.id === listing.seller_id;
   const isAdmin = profile?.role === "admin" && !isSuspended;
+  const isArchived = listing.status === "archived" || !!listing.archived_at;
+
+  if (isArchived) {
+    const participantIds = await getListingTransactionParticipantIds(id);
+    const canViewArchived = canViewArchivedListing({
+      isAdmin,
+      participantIds,
+      sellerId: listing.seller_id,
+      viewerId: user?.id,
+    });
+
+    if (!canViewArchived) notFound();
+  }
+
   const canManage = !isSuspended && (isOwner || isAdmin);
   const isTrade =
     listing.listing_type === "trade_only" || listing.listing_type === "sale_or_trade";
@@ -248,25 +264,28 @@ async function ListingDetailContent({
                   <>
                     {canBuy ? (
                       <RequestToBuyButton
-                        conversationId={existingTransaction?.conversation_id}
+                        conversationId={requestState?.conversationId}
+                        canRequest={requestState?.canRequestToBuy ?? true}
                         listingId={listing.id}
-                        hasPendingTransaction={!!existingTransaction}
+                        hasPendingTransaction={!!requestState?.pendingTransaction}
+                        remainingAttempts={requestState?.remainingBuyAttempts ?? 3}
+                        statusMessage={requestState?.buyStatusMessage}
                       />
                     ) : null}
                     {canTrade ? (
                       <RequestToTradeButton
-                        conversationId={existingTransaction?.conversation_id}
+                        conversationId={requestState?.pendingTransaction?.conversation_id}
                         listingId={listing.id}
-                        hasPendingTransaction={!!existingTransaction}
+                        hasPendingTransaction={!!requestState?.pendingTransaction}
                         offerableListings={offerableListings}
                       />
                     ) : null}
                   </>
                 ) : null}
 
-                {!existingTransaction && user && !isOwner && !isSuspended ? (
+                {!requestState?.pendingTransaction && user && !isOwner && !isSuspended ? (
                   <p className="text-sm text-muted-foreground">
-                    Messaging opens once you send a request.
+                    Messaging opens once the seller accepts your request.
                   </p>
                 ) : user && isSuspended ? (
                   <p className="text-sm text-muted-foreground">

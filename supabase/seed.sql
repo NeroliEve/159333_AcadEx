@@ -32,6 +32,25 @@ insert into public.study_areas (name, slug) values
   ('Music & Performing Arts',   'music-performing-arts');
 
 -- -----------------------------------------------------------------------------
+-- Degrees (admin-managed reference data)
+-- -----------------------------------------------------------------------------
+
+insert into public.degrees (name, slug, study_area_id, is_active) values
+  ('Business', 'business', (select id from public.study_areas where slug = 'business-commerce'), true),
+  ('Computer Science', 'computer-science', (select id from public.study_areas where slug = 'information-technology'), true),
+  ('Science', 'science', (select id from public.study_areas where slug = 'science-mathematics'), true),
+  ('Engineering', 'engineering', (select id from public.study_areas where slug = 'engineering'), true),
+  ('Law', 'law', (select id from public.study_areas where slug = 'law'), true),
+  ('Health Science', 'health-science', (select id from public.study_areas where slug = 'health-medicine'), true),
+  ('Education', 'education', (select id from public.study_areas where slug = 'education'), true),
+  ('Arts', 'arts', (select id from public.study_areas where slug = 'arts-humanities'), true),
+  ('Social Sciences', 'social-sciences', (select id from public.study_areas where slug = 'social-sciences'), true),
+  ('Design', 'design', (select id from public.study_areas where slug = 'architecture-design'), true),
+  ('Agriculture and Environment', 'agriculture-environment', (select id from public.study_areas where slug = 'agriculture-environment'), true),
+  ('Music and Performing Arts', 'music-performing-arts', (select id from public.study_areas where slug = 'music-performing-arts'), true)
+on conflict (slug) do nothing;
+
+-- -----------------------------------------------------------------------------
 -- Universities (all 8 NZ universities)
 -- -----------------------------------------------------------------------------
 

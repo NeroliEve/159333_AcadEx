@@ -1,10 +1,116 @@
 import { NextResponse } from "next/server";
+import {
+  didAvatarStorageRemoveDeleteObject,
+  getOwnedAvatarStoragePathsFromList,
+  getOwnedAvatarStoragePath,
+} from "@/lib/profile-avatar";
+import { parseAcademicProfileFields } from "@/lib/profile-validation";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 type ProfileResponse = {
   message?: string;
   status: "error" | "success";
 };
+
+async function removeAvatarFromStorage(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  storagePath: string,
+) {
+  const { data, error } = await supabase.storage
+    .from("avatars")
+    .remove([storagePath]);
+
+  if (!error && didAvatarStorageRemoveDeleteObject(data)) {
+    return;
+  }
+
+  try {
+    const admin = createAdminClient();
+    const { error: adminError } = await admin.storage
+      .from("avatars")
+      .remove([storagePath]);
+
+    if (adminError) {
+      console.error("Could not remove previous avatar from storage.", adminError);
+    }
+  } catch (adminError) {
+    console.error("Could not remove previous avatar from storage.", adminError);
+  }
+}
+
+async function removeStaleAvatarsFromStorage({
+  avatarUrl,
+  currentAvatarUrl,
+  supabase,
+  userId,
+}: {
+  avatarUrl: string;
+  currentAvatarUrl: string;
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  userId: string;
+}) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!supabaseUrl) {
+    return;
+  }
+
+  const keepStoragePath = avatarUrl
+    ? getOwnedAvatarStoragePath({ avatarUrl, supabaseUrl, userId })
+    : null;
+  const currentAvatarStoragePath = currentAvatarUrl
+    ? getOwnedAvatarStoragePath({
+        avatarUrl: currentAvatarUrl,
+        supabaseUrl,
+        userId,
+      })
+    : null;
+  const storagePaths = new Set<string>();
+
+  if (
+    currentAvatarStoragePath &&
+    currentAvatarStoragePath !== keepStoragePath
+  ) {
+    storagePaths.add(currentAvatarStoragePath);
+  }
+
+  try {
+    const admin = createAdminClient();
+    const { data: avatarFiles, error: listError } = await admin.storage
+      .from("avatars")
+      .list(userId);
+
+    if (listError) {
+      console.error("Could not list stale avatars from storage.", listError);
+    } else {
+      getOwnedAvatarStoragePathsFromList({
+        files: avatarFiles,
+        keepStoragePath,
+        userId,
+      }).forEach((storagePath) => storagePaths.add(storagePath));
+    }
+
+    if (storagePaths.size === 0) {
+      return;
+    }
+
+    const { error: removeError } = await admin.storage
+      .from("avatars")
+      .remove([...storagePaths]);
+
+    if (removeError) {
+      console.error("Could not remove stale avatars from storage.", removeError);
+    }
+
+    return;
+  } catch (adminError) {
+    console.error("Could not remove stale avatars from storage.", adminError);
+  }
+
+  if (currentAvatarStoragePath && currentAvatarStoragePath !== keepStoragePath) {
+    await removeAvatarFromStorage(supabase, currentAvatarStoragePath);
+  }
+}
 
 export async function PATCH(request: Request) {
   try {
@@ -26,16 +132,7 @@ export async function PATCH(request: Request) {
     const username = typeof body.username === "string" ? body.username.trim().toLowerCase() : "";
     const bio = typeof body.bio === "string" ? body.bio.trim() : "";
     const avatarUrl = typeof body.avatarUrl === "string" ? body.avatarUrl.trim() : "";
-    const universityIdValue =
-      typeof body.universityId === "string" || typeof body.universityId === "number"
-        ? String(body.universityId).trim()
-        : "";
-    const universityId =
-      universityIdValue === ""
-        ? null
-        : Number.isNaN(Number(universityIdValue))
-          ? null
-          : Number(universityIdValue);
+    const academicFields = parseAcademicProfileFields(body);
 
     if (!firstName) {
       return NextResponse.json<ProfileResponse>(
@@ -58,9 +155,23 @@ export async function PATCH(request: Request) {
       );
     }
 
-    if (universityIdValue !== "" && universityId === null) {
+    if (academicFields.errors.universityId) {
       return NextResponse.json<ProfileResponse>(
-        { message: "Choose a valid university.", status: "error" },
+        { message: academicFields.errors.universityId, status: "error" },
+        { status: 400 },
+      );
+    }
+
+    if (academicFields.errors.degreeId) {
+      return NextResponse.json<ProfileResponse>(
+        { message: academicFields.errors.degreeId, status: "error" },
+        { status: 400 },
+      );
+    }
+
+    if (academicFields.errors.yearLevel) {
+      return NextResponse.json<ProfileResponse>(
+        { message: academicFields.errors.yearLevel, status: "error" },
         { status: 400 },
       );
     }
@@ -79,6 +190,21 @@ export async function PATCH(request: Request) {
       }
     }
 
+    const { data: currentProfile, error: currentProfileError } = await supabase
+      .from("profiles")
+      .select("avatar_url")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (currentProfileError) {
+      return NextResponse.json<ProfileResponse>(
+        { message: currentProfileError.message, status: "error" },
+        { status: 400 },
+      );
+    }
+
+    const currentAvatarUrl = currentProfile?.avatar_url ?? "";
+
     const { error } = await supabase
       .from("profiles")
       .update({
@@ -86,8 +212,10 @@ export async function PATCH(request: Request) {
         first_name: firstName,
         last_name: lastName,
         username,
+        degree_id: academicFields.degreeId,
         university: null,
-        university_id: universityId,
+        university_id: academicFields.universityId,
+        year_level: academicFields.yearLevel,
         bio: bio || null,
       })
       .eq("id", user.id);
@@ -98,6 +226,13 @@ export async function PATCH(request: Request) {
         { status: 400 },
       );
     }
+
+    await removeStaleAvatarsFromStorage({
+      avatarUrl,
+      currentAvatarUrl,
+      supabase,
+      userId: user.id,
+    });
 
     return NextResponse.json<ProfileResponse>({
       message: "Profile updated successfully.",

@@ -52,24 +52,33 @@ export type Database = {
       }
       conversations: {
         Row: {
+          archived_at: string | null
           buyer_id: string
+          close_after: string | null
           created_at: string
+          delete_after: string | null
           id: string
           last_message_at: string | null
           listing_id: string
           seller_id: string
         }
         Insert: {
+          archived_at?: string | null
           buyer_id: string
+          close_after?: string | null
           created_at?: string
+          delete_after?: string | null
           id?: string
           last_message_at?: string | null
           listing_id: string
           seller_id: string
         }
         Update: {
+          archived_at?: string | null
           buyer_id?: string
+          close_after?: string | null
           created_at?: string
+          delete_after?: string | null
           id?: string
           last_message_at?: string | null
           listing_id?: string
@@ -143,6 +152,54 @@ export type Database = {
             columns: ["university_id"]
             isOneToOne: false
             referencedRelation: "universities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      degrees: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: number
+          is_active: boolean
+          name: string
+          slug: string
+          study_area_id: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: never
+          is_active?: boolean
+          name: string
+          slug: string
+          study_area_id: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: never
+          is_active?: boolean
+          name?: string
+          slug?: string
+          study_area_id?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "degrees_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "degrees_study_area_id_fkey"
+            columns: ["study_area_id"]
+            isOneToOne: false
+            referencedRelation: "study_areas"
             referencedColumns: ["id"]
           },
         ]
@@ -321,6 +378,7 @@ export type Database = {
           avatar_url: string | null
           bio: string | null
           created_at: string
+          degree_id: number | null
           email: string | null
           first_name: string
           id: string
@@ -334,12 +392,14 @@ export type Database = {
           university_id: number | null
           updated_at: string
           username: string
+          year_level: Database["public"]["Enums"]["academic_year_level"] | null
         }
         Insert: {
           account_status?: Database["public"]["Enums"]["profile_account_status"]
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
+          degree_id?: number | null
           email?: string | null
           first_name: string
           id: string
@@ -353,12 +413,14 @@ export type Database = {
           university_id?: number | null
           updated_at?: string
           username: string
+          year_level?: Database["public"]["Enums"]["academic_year_level"] | null
         }
         Update: {
           account_status?: Database["public"]["Enums"]["profile_account_status"]
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
+          degree_id?: number | null
           email?: string | null
           first_name?: string
           id?: string
@@ -372,8 +434,16 @@ export type Database = {
           university_id?: number | null
           updated_at?: string
           username?: string
+          year_level?: Database["public"]["Enums"]["academic_year_level"] | null
         }
         Relationships: [
+          {
+            foreignKeyName: "profiles_degree_id_fkey"
+            columns: ["degree_id"]
+            isOneToOne: false
+            referencedRelation: "degrees"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "profiles_suspended_by_fkey"
             columns: ["suspended_by"]
@@ -645,14 +715,18 @@ export type Database = {
           completed_at: string | null
           conversation_id: string | null
           created_at: string
+          declined_at: string | null
           id: string
           listing_id: string
           offered_listing_id: string | null
           paid_at: string | null
           payment_status: Database["public"]["Enums"]["transaction_payment_status"]
+          payment_requested_at: string | null
+          payment_requested_by: string | null
           reservation_confirmed_at: string | null
           reservation_expires_at: string | null
           reservation_requested_at: string
+          request_message: string | null
           seller_confirmed_completed: boolean
           seller_id: string
           status: Database["public"]["Enums"]["transaction_status"]
@@ -669,14 +743,18 @@ export type Database = {
           completed_at?: string | null
           conversation_id?: string | null
           created_at?: string
+          declined_at?: string | null
           id?: string
           listing_id: string
           offered_listing_id?: string | null
           paid_at?: string | null
           payment_status?: Database["public"]["Enums"]["transaction_payment_status"]
+          payment_requested_at?: string | null
+          payment_requested_by?: string | null
           reservation_confirmed_at?: string | null
           reservation_expires_at?: string | null
           reservation_requested_at?: string
+          request_message?: string | null
           seller_confirmed_completed?: boolean
           seller_id: string
           status?: Database["public"]["Enums"]["transaction_status"]
@@ -693,14 +771,18 @@ export type Database = {
           completed_at?: string | null
           conversation_id?: string | null
           created_at?: string
+          declined_at?: string | null
           id?: string
           listing_id?: string
           offered_listing_id?: string | null
           paid_at?: string | null
           payment_status?: Database["public"]["Enums"]["transaction_payment_status"]
+          payment_requested_at?: string | null
+          payment_requested_by?: string | null
           reservation_confirmed_at?: string | null
           reservation_expires_at?: string | null
           reservation_requested_at?: string
+          request_message?: string | null
           seller_confirmed_completed?: boolean
           seller_id?: string
           status?: Database["public"]["Enums"]["transaction_status"]
@@ -843,6 +925,7 @@ export type Database = {
       }
     }
     Enums: {
+      academic_year_level: "1" | "2" | "3" | "4" | "5" | "postgraduate"
       listing_condition: "new" | "like_new" | "good" | "fair" | "poor"
       listing_status: "available" | "pending" | "sold" | "archived"
       listing_type: "sale_only" | "trade_only" | "sale_or_trade"
@@ -857,7 +940,7 @@ export type Database = {
         | "checkout_pending"
         | "paid"
         | "failed"
-      transaction_status: "pending" | "completed" | "cancelled" | "mismatch"
+      transaction_status: "pending" | "completed" | "cancelled" | "declined" | "mismatch"
       wallet_transaction_status: "completed"
       wallet_transaction_type: "sale" | "withdrawal"
     }
@@ -978,6 +1061,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      academic_year_level: ["1", "2", "3", "4", "5", "postgraduate"],
       listing_condition: ["new", "like_new", "good", "fair", "poor"],
       listing_status: ["available", "pending", "sold", "archived"],
       listing_type: ["sale_only", "trade_only", "sale_or_trade"],
@@ -993,7 +1077,7 @@ export const Constants = {
         "paid",
         "failed",
       ],
-      transaction_status: ["pending", "completed", "cancelled", "mismatch"],
+      transaction_status: ["pending", "completed", "cancelled", "declined", "mismatch"],
       wallet_transaction_status: ["completed"],
       wallet_transaction_type: ["sale", "withdrawal"],
     },

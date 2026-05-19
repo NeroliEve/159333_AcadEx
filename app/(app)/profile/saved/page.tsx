@@ -1,17 +1,15 @@
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
-import { ListingCard } from "@/components/listing-card";
-import { getSavedListings, getViewerContext } from "@/lib/marketplace";
+import { SavedListingsPanel } from "@/components/saved-listings-panel";
+import { getViewerContext } from "@/lib/marketplace";
 
 async function SavedListingsContent() {
-  const { user, profile } = await getViewerContext();
+  const { user } = await getViewerContext();
 
   if (!user) {
     redirect("/auth/login");
   }
-
-  const savedListings = await getSavedListings(user.id);
 
   return (
     <section className="flex flex-col gap-10">
@@ -25,24 +23,7 @@ async function SavedListingsContent() {
         </p>
       </div>
 
-      {savedListings.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          You haven&apos;t saved any listings yet. Tap the heart on any listing to save it.
-        </p>
-      ) : (
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {savedListings.map((listing) => (
-            <ListingCard
-              key={listing.id}
-              isSaved
-              listing={listing}
-              viewerAccountStatus={profile?.account_status}
-              viewerId={profile?.id}
-              viewerRole={profile?.role}
-            />
-          ))}
-        </div>
-      )}
+      <SavedListingsPanel />
     </section>
   );
 }

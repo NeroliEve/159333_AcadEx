@@ -7,6 +7,11 @@ import type {
   TableInsert,
   TableRow,
 } from "@/lib/supabase/database.types";
+import {
+  getBuyRequestAttemptState,
+  type ExchangeTransactionStatus,
+} from "@/lib/exchange-flow";
+import { getRecommendedListingsForProfile } from "@/lib/recommendations";
 
 // ─── Shared types ────────────────────────────────────────────────────────────
 
@@ -15,6 +20,7 @@ type ProfileSummary = Pick<
   | "account_status"
   | "avatar_url"
   | "bio"
+  | "degree_id"
   | "id"
   | "email"
   | "first_name"
@@ -26,6 +32,7 @@ type ProfileSummary = Pick<
   | "university"
   | "university_id"
   | "username"
+  | "year_level"
 >;
 
 type CourseSummary = Pick<
@@ -43,6 +50,13 @@ type StudyAreaSummary = Pick<
   "id" | "name" | "slug"
 >;
 
+type DegreeSummary = Pick<
+  TableRow<"degrees">,
+  "id" | "is_active" | "name" | "slug" | "study_area_id"
+> & {
+  study_area: StudyAreaSummary | null;
+};
+
 export type ListingImageData = Pick<
   TableRow<"listing_images">,
   "id" | "image_url" | "is_primary" | "sort_order"
@@ -52,6 +66,7 @@ type ListingImageRow = ListingImageData & Pick<TableRow<"listing_images">, "list
 
 type ListingCardBase = Pick<
   TableRow<"listings">,
+  | "archived_at"
   | "author"
   | "condition"
   | "created_at"
@@ -82,10 +97,12 @@ export type ViewerProfile = ProfileSummary;
 export type CourseOption = CourseSummary;
 export type UniversityOption = UniversitySummary;
 export type StudyAreaOption = StudyAreaSummary;
+export type DegreeOption = DegreeSummary;
 export type ListingCondition = PublicEnum<"listing_condition">;
 export type ListingType = PublicEnum<"listing_type">;
 export type ListingInsert = TableInsert<"listings">;
 export type AdminCourse = CourseSummary;
+export type AdminDegree = DegreeSummary;
 
 export type PublicProfile = ProfileSummary & {
   listings: ListingCardData[];
@@ -104,10 +121,11 @@ const LISTING_CARD_SELECT = `
   price,
   condition,
   status,
+  archived_at,
   primary_image_url,
   created_at,
   course:courses!listings_course_id_fkey(id, course_code, course_name, university, university_id),
-  seller:profiles!listings_seller_id_fkey(id, avatar_url, first_name, is_verified, last_name, university, university_id, username),
+  seller:profiles!listings_seller_id_fkey(id, avatar_url, degree_id, first_name, is_verified, last_name, university, university_id, username, year_level),
   study_area:study_areas!listings_study_area_id_fkey(id, name, slug)
 `;
 
@@ -122,6 +140,7 @@ const LISTING_CARD_SELECT_ANON = `
   price,
   condition,
   status,
+  archived_at,
   primary_image_url,
   created_at,
   course:courses!listings_course_id_fkey(id, course_code, course_name, university, university_id),
@@ -204,7 +223,7 @@ export async function getViewerContext(): Promise<{
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "account_status, avatar_url, bio, id, email, first_name, is_verified, last_name, role, suspended_at, transactions_seen_at, university, university_id, username",
+      "account_status, avatar_url, bio, degree_id, id, email, first_name, is_verified, last_name, role, suspended_at, transactions_seen_at, university, university_id, username, year_level",
     )
     .eq("id", user.id)
     .maybeSingle();
@@ -255,8 +274,9 @@ export async function getListingsFeed(
   let query = supabase
     .from("listings")
     .select(audience === "authenticated" ? LISTING_CARD_SELECT : LISTING_CARD_SELECT_ANON)
-    .in("status", ["available", "pending", "sold"])
-    .is("deleted_at", null);
+    .in("status", ["available", "pending"])
+    .is("deleted_at", null)
+    .is("archived_at", null);
 
   if (blockedIds.length > 0) {
     query = query.not("seller_id", "in", `(${blockedIds.join(",")})`);
@@ -337,6 +357,56 @@ export async function getListingsFeed(
 
 // ─── Individual listing queries ───────────────────────────────────────────────
 
+export async function getRecommendedListings(
+  profile: ViewerProfile | null,
+  limit = 6,
+): Promise<{
+  error: string | null;
+  listings: ListingCardData[];
+}> {
+  if (!profile?.id || !profile.degree_id || !profile.university_id) {
+    return { error: null, listings: [] };
+  }
+
+  const supabase = await createClient();
+  const { data: degree, error: degreeError } = await supabase
+    .from("degrees")
+    .select("study_area_id")
+    .eq("id", profile.degree_id)
+    .maybeSingle();
+
+  if (degreeError) {
+    return { error: degreeError.message, listings: [] };
+  }
+
+  if (!degree?.study_area_id) {
+    return { error: null, listings: [] };
+  }
+
+  const { error, listings } = await getListingsFeed(
+    "authenticated",
+    {},
+    Math.max(48, limit * 8),
+  );
+
+  if (error) {
+    return { error, listings: [] };
+  }
+
+  return {
+    error: null,
+    listings: getRecommendedListingsForProfile({
+      limit,
+      listings,
+      profile: {
+        degreeStudyAreaId: degree.study_area_id,
+        id: profile.id,
+        universityId: profile.university_id,
+      },
+    }),
+  };
+}
+
 export async function getMyListings(userId: string): Promise<ListingCardData[]> {
   if (!hasEnvVars) return [];
 
@@ -346,6 +416,7 @@ export async function getMyListings(userId: string): Promise<ListingCardData[]> 
     .select(LISTING_CARD_SELECT)
     .eq("seller_id", userId)
     .is("deleted_at", null)
+    .is("archived_at", null)
     .order("created_at", { ascending: false });
 
   return attachListingImages(supabase, (data ?? []) as unknown as ListingCardBase[]);
@@ -372,6 +443,7 @@ export async function getMyAvailableListings(
     .eq("seller_id", userId)
     .eq("status", "available")
     .is("deleted_at", null)
+    .is("archived_at", null)
     .order("created_at", { ascending: false });
 
   return (data ?? []) as unknown as Array<{
@@ -420,6 +492,24 @@ export async function getListingById(id: string): Promise<{
 
 // ─── Public profile ───────────────────────────────────────────────────────────
 
+export async function getListingTransactionParticipantIds(listingId: string): Promise<string[]> {
+  if (!hasEnvVars) return [];
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("transactions")
+    .select("buyer_id, seller_id")
+    .or(`listing_id.eq.${listingId},offered_listing_id.eq.${listingId}`);
+
+  const participantIds = new Set<string>();
+  for (const transaction of data ?? []) {
+    participantIds.add(transaction.buyer_id);
+    participantIds.add(transaction.seller_id);
+  }
+
+  return [...participantIds];
+}
+
 export async function getPublicProfile(username: string): Promise<{
   profile: PublicProfile | null;
   error: string | null;
@@ -433,7 +523,7 @@ export async function getPublicProfile(username: string): Promise<{
   const { data: profileData, error: profileError } = await supabase
     .from("profiles")
     .select(
-      "account_status, avatar_url, bio, id, email, first_name, is_verified, last_name, role, suspended_at, transactions_seen_at, university, university_id, username",
+      "account_status, avatar_url, bio, degree_id, id, email, first_name, is_verified, last_name, role, suspended_at, transactions_seen_at, university, university_id, username, year_level",
     )
     .eq("username", username)
     .maybeSingle();
@@ -447,6 +537,7 @@ export async function getPublicProfile(username: string): Promise<{
     .eq("seller_id", profileData.id)
     .in("status", ["available", "pending"])
     .is("deleted_at", null)
+    .is("archived_at", null)
     .order("created_at", { ascending: false });
 
   const listings = await attachListingImages(
@@ -496,6 +587,31 @@ export async function getStudyAreaOptions(): Promise<StudyAreaOption[]> {
   return data ?? [];
 }
 
+export async function getDegreeOptions(
+  includeInactive = false,
+  limit = 100,
+): Promise<DegreeOption[]> {
+  if (!hasEnvVars) return [];
+
+  const supabase = await createClient();
+  let query = supabase
+    .from("degrees")
+    .select("id, is_active, name, slug, study_area_id, study_area:study_areas!degrees_study_area_id_fkey(id, name, slug)")
+    .order("name", { ascending: true })
+    .limit(limit);
+
+  if (!includeInactive) {
+    query = query.eq("is_active", true);
+  }
+
+  const { data } = await query;
+  return (data ?? []) as unknown as DegreeOption[];
+}
+
+export async function getAdminDegrees(): Promise<AdminDegree[]> {
+  return getDegreeOptions(true, 200);
+}
+
 export async function getUniversityOptions(
   includeInactive = false,
   limit = 100,
@@ -533,8 +649,12 @@ export type TransactionData = {
   seller_confirmed_completed: boolean;
   reservation_confirmed_at: string | null;
   paid_at: string | null;
+  payment_requested_at: string | null;
+  payment_requested_by: string | null;
   completed_at: string | null;
   cancelled_at: string | null;
+  declined_at: string | null;
+  request_message: string | null;
   created_at: string;
   updated_at: string;
   listing: Pick<TableRow<"listings">, "id" | "title" | "primary_image_url" | "price" | "condition"> | null;
@@ -546,12 +666,17 @@ export type TransactionData = {
 const TRANSACTION_SELECT = `
   id, listing_id, offered_listing_id, conversation_id, buyer_id, seller_id, agreed_price, agreed_trade_text,
   status, payment_status, seller_confirmed_completed, reservation_confirmed_at, paid_at,
-  completed_at, cancelled_at, created_at, updated_at,
+  payment_requested_at, payment_requested_by,
+  completed_at, cancelled_at, declined_at, request_message, created_at, updated_at,
   listing:listings!transactions_listing_id_fkey(id, title, primary_image_url, price, condition),
   offered_listing:listings!transactions_offered_listing_id_fkey(id, title, primary_image_url, price, condition),
   buyer:profiles!transactions_buyer_id_fkey(id, first_name, last_name, username, avatar_url),
   seller:profiles!transactions_seller_id_fkey(id, first_name, last_name, username, avatar_url)
 `;
+
+function isTransactionHistoryEntry(tx: TransactionData) {
+  return tx.status === "completed" || (tx.status === "cancelled" && !!tx.reservation_confirmed_at);
+}
 
 // Fetches all transactions for a user split into buying and selling
 export async function getMyTransactions(userId: string): Promise<{
@@ -576,8 +701,8 @@ export async function getMyTransactions(userId: string): Promise<{
   ]);
 
   return {
-    buying: (buying ?? []) as unknown as TransactionData[],
-    selling: (selling ?? []) as unknown as TransactionData[],
+    buying: ((buying ?? []) as unknown as TransactionData[]).filter(isTransactionHistoryEntry),
+    selling: ((selling ?? []) as unknown as TransactionData[]).filter(isTransactionHistoryEntry),
   };
 }
 
@@ -599,6 +724,71 @@ export async function getExistingTransaction(
     .maybeSingle();
 
   return data as unknown as TransactionData | null;
+}
+
+export type ListingRequestState = {
+  pendingTransaction: TransactionData | null;
+  latestDeclinedTransaction: TransactionData | null;
+  declinedBuyCount: number;
+  canRequestToBuy: boolean;
+  remainingBuyAttempts: number;
+  buyStatusMessage: string | null;
+  conversationId: string | null;
+};
+
+export async function getListingRequestState(
+  listingId: string,
+  buyerId: string,
+): Promise<ListingRequestState> {
+  if (!hasEnvVars) {
+    const attemptState = getBuyRequestAttemptState({
+      declinedCount: 0,
+      hasPendingRequest: false,
+    });
+
+    return {
+      pendingTransaction: null,
+      latestDeclinedTransaction: null,
+      declinedBuyCount: 0,
+      canRequestToBuy: attemptState.canRequest,
+      remainingBuyAttempts: attemptState.remainingAttempts,
+      buyStatusMessage: attemptState.statusMessage,
+      conversationId: null,
+    };
+  }
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("transactions")
+    .select(TRANSACTION_SELECT)
+    .eq("listing_id", listingId)
+    .eq("buyer_id", buyerId)
+    .in("status", ["pending", "declined"] as ExchangeTransactionStatus[])
+    .order("created_at", { ascending: false });
+
+  const transactions = (data ?? []) as unknown as TransactionData[];
+  const pendingTransaction = transactions.find((tx) => tx.status === "pending") ?? null;
+  const declinedBuyTransactions = transactions.filter(
+    (tx) => tx.status === "declined" && !tx.offered_listing_id,
+  );
+  const latestDeclinedTransaction = declinedBuyTransactions[0] ?? null;
+  const attemptState = getBuyRequestAttemptState({
+    declinedCount: declinedBuyTransactions.length,
+    hasPendingRequest: !!pendingTransaction,
+  });
+
+  return {
+    pendingTransaction,
+    latestDeclinedTransaction,
+    declinedBuyCount: declinedBuyTransactions.length,
+    canRequestToBuy: attemptState.canRequest,
+    remainingBuyAttempts: attemptState.remainingAttempts,
+    buyStatusMessage: attemptState.statusMessage,
+    conversationId:
+      pendingTransaction?.conversation_id ??
+      latestDeclinedTransaction?.conversation_id ??
+      null,
+  };
 }
 
 // ─── Reviews ─────────────────────────────────────────────────────────────────
@@ -697,7 +887,8 @@ export async function getSavedListings(userId: string): Promise<ListingCardData[
 
   const listings = (data ?? [])
     .map((row) => (row as unknown as { listing: ListingCardBase | null }).listing)
-    .filter((l): l is ListingCardBase => l !== null);
+    .filter((l): l is ListingCardBase => l !== null)
+    .filter((listing) => listing.status !== "archived" && !listing.archived_at);
 
   return attachListingImages(supabase, listings);
 }

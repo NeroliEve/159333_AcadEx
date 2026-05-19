@@ -50,14 +50,14 @@ export function SearchFilterBar({ courses, studyAreas, universities }: SearchFil
     if (minPrice > PRICE_MIN) params.set("minPrice", String(minPrice));
     if (maxPrice < PRICE_MAX) params.set("maxPrice", String(maxPrice));
 
-    router.push(`/home?${params.toString()}`);
+    router.push(`/browse?${params.toString()}`);
   }
 
   function handleClear() {
     formRef.current?.reset();
     setMinPrice(PRICE_MIN);
     setMaxPrice(PRICE_MAX);
-    router.push("/home");
+    router.push("/browse");
   }
 
   const hasFilters =

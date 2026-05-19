@@ -76,7 +76,7 @@ export function ListingImageCarousel({
 
       {isLoading ? (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-muted text-sm font-medium text-muted-foreground">
-          Loading...
+          Loading image
         </div>
       ) : null}
 

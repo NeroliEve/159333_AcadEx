@@ -3,20 +3,14 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { MarkTransactionsSeen } from "@/components/mark-transactions-seen";
-import { PayTransactionButton } from "@/components/pay-transaction-button";
-import { ReviewForm } from "@/components/review-form";
-import { TransactionActions } from "@/components/transaction-actions";
 import { isMarketplaceSuspended } from "@/lib/admin";
 import {
   formatListingCondition,
   formatPrice,
   getMyTransactions,
-  getReviewForTransaction,
   getViewerContext,
-  type ReviewData,
   type TransactionData,
 } from "@/lib/marketplace";
-import { canCompleteTransaction } from "@/lib/payments";
 
 function transactionStatusBadge(status: TransactionData["status"]) {
   switch (status) {
@@ -50,25 +44,13 @@ function TransactionRow({
   isSuspended,
   transaction: tx,
   viewerId,
-  existingReview,
 }: {
   isSuspended: boolean;
   transaction: TransactionData;
   viewerId: string;
-  existingReview: ReviewData | null;
 }) {
   const isSeller = tx.seller_id === viewerId;
-  const isBuyer = tx.buyer_id === viewerId;
   const isTrade = !!tx.offered_listing_id;
-  const isAccepted = !!tx.reservation_confirmed_at;
-  const canComplete = canCompleteTransaction(tx);
-  const canCancel = !(tx.payment_status === "paid" && !isTrade);
-  const buyerCanPay =
-    isBuyer &&
-    !isTrade &&
-    isAccepted &&
-    tx.status === "pending" &&
-    tx.payment_status !== "paid";
   const otherParty = isSeller ? tx.buyer : tx.seller;
   const otherName = otherParty
     ? `${otherParty.first_name} ${otherParty.last_name}`.trim() || otherParty.username
@@ -159,36 +141,6 @@ function TransactionRow({
         </div>
       ) : null}
 
-      {buyerCanPay && !isSuspended ? (
-        <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-1">
-              <p className="text-sm font-medium">Seller accepted your request</p>
-              <p className="text-xs text-muted-foreground">
-                Pay with Stripe test checkout to credit the seller&apos;s demo wallet.
-              </p>
-            </div>
-            <PayTransactionButton transactionId={tx.id} />
-          </div>
-        </div>
-      ) : null}
-
-      {isSeller && isAccepted && !isTrade && tx.payment_status !== "paid" ? (
-        <p className="rounded-lg border border-border/70 bg-secondary/40 p-3 text-sm text-muted-foreground">
-          Waiting for the buyer to complete Stripe test payment before this sale can be completed.
-        </p>
-      ) : null}
-
-      {tx.status === "pending" && !isSuspended ? (
-        <TransactionActions
-          canCancel={canCancel}
-          canComplete={canComplete}
-          transactionId={tx.id}
-          isAccepted={isAccepted}
-          isSeller={isSeller}
-        />
-      ) : null}
-
       {tx.conversation_id && !isSuspended ? (
         <div className="flex">
           <Link
@@ -197,17 +149,6 @@ function TransactionRow({
           >
             Open conversation
           </Link>
-        </div>
-      ) : null}
-
-      {tx.status === "completed" && otherParty && !isSuspended ? (
-        <div className="border-t border-border/70 pt-3">
-          <ReviewForm
-            existingReview={existingReview}
-            revieweeId={otherParty.id}
-            reviewerRole={isSeller ? "seller" : "buyer"}
-            transactionId={tx.id}
-          />
         </div>
       ) : null}
 
@@ -229,17 +170,6 @@ async function ProfileTransactionsContent() {
 
   const transactions = await getMyTransactions(user.id);
   const isSuspended = isMarketplaceSuspended(profile);
-  const completedTxIds = [...transactions.buying, ...transactions.selling]
-    .filter((tx) => tx.status === "completed")
-    .map((tx) => tx.id);
-
-  const reviewMap = new Map<string, ReviewData | null>();
-  await Promise.all(
-    completedTxIds.map(async (txId) => {
-      const review = await getReviewForTransaction(txId, user.id);
-      reviewMap.set(txId, review);
-    }),
-  );
 
   return (
     <section className="flex flex-col gap-10">
@@ -264,7 +194,6 @@ async function ProfileTransactionsContent() {
               {transactions.buying.map((tx) => (
                 <TransactionRow
                   key={tx.id}
-                  existingReview={reviewMap.get(tx.id) ?? null}
                   isSuspended={isSuspended}
                   transaction={tx}
                   viewerId={user.id}
@@ -283,7 +212,6 @@ async function ProfileTransactionsContent() {
               {transactions.selling.map((tx) => (
                 <TransactionRow
                   key={tx.id}
-                  existingReview={reviewMap.get(tx.id) ?? null}
                   isSuspended={isSuspended}
                   transaction={tx}
                   viewerId={user.id}
@@ -301,6 +229,7 @@ function ProfileTransactionsFallback() {
   return (
     <section className="flex flex-col gap-10">
       <div className="space-y-2">
+        <p className="text-sm text-muted-foreground">Loading transactions</p>
         <div className="h-4 w-24 animate-pulse rounded bg-muted" />
         <div className="h-8 w-56 animate-pulse rounded bg-muted" />
         <div className="h-4 w-72 animate-pulse rounded bg-muted" />

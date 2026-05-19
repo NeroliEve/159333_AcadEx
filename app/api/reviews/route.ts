@@ -4,6 +4,8 @@ import {
   getMarketplaceSuspendedResponse,
   getViewerAccessContext,
 } from "@/lib/admin";
+import { canReviewTransactionStatus } from "@/lib/exchange-flow";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function POST(request: Request) {
   const { profile, supabase, userId } = await getViewerAccessContext();
@@ -31,25 +33,30 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "You can't review yourself." }, { status: 400 });
   }
 
-  // Verify the transaction exists, is completed, and the reviewer is a participant
+  // Verify the transaction exists, is reviewable, and the reviewer is a participant
   const { data: transaction } = await supabase
     .from("transactions")
-    .select("id, buyer_id, seller_id, status")
+    .select("id, buyer_id, seller_id, status, reservation_confirmed_at")
     .eq("id", transactionId)
     .maybeSingle();
 
   if (!transaction) {
     return NextResponse.json({ error: "Transaction not found." }, { status: 404 });
   }
-  if (transaction.status !== "completed") {
-    return NextResponse.json({ error: "You can only review a completed transaction." }, { status: 400 });
+  if (!canReviewTransactionStatus(transaction.status, transaction.reservation_confirmed_at)) {
+    return NextResponse.json(
+      { error: "You can only review a completed or cancelled transaction." },
+      { status: 400 },
+    );
   }
   if (userId !== transaction.buyer_id && userId !== transaction.seller_id) {
     return NextResponse.json({ error: "You are not part of this transaction." }, { status: 403 });
   }
 
-  // Upsert so editing a review works without hitting the unique constraint
-  const { error } = await supabase
+  // Upsert with the service role after validating the user/transaction above.
+  // This avoids stale RLS policy rules blocking accepted-cancelled reviews.
+  const adminSupabase = createAdminClient();
+  const { error } = await adminSupabase
     .from("reviews")
     .upsert(
       {

@@ -4,7 +4,7 @@ import { nzdToMinorUnits } from "@/lib/payments";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type FulfillmentResult =
-  | { status: "paid"; transactionId: string }
+  | { conversationId: string | null; status: "paid"; transactionId: string }
   | { reason: string; status: "ignored" | "failed" };
 
 function getPaymentIntentId(session: Stripe.Checkout.Session) {
@@ -32,7 +32,7 @@ export async function fulfillCheckoutSession(
   const supabase = createAdminClient();
   const { data: transaction, error } = await supabase
     .from("transactions")
-    .select("id, agreed_price, seller_id, payment_status, stripe_checkout_session_id")
+    .select("id, agreed_price, conversation_id, seller_id, payment_status, stripe_checkout_session_id")
     .eq("id", transactionId)
     .maybeSingle();
 
@@ -41,7 +41,11 @@ export async function fulfillCheckoutSession(
   }
 
   if (transaction.payment_status === "paid") {
-    return { status: "paid", transactionId: transaction.id };
+    return {
+      conversationId: transaction.conversation_id,
+      status: "paid",
+      transactionId: transaction.id,
+    };
   }
 
   if (
@@ -104,5 +108,9 @@ export async function fulfillCheckoutSession(
     return { reason: walletError.message, status: "failed" };
   }
 
-  return { status: "paid", transactionId: transaction.id };
+  return {
+    conversationId: transaction.conversation_id,
+    status: "paid",
+    transactionId: transaction.id,
+  };
 }

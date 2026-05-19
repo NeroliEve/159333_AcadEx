@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getViewerAccessContext } from "@/lib/admin";
+import { canReviewTransactionStatus } from "@/lib/exchange-flow";
 
 export async function GET() {
   const { profile, supabase, userId } = await getViewerAccessContext();
@@ -16,11 +17,15 @@ export async function GET() {
 
   // Count transactions involving the viewer where the last update happened
   // after the viewer last opened their transactions list.
-  const { count } = await supabase
+  const { data } = await supabase
     .from("transactions")
-    .select("id", { count: "exact", head: true })
+    .select("id, status, reservation_confirmed_at")
     .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`)
     .gt("updated_at", seenAt);
 
-  return NextResponse.json({ count: count ?? 0 });
+  const count = (data ?? []).filter((tx) =>
+    canReviewTransactionStatus(tx.status, tx.reservation_confirmed_at),
+  ).length;
+
+  return NextResponse.json({ count });
 }

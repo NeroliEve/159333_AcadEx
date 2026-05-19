@@ -4,7 +4,20 @@ import {
   getMarketplaceSuspendedResponse,
   getViewerAccessContext,
 } from "@/lib/admin";
-import { canCompleteTransaction } from "@/lib/payments";
+import { canCancelAcceptedTransaction } from "@/lib/exchange-flow";
+import { getCompletedListingArchiveUpdate, getListingStatusUpdate } from "@/lib/listing-archive";
+import { canCompleteTransaction, canRequestSellerPayment } from "@/lib/payments";
+
+const CONVERSATION_CLOSE_HOURS = 24;
+
+function getConversationCloseTimestamp(now = new Date()) {
+  const closeAfter = new Date(now);
+  closeAfter.setHours(closeAfter.getHours() + CONVERSATION_CLOSE_HOURS);
+
+  return {
+    close_after: closeAfter.toISOString(),
+  };
+}
 
 export async function PATCH(
   request: Request,
@@ -21,15 +34,17 @@ export async function PATCH(
     return getMarketplaceSuspendedResponse("update transactions");
   }
 
-  const { action } = await request.json() as { action: "accept" | "complete" | "cancel" };
+  const { action } = await request.json() as {
+    action: "accept" | "decline" | "request_payment" | "complete" | "cancel";
+  };
 
-  if (!["accept", "complete", "cancel"].includes(action)) {
+  if (!["accept", "decline", "request_payment", "complete", "cancel"].includes(action)) {
     return NextResponse.json({ error: "Invalid action." }, { status: 400 });
   }
 
   const { data: transaction } = await supabase
     .from("transactions")
-    .select("id, listing_id, offered_listing_id, buyer_id, seller_id, status, reservation_confirmed_at, payment_status")
+    .select("id, listing_id, offered_listing_id, conversation_id, buyer_id, seller_id, status, reservation_confirmed_at, payment_status")
     .eq("id", id)
     .maybeSingle();
 
@@ -51,6 +66,21 @@ export async function PATCH(
     return NextResponse.json({ error: "Only the seller can perform this action." }, { status: 403 });
   }
 
+  if (action === "request_payment") {
+    const eligibility = canRequestSellerPayment(transaction, userId);
+    if (!eligibility.eligible) {
+      return NextResponse.json({ error: eligibility.reason }, { status: 403 });
+    }
+  }
+
+  if (action === "decline" && !isSeller) {
+    return NextResponse.json({ error: "Only the seller can decline requests." }, { status: 403 });
+  }
+
+  if ((action === "accept" || action === "decline") && transaction.reservation_confirmed_at) {
+    return NextResponse.json({ error: "This request has already been accepted." }, { status: 400 });
+  }
+
   if (action === "complete" && !canCompleteTransaction(transaction)) {
     return NextResponse.json(
       { error: "The buyer must complete Stripe payment before this sale can be marked completed." },
@@ -58,13 +88,21 @@ export async function PATCH(
     );
   }
 
-  if (
-    action === "cancel" &&
-    !transaction.offered_listing_id &&
-    transaction.payment_status === "paid"
-  ) {
+  if (action === "complete" && !transaction.reservation_confirmed_at) {
     return NextResponse.json(
-      { error: "Paid demo transactions cannot be cancelled." },
+      { error: "The seller must accept this request before it can be completed." },
+      { status: 400 },
+    );
+  }
+
+  if (action === "cancel" && !canCancelAcceptedTransaction({
+    offeredListingId: transaction.offered_listing_id,
+    paymentStatus: transaction.payment_status,
+    reservationConfirmedAt: transaction.reservation_confirmed_at,
+    status: transaction.status,
+  })) {
+    return NextResponse.json(
+      { error: "Only accepted unpaid sales or active trades can be cancelled." },
       { status: 400 },
     );
   }
@@ -77,11 +115,13 @@ export async function PATCH(
     const [{ error: txError }, { error: listingError }] = await Promise.all([
       supabase.from("transactions").update({
         payment_status: transaction.offered_listing_id ? "not_required" : "unpaid",
+        payment_requested_at: null,
+        payment_requested_by: null,
         status: "pending",
         reservation_confirmed_at: now,
         updated_at: now,
       }).eq("id", id),
-      supabase.from("listings").update({ status: "pending" }).in("id", listingIds),
+      supabase.from("listings").update(getListingStatusUpdate("pending", now)).in("id", listingIds),
     ]);
 
     if (txError || listingError) {
@@ -106,7 +146,38 @@ export async function PATCH(
     }
   }
 
+  if (action === "request_payment") {
+    const { error: txError } = await supabase
+      .from("transactions")
+      .update({
+        payment_requested_at: now,
+        payment_requested_by: userId,
+        updated_at: now,
+      })
+      .eq("id", id);
+
+    if (txError) {
+      return NextResponse.json({ error: txError.message }, { status: 500 });
+    }
+  }
+
+  if (action === "decline") {
+    const { error: txError } = await supabase
+      .from("transactions")
+      .update({
+        status: "declined",
+        declined_at: now,
+        updated_at: now,
+      })
+      .eq("id", id);
+
+    if (txError) {
+      return NextResponse.json({ error: txError.message }, { status: 500 });
+    }
+  }
+
   if (action === "complete") {
+    const closeConversation = getConversationCloseTimestamp(new Date(now));
     const [{ error: txError }, { error: listingError }] = await Promise.all([
       supabase.from("transactions").update({
         status: "completed",
@@ -114,7 +185,10 @@ export async function PATCH(
         completed_at: now,
         updated_at: now,
       }).eq("id", id),
-      supabase.from("listings").update({ status: "sold" }).in("id", listingIds),
+      supabase.from("listings").update(getCompletedListingArchiveUpdate(now)).in("id", listingIds),
+      transaction.conversation_id
+        ? supabase.from("conversations").update(closeConversation).eq("id", transaction.conversation_id)
+        : Promise.resolve({ error: null }),
     ]);
 
     if (txError || listingError) {
@@ -123,6 +197,7 @@ export async function PATCH(
   }
 
   if (action === "cancel") {
+    const closeConversation = getConversationCloseTimestamp(new Date(now));
     const { error: txError } = await supabase
       .from("transactions")
       .update({ status: "cancelled", cancelled_at: now, updated_at: now })
@@ -136,8 +211,15 @@ export async function PATCH(
     if (transaction.reservation_confirmed_at) {
       await supabase
         .from("listings")
-        .update({ status: "available" })
+        .update(getListingStatusUpdate("available", now))
         .in("id", listingIds);
+    }
+
+    if (transaction.conversation_id) {
+      await supabase
+        .from("conversations")
+        .update(closeConversation)
+        .eq("id", transaction.conversation_id);
     }
   }
 

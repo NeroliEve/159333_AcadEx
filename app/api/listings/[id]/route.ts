@@ -1,9 +1,17 @@
 import { NextResponse } from "next/server";
 
+import { apiError, apiSuccess } from "@/lib/api";
 import {
   getMarketplaceSuspendedResponse,
   getViewerAccessContext,
 } from "@/lib/admin";
+import { canViewArchivedListing } from "@/lib/listing-archive";
+import {
+  getListingById,
+  getListingRequestState,
+  getListingTransactionParticipantIds,
+  getMyAvailableListings,
+} from "@/lib/marketplace";
 
 type UpdateListingResponse = {
   fieldErrors?: Partial<Record<FieldName, string>>;
@@ -40,6 +48,77 @@ function getImageUrls(body: Record<string, unknown>) {
 
   const imageUrl = str(body.imageUrl);
   return imageUrl ? [imageUrl] : [];
+}
+
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const { id } = await params;
+    const [{ profile, userId }, { listing, error }] = await Promise.all([
+      getViewerAccessContext(),
+      getListingById(id),
+    ]);
+
+    if (error || !listing) {
+      return NextResponse.json(apiError(error ?? "Listing not found."), { status: 404 });
+    }
+
+    const isSuspended = profile?.account_status === "suspended";
+    const isOwner = userId === listing.seller_id;
+    const isAdmin = profile?.role === "admin" && !isSuspended;
+    const isArchived = listing.status === "archived" || !!listing.archived_at;
+
+    if (isArchived) {
+      const participantIds = await getListingTransactionParticipantIds(id);
+      const canViewArchived = canViewArchivedListing({
+        isAdmin,
+        participantIds,
+        sellerId: listing.seller_id,
+        viewerId: userId,
+      });
+
+      if (!canViewArchived) {
+        return NextResponse.json(apiError("Listing not found."), { status: 404 });
+      }
+    }
+
+    const canTrade =
+      listing.listing_type === "trade_only" ||
+      listing.listing_type === "sale_or_trade";
+    const requestState =
+      userId && !isOwner ? await getListingRequestState(id, userId) : null;
+    const offerableListings =
+      canTrade && userId && !isOwner && !isSuspended && listing.status === "available"
+        ? (await getMyAvailableListings(userId)).filter((entry) => entry.id !== listing.id)
+        : [];
+
+    return NextResponse.json(
+      apiSuccess({
+        existingTransaction: requestState?.pendingTransaction ?? null,
+        isAdmin,
+        isOwner,
+        isSuspended,
+        listing,
+        offerableListings,
+        requestState,
+        viewer: profile
+          ? {
+              account_status: profile.account_status,
+              id: profile.id,
+              role: profile.role,
+            }
+          : null,
+        viewerId: userId,
+      }),
+    );
+  } catch (error) {
+    return NextResponse.json(
+      apiError(error instanceof Error ? error.message : "Could not load listing."),
+      { status: 500 },
+    );
+  }
 }
 
 export async function PATCH(

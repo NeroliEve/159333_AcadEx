@@ -4,6 +4,7 @@ import {
   getMarketplaceSuspendedResponse,
   getViewerAccessContext,
 } from "@/lib/admin";
+import { canSendConversationMessage } from "@/lib/exchange-flow";
 import { MAX_MESSAGE_LENGTH, MESSAGE_SELECT } from "@/lib/messages";
 
 type MessageRouteContext = {
@@ -50,7 +51,7 @@ export async function POST(
 
   const { data: conversation } = await supabase
     .from("conversations")
-    .select("id, buyer_id, seller_id")
+    .select("id, buyer_id, seller_id, archived_at")
     .eq("id", id)
     .maybeSingle();
 
@@ -58,6 +59,36 @@ export async function POST(
     return NextResponse.json(
       { error: "Conversation not found." },
       { status: 404 },
+    );
+  }
+
+  if (conversation.buyer_id !== userId && conversation.seller_id !== userId) {
+    return NextResponse.json(
+      { error: "You are not part of this conversation." },
+      { status: 403 },
+    );
+  }
+
+  const { data: transaction } = await supabase
+    .from("transactions")
+    .select("id, status, reservation_confirmed_at")
+    .eq("conversation_id", id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!canSendConversationMessage({
+    archivedAt: conversation.archived_at,
+    transaction: transaction
+      ? {
+          reservationConfirmedAt: transaction.reservation_confirmed_at,
+          status: transaction.status,
+        }
+      : null,
+  })) {
+    return NextResponse.json(
+      { error: "Chat opens after the seller accepts and closes when the transaction ends." },
+      { status: 403 },
     );
   }
 
@@ -94,6 +125,11 @@ export async function POST(
       { status: 500 },
     );
   }
+
+  await supabase
+    .from("conversations")
+    .update({ last_message_at: message.created_at })
+    .eq("id", id);
 
   return NextResponse.json({ message });
 }

@@ -39,7 +39,7 @@ async function CreateListingPageContent() {
             <Link href="/auth/sign-up">Create account</Link>
           </PillButton>
           <PillButton asChild variant="secondary">
-            <Link href="/home">Browse books</Link>
+            <Link href="/browse">Browse books</Link>
           </PillButton>
         </div>
       </section>

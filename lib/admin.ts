@@ -60,6 +60,7 @@ export type AdminUserRecord = AdminUserBase;
 
 export type AdminListingRecord = Pick<
   TableRow<"listings">,
+  | "archived_at"
   | "condition"
   | "created_at"
   | "deleted_at"
@@ -128,6 +129,11 @@ export type AdminWorkspaceData = {
   users: AdminUserRecord[];
 };
 
+export type AdminOverviewData = {
+  newestPendingReports: AdminReportRecord[];
+  overview: AdminOverviewStats;
+};
+
 const VIEWER_PROFILE_SELECT =
   "account_status, avatar_url, bio, email, first_name, id, is_verified, last_name, role, suspended_at, transactions_seen_at, university, university_id, username";
 const ADMIN_USER_SELECT =
@@ -135,6 +141,7 @@ const ADMIN_USER_SELECT =
 const ADMIN_LISTING_SELECT = `
   id,
   condition,
+  archived_at,
   created_at,
   deleted_at,
   listing_type,
@@ -347,10 +354,34 @@ export async function getAdminWorkspaceData(
     throw new Error(firstError.message);
   }
 
+  const reportsWithContext = await getReportsWithMessageContext(
+    supabase,
+    (reports ?? []) as unknown as AdminReportRecord[],
+  );
+
+  return {
+    auditLogs: (auditLogs ?? []) as unknown as AdminAuditRecord[],
+    listings: (listings ?? []) as unknown as AdminListingRecord[],
+    overview: {
+      activeAdmins: activeAdminsCount ?? 0,
+      hiddenListings: hiddenListingsCount ?? 0,
+      pendingReports: pendingReportsCount ?? 0,
+      suspendedUsers: suspendedUsersCount ?? 0,
+      unverifiedUsers: unverifiedUsersCount ?? 0,
+    },
+    reports: reportsWithContext,
+    users: (users ?? []) as unknown as AdminUserRecord[],
+  };
+}
+
+async function getReportsWithMessageContext(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  reports: AdminReportRecord[],
+) {
   // For every report against a message, fetch the 2 messages before and 2 after
   // from the same conversation so admins can read the surrounding context.
-  const reportsWithContext = await Promise.all(
-    ((reports ?? []) as unknown as AdminReportRecord[]).map(async (report) => {
+  return Promise.all(
+    reports.map(async (report) => {
       const reportedMessage = report.reportedMessage;
       if (!reportedMessage?.conversation_id || !reportedMessage?.created_at) {
         return report;
@@ -382,10 +413,63 @@ export async function getAdminWorkspaceData(
       };
     }),
   );
+}
+
+export async function getAdminOverviewData(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<AdminOverviewData> {
+  const [
+    { data: newestPendingReports, error: reportsError },
+    { count: suspendedUsersCount, error: suspendedUsersError },
+    { count: unverifiedUsersCount, error: unverifiedUsersError },
+    { count: pendingReportsCount, error: pendingReportsError },
+    { count: hiddenListingsCount, error: hiddenListingsError },
+    { count: activeAdminsCount, error: activeAdminsError },
+  ] = await Promise.all([
+    supabase
+      .from("reports")
+      .select(ADMIN_REPORT_SELECT)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false })
+      .limit(5),
+    supabase
+      .from("profiles")
+      .select("id", { count: "exact", head: true })
+      .eq("account_status", "suspended"),
+    supabase
+      .from("profiles")
+      .select("id", { count: "exact", head: true })
+      .eq("is_verified", false),
+    supabase
+      .from("reports")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending"),
+    supabase
+      .from("listings")
+      .select("id", { count: "exact", head: true })
+      .not("deleted_at", "is", null),
+    supabase
+      .from("profiles")
+      .select("id", { count: "exact", head: true })
+      .eq("role", "admin")
+      .eq("account_status", "active"),
+  ]);
+
+  const firstError = [
+    reportsError,
+    suspendedUsersError,
+    unverifiedUsersError,
+    pendingReportsError,
+    hiddenListingsError,
+    activeAdminsError,
+  ].find(Boolean);
+
+  if (firstError) {
+    throw new Error(firstError.message);
+  }
 
   return {
-    auditLogs: (auditLogs ?? []) as unknown as AdminAuditRecord[],
-    listings: (listings ?? []) as unknown as AdminListingRecord[],
+    newestPendingReports: (newestPendingReports ?? []) as unknown as AdminReportRecord[],
     overview: {
       activeAdmins: activeAdminsCount ?? 0,
       hiddenListings: hiddenListingsCount ?? 0,
@@ -393,7 +477,60 @@ export async function getAdminWorkspaceData(
       suspendedUsers: suspendedUsersCount ?? 0,
       unverifiedUsers: unverifiedUsersCount ?? 0,
     },
-    reports: reportsWithContext,
-    users: (users ?? []) as unknown as AdminUserRecord[],
   };
+}
+
+export async function getAdminUsersData(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+) {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select(ADMIN_USER_SELECT)
+    .order("updated_at", { ascending: false })
+    .limit(200);
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as unknown as AdminUserRecord[];
+}
+
+export async function getAdminListingsData(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+) {
+  const { data, error } = await supabase
+    .from("listings")
+    .select(ADMIN_LISTING_SELECT)
+    .order("updated_at", { ascending: false })
+    .limit(200);
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as unknown as AdminListingRecord[];
+}
+
+export async function getAdminReportsData(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+) {
+  const { data, error } = await supabase
+    .from("reports")
+    .select(ADMIN_REPORT_SELECT)
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (error) throw new Error(error.message);
+  return getReportsWithMessageContext(
+    supabase,
+    (data ?? []) as unknown as AdminReportRecord[],
+  );
+}
+
+export async function getAdminAuditLogsData(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+) {
+  const { data, error } = await supabase
+    .from("admin_action_logs")
+    .select(ADMIN_AUDIT_LOG_SELECT)
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as unknown as AdminAuditRecord[];
 }

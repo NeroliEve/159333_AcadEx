@@ -43,12 +43,12 @@ export function AiSearchBar() {
       // Build URL params from the filters Claude extracted
       const params = new URLSearchParams(data.filters ?? {});
 
-      // Pass the explanation through the URL so the home page can display it
+      // Pass the explanation through the URL so the browse page can display it
       if (data.explanation) {
         params.set("_ai", data.explanation);
       }
 
-      router.push(`/home?${params.toString()}`);
+      router.push(`/browse?${params.toString()}`);
     } catch {
       setError("AI search is unavailable right now.");
     } finally {

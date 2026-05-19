@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 
 import { SignUpForm } from "@/components/sign-up-form";
+import { getDegreeOptions, getUniversityOptions } from "@/lib/marketplace";
 import { createClient } from "@/lib/supabase/server";
 import { hasEnvVars } from "@/lib/utils";
 
@@ -14,9 +15,14 @@ async function SignUpContent() {
     }
   }
 
+  const [degrees, universities] = await Promise.all([
+    getDegreeOptions(),
+    getUniversityOptions(),
+  ]);
+
   return (
-    <div className="w-full max-w-md">
-      <SignUpForm />
+    <div className="w-full max-w-lg">
+      <SignUpForm degrees={degrees} universities={universities} />
     </div>
   );
 }

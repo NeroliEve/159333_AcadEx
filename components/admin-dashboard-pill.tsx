@@ -7,14 +7,14 @@ import { PillButton } from "@/components/ui/pill-button";
 import { createClient } from "@/lib/supabase/client";
 
 type AdminDashboardPillProps = {
-  initialPendingReportCount: number;
+  initialPendingReportCount?: number;
 };
 
 function formatCount(count: number) {
   return count > 99 ? "99+" : count.toString();
 }
 
-export function AdminDashboardPill({ initialPendingReportCount }: AdminDashboardPillProps) {
+export function AdminDashboardPill({ initialPendingReportCount = 0 }: AdminDashboardPillProps) {
   const [count, setCount] = useState(initialPendingReportCount);
 
   useEffect(() => {
@@ -47,6 +47,8 @@ export function AdminDashboardPill({ initialPendingReportCount }: AdminDashboard
       }
     }
 
+    void refreshCount();
+
     return () => {
       isMounted = false;
       void supabase.removeChannel(channel);
@@ -56,7 +58,7 @@ export function AdminDashboardPill({ initialPendingReportCount }: AdminDashboard
   return (
     <div className="relative">
       <PillButton asChild size="sm" variant="secondary">
-        <Link href="/admin">Admin dashboard</Link>
+        <Link href="/admin?tab=overview">Admin dashboard</Link>
       </PillButton>
       {count > 0 ? (
         <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">

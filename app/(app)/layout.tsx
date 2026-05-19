@@ -1,7 +1,11 @@
 import { BrandTitle } from "@/components/brand-title";
 import { SiteHeader } from "@/components/site-header";
 import { ThemePicker } from "@/components/theme-picker";
+import { getViewerContext } from "@/lib/marketplace";
+import { isProfileComplete } from "@/lib/profile-completion";
+import { headers } from "next/headers";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
 function HeaderFallback() {
@@ -17,7 +21,38 @@ function HeaderFallback() {
   );
 }
 
-export default async function AppLayout({
+function MainFallback() {
+  return (
+    <main className="mx-auto flex w-full max-w-5xl flex-col px-6 py-12">
+      <div className="h-72 animate-pulse rounded-2xl border border-border/70 bg-muted/40" />
+    </main>
+  );
+}
+
+async function ProfileCompletionGate({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  const [requestHeaders, { profile }] = await Promise.all([
+    headers(),
+    getViewerContext(),
+  ]);
+  const pathname = requestHeaders.get("x-pathname") ?? "";
+  const isCompletingProfile = pathname.startsWith("/profile/edit");
+
+  if (profile && !isProfileComplete(profile) && !isCompletingProfile) {
+    redirect("/profile/edit?complete=1");
+  }
+
+  return (
+    <main className="mx-auto flex w-full max-w-5xl flex-col px-6 py-12">
+      {children}
+    </main>
+  );
+}
+
+export default function AppLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
@@ -27,9 +62,9 @@ export default async function AppLayout({
       <Suspense fallback={<HeaderFallback />}>
         <SiteHeader />
       </Suspense>
-      <main className="mx-auto flex w-full max-w-5xl flex-col px-6 py-12">
-        {children}
-      </main>
+      <Suspense fallback={<MainFallback />}>
+        <ProfileCompletionGate>{children}</ProfileCompletionGate>
+      </Suspense>
     </div>
   );
 }

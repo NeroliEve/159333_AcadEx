@@ -16,6 +16,7 @@ async function CheckoutSuccessContent({
   const { session_id: sessionId } = await searchParams;
   let title = "Payment status unavailable";
   let message = "Stripe did not send a checkout session ID back to AcadEx.";
+  let conversationId: string | null = null;
 
   if (sessionId) {
     try {
@@ -26,6 +27,7 @@ async function CheckoutSuccessContent({
       if (result.status === "paid") {
         title = "Payment successful";
         message = "The seller's demo wallet has been credited for this order.";
+        conversationId = result.conversationId;
       } else {
         title = "Payment not completed";
         message = result.reason;
@@ -47,8 +49,16 @@ async function CheckoutSuccessContent({
       </div>
 
       <div className="flex flex-wrap gap-3">
+        {conversationId ? (
+          <Link
+            className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:opacity-90"
+            href={`/messages/${conversationId}`}
+          >
+            Return to conversation
+          </Link>
+        ) : null}
         <Link
-          className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:opacity-90"
+          className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
           href="/profile/transactions"
         >
           View transactions
@@ -67,6 +77,7 @@ async function CheckoutSuccessContent({
 function CheckoutSuccessFallback() {
   return (
     <section className="mx-auto max-w-2xl space-y-4 rounded-xl border border-border/70 bg-card p-8">
+      <p className="text-sm text-muted-foreground">Loading payment status</p>
       <div className="h-4 w-32 animate-pulse rounded bg-muted" />
       <div className="h-9 w-64 animate-pulse rounded bg-muted" />
       <div className="h-4 w-full animate-pulse rounded bg-muted" />

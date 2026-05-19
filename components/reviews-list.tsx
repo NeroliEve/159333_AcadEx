@@ -50,7 +50,7 @@ function ReviewCard({ review }: { review: ReviewData }) {
     ? `${reviewer.first_name ?? ""} ${reviewer.last_name ?? ""}`.trim() || reviewer.username
     : "Anonymous";
   const roleLabel =
-    review.reviewer_role === "buyer" ? "Bought from this seller" : "Sold to this seller";
+    review.reviewer_role === "buyer" ? "Bought from this user" : "Sold to this user";
 
   return (
     <div className="rounded-xl border border-border/70 bg-card p-5 space-y-3">

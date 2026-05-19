@@ -83,7 +83,7 @@ export function RequestToTradeButton({
           Trade request sent
         </div>
         <p className="text-xs text-muted-foreground text-center">
-          The seller has been notified. You can continue in the conversation thread.
+          The seller has been notified. Chat opens after they accept.
         </p>
         {activeConversationId ? (
           <Link

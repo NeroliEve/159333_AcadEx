@@ -20,15 +20,50 @@ type ConversationListing = Pick<
   "id" | "primary_image_url" | "status" | "title"
 >;
 
+export type ConversationTransaction = {
+  id: string;
+  agreed_price: number | null;
+  agreed_trade_text: string | null;
+  buyer_id: string;
+  cancelled_at: string | null;
+  completed_at: string | null;
+  conversation_id: string | null;
+  declined_at: string | null;
+  listing_id: string;
+  offered_listing_id: string | null;
+  paid_at: string | null;
+  payment_status: TableRow<"transactions">["payment_status"];
+  payment_requested_at: string | null;
+  payment_requested_by: string | null;
+  reservation_confirmed_at: string | null;
+  request_message: string | null;
+  seller_id: string;
+  status: TableRow<"transactions">["status"];
+  offered_listing: ConversationListing | null;
+};
+
 export type ConversationMessage = TableRow<"messages"> & {
   sender: ConversationParticipant | null;
 };
 
+export type ConversationReview = Pick<
+  TableRow<"reviews">,
+  "comment" | "rating"
+> | null;
+
 type ConversationRow = Pick<
   TableRow<"conversations">,
-  "buyer_id" | "created_at" | "id" | "last_message_at" | "listing_id" | "seller_id"
+  | "archived_at"
+  | "buyer_id"
+  | "created_at"
+  | "delete_after"
+  | "id"
+  | "last_message_at"
+  | "listing_id"
+  | "seller_id"
 > & {
   buyer: ConversationParticipant | null;
+  close_after?: string | null;
   listing: ConversationListing | null;
   seller: ConversationParticipant | null;
 };
@@ -36,11 +71,13 @@ type ConversationRow = Pick<
 export type ConversationSummary = ConversationRow & {
   latestMessage: ConversationMessage | null;
   otherParticipant: ConversationParticipant | null;
+  transaction: ConversationTransaction | null;
   unreadCount: number;
 };
 
 export type ConversationDetail = ConversationSummary & {
   messages: ConversationMessage[];
+  viewerReview: ConversationReview;
 };
 
 const CONVERSATION_PARTICIPANT_SELECT = `
@@ -59,7 +96,9 @@ const CONVERSATION_SELECT = `
   buyer_id,
   seller_id,
   listing_id,
+  archived_at,
   created_at,
+  delete_after,
   last_message_at,
   listing:listings!conversations_listing_id_fkey(id, primary_image_url, status, title),
   buyer:profiles!conversations_buyer_id_fkey(${CONVERSATION_PARTICIPANT_SELECT}),
@@ -74,6 +113,48 @@ export const MESSAGE_SELECT = `
   is_read,
   sender_id,
   sender:profiles!messages_sender_id_fkey(${CONVERSATION_PARTICIPANT_SELECT})
+`;
+
+const CONVERSATION_TRANSACTION_SELECT = `
+  id,
+  agreed_price,
+  agreed_trade_text,
+  buyer_id,
+  cancelled_at,
+  completed_at,
+  conversation_id,
+  declined_at,
+  listing_id,
+  offered_listing_id,
+  paid_at,
+  payment_status,
+  payment_requested_at,
+  payment_requested_by,
+  reservation_confirmed_at,
+  request_message,
+  seller_id,
+  status,
+  offered_listing:listings!transactions_offered_listing_id_fkey(id, primary_image_url, status, title)
+`;
+
+const LEGACY_CONVERSATION_TRANSACTION_SELECT = `
+  id,
+  agreed_price,
+  agreed_trade_text,
+  buyer_id,
+  cancelled_at,
+  completed_at,
+  conversation_id,
+  declined_at,
+  listing_id,
+  offered_listing_id,
+  paid_at,
+  payment_status,
+  reservation_confirmed_at,
+  request_message,
+  seller_id,
+  status,
+  offered_listing:listings!transactions_offered_listing_id_fkey(id, primary_image_url, status, title)
 `;
 
 function getOtherParticipant(
@@ -111,11 +192,13 @@ function toConversationSummary(
   viewerId: string,
   latestByConversation: Map<string, ConversationMessage>,
   unreadCounts: Map<string, number>,
+  transactionByConversation: Map<string, ConversationTransaction>,
 ): ConversationSummary {
   return {
     ...conversation,
     latestMessage: latestByConversation.get(conversation.id) ?? null,
     otherParticipant: getOtherParticipant(conversation, viewerId),
+    transaction: transactionByConversation.get(conversation.id) ?? null,
     unreadCount: unreadCounts.get(conversation.id) ?? 0,
   };
 }
@@ -129,16 +212,69 @@ function sortConversations<T extends ConversationRow>(conversations: T[]) {
   });
 }
 
+async function getLatestTransactionsByConversation(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  conversationIds: string[],
+) {
+  const transactionByConversation = new Map<string, ConversationTransaction>();
+
+  if (conversationIds.length === 0) return transactionByConversation;
+
+  const result = await supabase
+    .from("transactions")
+    .select(CONVERSATION_TRANSACTION_SELECT)
+    .in("conversation_id", conversationIds)
+    .order("created_at", { ascending: false });
+  let data = result.data as unknown[] | null;
+  let error = result.error;
+
+  if (error) {
+    const legacyResult = await supabase
+      .from("transactions")
+      .select(LEGACY_CONVERSATION_TRANSACTION_SELECT)
+      .in("conversation_id", conversationIds)
+      .order("created_at", { ascending: false });
+
+    data = legacyResult.data as unknown[] | null;
+    error = legacyResult.error;
+  }
+
+  if (error) return transactionByConversation;
+
+  const transactions = ((data ?? []) as unknown as ConversationTransaction[]).map(
+    (transaction) => ({
+      ...transaction,
+      payment_requested_at: transaction.payment_requested_at ?? null,
+      payment_requested_by: transaction.payment_requested_by ?? null,
+    }),
+  );
+
+  for (const transaction of transactions) {
+    if (transaction.conversation_id && !transactionByConversation.has(transaction.conversation_id)) {
+      transactionByConversation.set(transaction.conversation_id, transaction);
+    }
+  }
+
+  return transactionByConversation;
+}
+
 export async function getMyConversationSummaries(
   viewerId: string,
+  options: { archived?: boolean } = {},
 ): Promise<ConversationSummary[]> {
   if (!hasEnvVars) return [];
 
   const supabase = await createClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("conversations")
     .select(CONVERSATION_SELECT)
     .or(`buyer_id.eq.${viewerId},seller_id.eq.${viewerId}`);
+
+  query = options.archived
+    ? query.not("archived_at", "is", null)
+    : query.is("archived_at", null);
+
+  const { data, error } = await query;
 
   if (error || !data || data.length === 0) return [];
 
@@ -169,9 +305,19 @@ export async function getMyConversationSummaries(
 
   const messages = (messageData ?? []) as unknown as ConversationMessage[];
   const { latestByConversation, unreadCounts } = buildMessageMaps(messages, viewerId);
+  const transactionByConversation = await getLatestTransactionsByConversation(
+    supabase,
+    conversationIds,
+  );
 
   return conversationRows.map((conversation) =>
-    toConversationSummary(conversation, viewerId, latestByConversation, unreadCounts),
+    toConversationSummary(
+      conversation,
+      viewerId,
+      latestByConversation,
+      unreadCounts,
+      transactionByConversation,
+    ),
   );
 }
 
@@ -184,7 +330,8 @@ export async function getUnreadMessageCount(
   const { data, error } = await supabase
     .from("conversations")
     .select("id, buyer_id, seller_id")
-    .or(`buyer_id.eq.${viewerId},seller_id.eq.${viewerId}`);
+    .or(`buyer_id.eq.${viewerId},seller_id.eq.${viewerId}`)
+    .is("archived_at", null);
 
   if (error || !data || data.length === 0) return 0;
 
@@ -258,13 +405,32 @@ export async function getConversationDetail(
     viewerId,
     latestByConversation,
     unreadCounts,
+    await getLatestTransactionsByConversation(supabase, [conversationId]),
   );
 
   return {
     conversation: {
       ...summary,
       messages,
+      viewerReview: summary.transaction
+        ? await getReviewForConversationTransaction(supabase, summary.transaction.id, viewerId)
+        : null,
     },
     error: null,
   };
+}
+
+async function getReviewForConversationTransaction(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  transactionId: string,
+  reviewerId: string,
+): Promise<ConversationReview> {
+  const { data } = await supabase
+    .from("reviews")
+    .select("rating, comment")
+    .eq("transaction_id", transactionId)
+    .eq("reviewer_id", reviewerId)
+    .maybeSingle();
+
+  return data ?? null;
 }

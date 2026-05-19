@@ -4,6 +4,7 @@ import {
   getMarketplaceSuspendedResponse,
   getViewerAccessContext,
 } from "@/lib/admin";
+import { getListingStatusUpdate } from "@/lib/listing-archive";
 
 export async function POST(
   _request: Request,
@@ -63,7 +64,7 @@ export async function POST(
   if (listingsToRevert.size > 0) {
     await supabase
       .from("listings")
-      .update({ status: "available" })
+      .update(getListingStatusUpdate("available", now))
       .in("id", Array.from(listingsToRevert));
   }
 

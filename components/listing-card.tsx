@@ -6,12 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ListingImageCarousel } from "@/components/listing-image-carousel";
 import { ListingManageMenu } from "@/components/listing-manage-menu";
 import { SaveButton } from "@/components/save-button";
-import {
-  formatListingCondition,
-  formatPrice,
-  getProfileDisplayName,
-  type ListingCardData,
-} from "@/lib/marketplace";
+import type { ListingCardData } from "@/lib/marketplace";
 
 type ListingCardProps = {
   listing: ListingCardData;
@@ -37,6 +32,38 @@ function formatRelativeDate(dateString: string) {
     Math.round(diffInHours / 24),
     "day",
   );
+}
+
+function getProfileDisplayName(
+  profile: ListingCardData["seller"],
+  emailFallback?: string | null,
+) {
+  if (!profile) return emailFallback ?? "Student";
+
+  const fullName = `${profile.first_name} ${profile.last_name}`.trim();
+  if (fullName) return fullName;
+  if (profile.username) return profile.username;
+
+  return emailFallback ?? "Student";
+}
+
+function formatListingCondition(condition: ListingCardData["condition"]) {
+  switch (condition) {
+    case "like_new":
+      return "Like new";
+    default:
+      return `${condition.charAt(0).toUpperCase()}${condition.slice(1)}`;
+  }
+}
+
+function formatPrice(price: number | null) {
+  if (price == null) return "Price on request";
+
+  return new Intl.NumberFormat("en-NZ", {
+    currency: "NZD",
+    maximumFractionDigits: 0,
+    style: "currency",
+  }).format(price);
 }
 
 // Maps listing status to a badge colour class
