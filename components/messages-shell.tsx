@@ -7,7 +7,10 @@ import { usePathname } from "next/navigation";
 import { MessagesProvider, useMessagesContext } from "@/components/messages-context";
 import { Card, CardContent } from "@/components/ui/card";
 import type { ApiResponse } from "@/lib/api";
-import { isUnacceptedBuyRequest } from "@/lib/exchange-flow";
+import {
+  isUnacceptedBuyRequest,
+  isUnacceptedTradeRequest,
+} from "@/lib/exchange-flow";
 import type { ConversationMessage, ConversationSummary } from "@/lib/messages";
 import { cn } from "@/lib/utils";
 
@@ -108,6 +111,16 @@ function MessagesSidebar() {
       reservationConfirmedAt: summary.transaction.reservation_confirmed_at,
       status: summary.transaction.status,
     });
+    const isTradeRequest = !!summary.transaction && isUnacceptedTradeRequest({
+      requestType: summary.transaction.request_type,
+      reservationConfirmedAt: summary.transaction.reservation_confirmed_at,
+      status: summary.transaction.status,
+    });
+    const requestLabel = isBuyRequest
+      ? "Buy request"
+      : isTradeRequest
+        ? "Trade request"
+        : null;
 
     return (
       <Link
@@ -126,10 +139,10 @@ function MessagesSidebar() {
             <p
               className={cn(
                 "truncate text-xs text-muted-foreground",
-                isBuyRequest && "font-semibold text-foreground",
+                requestLabel && "font-semibold text-foreground",
               )}
             >
-              {isBuyRequest ? "Buy request" : participantName}
+              {requestLabel ?? participantName}
             </p>
           </div>
           <div className="shrink-0 text-right">
@@ -143,7 +156,7 @@ function MessagesSidebar() {
             ) : null}
           </div>
         </div>
-        {!isBuyRequest ? (
+        {!requestLabel ? (
           <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
             {getConversationPreview(summary)}
           </p>

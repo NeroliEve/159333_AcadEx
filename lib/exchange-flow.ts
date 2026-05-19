@@ -91,7 +91,7 @@ export function canSendConversationMessage({
     !archivedAt &&
     !!transaction &&
     (
-      transaction.status === "pending" ||
+      (transaction.status === "pending" && !!transaction.reservationConfirmedAt) ||
       transaction.status === "completed" ||
       transaction.status === "cancelled"
     )
@@ -121,6 +121,18 @@ export function isUnacceptedBuyRequest(transaction: {
     !transaction.reservationConfirmedAt &&
     !transaction.offeredListingId &&
     transaction.requestType === "buy"
+  );
+}
+
+export function isUnacceptedTradeRequest(transaction: {
+  requestType: TransactionRequestType;
+  reservationConfirmedAt: string | null;
+  status: ExchangeTransactionStatus;
+}) {
+  return (
+    transaction.status === "pending" &&
+    !transaction.reservationConfirmedAt &&
+    transaction.requestType === "trade"
   );
 }
 

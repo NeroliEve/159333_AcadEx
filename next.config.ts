@@ -21,6 +21,15 @@ const nextConfig: NextConfig = {
         port: "54321",
         protocol: "http",
       },
+      {
+        hostname: "covers.openlibrary.org",
+        pathname: "/b/**",
+        protocol: "https",
+      },
+      {
+        hostname: "i.pravatar.cc",
+        protocol: "https",
+      },
     ],
   },
 };

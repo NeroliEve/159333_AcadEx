@@ -142,3 +142,61 @@ describe("browse query helpers", () => {
     expect(shouldIncludeBrowseMetadata(new URLSearchParams("_metadata=0"))).toBe(false);
   });
 });
+
+describe("getListingRequestState", () => {
+  beforeEach(() => {
+    mockGetUser.mockReset();
+    mockCreateClient.mockReset();
+    vi.resetModules();
+  });
+
+  it("does not treat cancelled transactions as pending request state", async () => {
+    const supabase = {
+      from: vi.fn((table: string) => {
+        if (table === "transactions") {
+          return new MockQuery({
+            data: [
+              {
+                conversation_id: "conversation-cancelled",
+                offered_listing_id: null,
+                request_type: "buy",
+                status: "cancelled",
+              },
+              {
+                conversation_id: "conversation-declined",
+                offered_listing_id: null,
+                request_type: "buy",
+                status: "declined",
+              },
+            ],
+            error: null,
+          });
+        }
+
+        throw new Error(`Unexpected table ${table}`);
+      }),
+    };
+
+    mockCreateClient.mockResolvedValue(supabase);
+
+    const { getListingRequestState } = await import("@/lib/marketplace");
+
+    const state = await getListingRequestState("listing-1", "buyer-1");
+
+    expect(state.pendingTransaction).toBeNull();
+    expect(state.canRequestToBuy).toBe(true);
+    expect(state.buyStatusMessage).toBe("Buy request declined. You can request 2 more times.");
+    expect(state.conversationId).toBe("conversation-declined");
+  });
+});
+
+describe("shouldShowListingRequestActions", () => {
+  it("keeps request actions visible for the buyer's pending transaction after seller acceptance marks the listing pending", async () => {
+    const { shouldShowListingRequestActions } = await import("@/lib/marketplace");
+
+    expect(shouldShowListingRequestActions({
+      hasViewerPendingTransaction: true,
+      listingStatus: "pending",
+    })).toBe(true);
+  });
+});

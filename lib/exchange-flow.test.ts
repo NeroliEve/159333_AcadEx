@@ -9,6 +9,7 @@ import {
   getDeclinedRequestNotice,
   getBuyRequestAttemptState,
   isUnacceptedBuyRequest,
+  isUnacceptedTradeRequest,
   validateTradeRequestMessage,
   validateBuyRequestMessage,
 } from "@/lib/exchange-flow";
@@ -101,7 +102,7 @@ describe("canSendConversationMessage", () => {
     ).toBe(true);
   });
 
-  it("allows chat while a request is still pending seller acceptance", () => {
+  it("rejects chat for unaccepted trade requests", () => {
     expect(
       canSendConversationMessage({
         archivedAt: null,
@@ -111,7 +112,20 @@ describe("canSendConversationMessage", () => {
           status: "pending",
         },
       }),
-    ).toBe(true);
+    ).toBe(false);
+  });
+
+  it("rejects chat for unaccepted buy requests", () => {
+    expect(
+      canSendConversationMessage({
+        archivedAt: null,
+        transaction: {
+          reservationConfirmedAt: null,
+          requestType: "buy",
+          status: "pending",
+        },
+      }),
+    ).toBe(false);
   });
 
   it("rejects chat for archived conversations", () => {
@@ -198,6 +212,34 @@ describe("isUnacceptedBuyRequest", () => {
         requestType: "buy",
         reservationConfirmedAt: null,
         status: "declined",
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("isUnacceptedTradeRequest", () => {
+  it("returns true for pending trade requests awaiting seller acceptance", () => {
+    expect(
+      isUnacceptedTradeRequest({
+        requestType: "trade",
+        reservationConfirmedAt: null,
+        status: "pending",
+      }),
+    ).toBe(true);
+
+    expect(
+      isUnacceptedTradeRequest({
+        requestType: "trade",
+        reservationConfirmedAt: "2026-05-14T00:00:00.000Z",
+        status: "pending",
+      }),
+    ).toBe(false);
+
+    expect(
+      isUnacceptedTradeRequest({
+        requestType: "buy",
+        reservationConfirmedAt: null,
+        status: "pending",
       }),
     ).toBe(false);
   });

@@ -21,6 +21,7 @@ import {
   getMyAvailableListings,
   getProfileDisplayName,
   getViewerContext,
+  shouldShowListingRequestActions,
 } from "@/lib/marketplace";
 import { hasEnvVars } from "@/lib/utils";
 
@@ -100,6 +101,15 @@ async function ListingDetailContent({
   const canBuy = listing.listing_type !== "trade_only";
   const canTrade = isTrade;
   const sellerUniversity = getVisibleSellerUniversity(listing);
+  const hasViewerPendingTransaction = !!requestState?.pendingTransaction;
+  const showRequestActions = !!user && !isOwner && !isSuspended && shouldShowListingRequestActions({
+    hasViewerPendingTransaction,
+    listingStatus: listing.status,
+  });
+  const pendingRequestType = requestState?.pendingTransaction?.request_type ?? null;
+  const showBuyAction = canBuy && (!pendingRequestType || pendingRequestType === "buy");
+  const showTradeAction = canTrade && (!pendingRequestType || pendingRequestType === "trade");
+  const pendingRequestAccepted = !!requestState?.pendingTransaction?.reservation_confirmed_at;
 
   const offerableListings =
     canTrade && user && !isOwner && !isSuspended && listing.status === "available"
@@ -262,30 +272,32 @@ async function ListingDetailContent({
               </div>
 
               <div className="flex flex-col gap-3">
-                {user && !isOwner && !isSuspended && listing.status === "available" ? (
+                {showRequestActions ? (
                   <>
-                    {canBuy ? (
+                    {showBuyAction ? (
                       <RequestToBuyButton
                         conversationId={requestState?.conversationId}
                         canRequest={requestState?.canRequestToBuy ?? true}
                         listingId={listing.id}
-                        hasPendingTransaction={!!requestState?.pendingTransaction}
+                        hasPendingTransaction={hasViewerPendingTransaction}
+                        isAccepted={pendingRequestAccepted}
                         remainingAttempts={requestState?.remainingBuyAttempts ?? 3}
                         statusMessage={requestState?.buyStatusMessage}
                       />
                     ) : null}
-                    {canTrade ? (
+                    {showTradeAction ? (
                       <RequestToTradeButton
                         conversationId={requestState?.pendingTransaction?.conversation_id}
                         listingId={listing.id}
-                        hasPendingTransaction={!!requestState?.pendingTransaction}
+                        hasPendingTransaction={hasViewerPendingTransaction}
+                        isAccepted={pendingRequestAccepted}
                         offerableListings={offerableListings}
                       />
                     ) : null}
                   </>
                 ) : null}
 
-                {!requestState?.pendingTransaction && user && !isOwner && !isSuspended ? (
+                {!hasViewerPendingTransaction && user && !isOwner && !isSuspended ? (
                   <p className="text-sm text-muted-foreground">
                     Messaging opens after you send a request.
                   </p>

@@ -14,4 +14,27 @@ describe("next image configuration", () => {
       ]),
     );
   });
+
+  it("allows Open Library cover image URLs", () => {
+    expect(nextConfig.images?.remotePatterns).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          hostname: "covers.openlibrary.org",
+          pathname: "/b/**",
+          protocol: "https",
+        }),
+      ]),
+    );
+  });
+
+  it("allows Pravatar profile image URLs", () => {
+    expect(nextConfig.images?.remotePatterns).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          hostname: "i.pravatar.cc",
+          protocol: "https",
+        }),
+      ]),
+    );
+  });
 });

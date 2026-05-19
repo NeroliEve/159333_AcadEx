@@ -886,6 +886,16 @@ export type ListingRequestState = {
   conversationId: string | null;
 };
 
+export function shouldShowListingRequestActions({
+  hasViewerPendingTransaction,
+  listingStatus,
+}: {
+  hasViewerPendingTransaction: boolean;
+  listingStatus: PublicEnum<"listing_status">;
+}) {
+  return listingStatus === "available" || hasViewerPendingTransaction;
+}
+
 export async function getListingRequestState(
   listingId: string,
   buyerId: string,

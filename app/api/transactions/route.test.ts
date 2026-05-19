@@ -268,4 +268,49 @@ describe("POST /api/transactions", () => {
     expect(response.status).toBe(409);
     expect(supabase.inserts).toEqual([]);
   });
+
+  it("creates a new conversation when a previous request conversation already exists", async () => {
+    const supabase = createMockSupabase({
+      existingConversation: { id: "conversation-old" },
+      existingTransaction: null,
+      listings: { "listing-sale": saleListing },
+    });
+    mockGetViewerAccessContext.mockResolvedValue({
+      profile: { account_status: "active" },
+      supabase,
+      userId: "buyer-1",
+    });
+
+    const { POST } = await import("@/app/api/transactions/route");
+    const response = await POST(postTransaction({
+      listingId: "listing-sale",
+      requestMessage: "Can I buy this now?",
+    }));
+
+    expect(response.status).toBe(200);
+    expect(supabase.inserts).toContainEqual({
+      table: "conversations",
+      payload: expect.objectContaining({
+        buyer_id: "buyer-1",
+        listing_id: "listing-sale",
+        seller_id: "seller-1",
+      }),
+    });
+    expect(supabase.inserts).toContainEqual({
+      table: "transactions",
+      payload: expect.objectContaining({
+        conversation_id: "conversation-new",
+        request_message: "Can I buy this now?",
+        request_type: "buy",
+      }),
+    });
+    expect(supabase.updates).not.toContainEqual({
+      table: "conversations",
+      payload: expect.objectContaining({
+        archived_at: null,
+        close_after: null,
+        delete_after: null,
+      }),
+    });
+  });
 });

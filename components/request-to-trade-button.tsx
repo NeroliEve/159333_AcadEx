@@ -28,6 +28,7 @@ function formatOfferPrice(entry: OfferableListing) {
 type RequestToTradeButtonProps = {
   listingId: string;
   hasPendingTransaction: boolean;
+  isAccepted?: boolean;
   conversationId?: string | null;
   offerableListings: OfferableListing[];
 };
@@ -35,6 +36,7 @@ type RequestToTradeButtonProps = {
 export function RequestToTradeButton({
   listingId,
   hasPendingTransaction,
+  isAccepted = false,
   conversationId,
   offerableListings,
 }: RequestToTradeButtonProps) {
@@ -83,12 +85,6 @@ export function RequestToTradeButton({
     setActiveConversationId(nextConversationId);
     setIsModalOpen(false);
     setIsLoading(false);
-
-    if (nextConversationId) {
-      router.push(`/messages/${nextConversationId}`);
-      return;
-    }
-
     router.refresh();
   }
 
@@ -96,10 +92,12 @@ export function RequestToTradeButton({
     return (
       <div className="space-y-1">
         <div className="inline-flex h-10 w-full items-center justify-center rounded-md bg-secondary px-4 text-sm font-medium text-secondary-foreground">
-          Trade request sent
+          {isAccepted ? "Trade request accepted" : "Trade request sent"}
         </div>
         <p className="text-center text-xs text-muted-foreground">
-          Continue the conversation with the seller in messages.
+          {isAccepted
+            ? "Chat is open with the seller."
+            : "The seller has been notified. Chat opens after they accept."}
         </p>
         {activeConversationId ? (
           <Link

@@ -121,56 +121,24 @@ export async function POST(request: Request) {
     }
   }
 
-  // Reuse or create the conversation. Race-safe: if SELECT misses and a
-  // concurrent INSERT lands first, the second INSERT hits the unique
-  // constraint and we fall back to fetching the existing one.
-  let conversationId: string;
-
-  const { data: existingConv } = await supabase
+  const { data: newConv, error: convError } = await supabase
     .from("conversations")
+    .insert({
+      listing_id: listingId,
+      buyer_id: userId,
+      seller_id: listing.seller_id,
+    })
     .select("id")
-    .eq("listing_id", listingId)
-    .eq("buyer_id", userId)
-    .eq("seller_id", listing.seller_id)
-    .maybeSingle();
+    .single();
 
-  if (existingConv) {
-    conversationId = existingConv.id;
-    await supabase
-      .from("conversations")
-      .update({ archived_at: null, close_after: null, delete_after: null })
-      .eq("id", conversationId);
-  } else {
-    const { data: newConv, error: convError } = await supabase
-      .from("conversations")
-      .insert({
-        listing_id: listingId,
-        buyer_id: userId,
-        seller_id: listing.seller_id,
-      })
-      .select("id")
-      .single();
-
-    if (newConv) {
-      conversationId = newConv.id;
-    } else {
-      const { data: refetched } = await supabase
-        .from("conversations")
-        .select("id")
-        .eq("listing_id", listingId)
-        .eq("buyer_id", userId)
-        .eq("seller_id", listing.seller_id)
-        .maybeSingle();
-
-      if (!refetched) {
-        return NextResponse.json(
-          { error: convError?.message ?? "Could not create conversation." },
-          { status: 500 },
-        );
-      }
-      conversationId = refetched.id;
-    }
+  if (!newConv) {
+    return NextResponse.json(
+      { error: convError?.message ?? "Could not create conversation." },
+      { status: 500 },
+    );
   }
+
+  const conversationId = newConv.id;
 
   // Listing stays "available" — other buyers can still request it.
   // It only moves to "pending" when the seller accepts one of the requests.
