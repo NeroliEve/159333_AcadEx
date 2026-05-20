@@ -15,6 +15,10 @@ import {
 } from "@/lib/exchange-flow";
 import { isMissingSellerUniversityColumnError } from "@/lib/listing-visibility";
 import { getRecommendedListingsForProfile } from "@/lib/recommendations";
+import {
+  getValidListingSort,
+  type ListingSort,
+} from "@/lib/browse-search";
 
 // ─── Shared types ────────────────────────────────────────────────────────────
 
@@ -286,6 +290,7 @@ export type ListingsFeedFilters = {
   minPrice?: number;
   maxPrice?: number;
   sellerName?: string;
+  sort?: ListingSort;
 };
 
 type BrowseSearchParams =
@@ -344,6 +349,7 @@ export function getListingsFeedFilters(
     minPrice: getBrowseNumberSearchParam(searchParams, "minPrice"),
     maxPrice: getBrowseNumberSearchParam(searchParams, "maxPrice"),
     sellerName: getBrowseSearchParam(searchParams, "sellerName") || undefined,
+    sort: getValidListingSort(getBrowseSearchParam(searchParams, "sort")),
   };
 }
 
@@ -447,9 +453,19 @@ export async function getListingsFeed(
       query = query.lte("price", filters.maxPrice);
     }
 
-    return query
-      .order("created_at", { ascending: false })
-      .limit(limit);
+    if (filters.sort === "price_asc") {
+      query = query
+        .order("price", { ascending: true, nullsFirst: false })
+        .order("created_at", { ascending: false });
+    } else if (filters.sort === "price_desc") {
+      query = query
+        .order("price", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false });
+    } else {
+      query = query.order("created_at", { ascending: false });
+    }
+
+    return query.limit(limit);
   }
 
   let result = await runListingsQuery();

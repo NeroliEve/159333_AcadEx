@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { Input } from "@/components/ui/input";
 import { PillButton } from "@/components/ui/pill-button";
+import { setAiBaseFilterParams } from "@/lib/browse-search";
 
 type AiSearchResponse = {
   status: "success" | "error";
@@ -40,8 +41,11 @@ export function AiSearchBar() {
         return;
       }
 
-      // Build URL params from the filters Claude extracted
-      const params = new URLSearchParams(data.filters ?? {});
+      // Build durable URL params from the filters Claude extracted.
+      const params = new URLSearchParams();
+      params.set("mode", "ai");
+      params.set("aiQuery", query.trim());
+      setAiBaseFilterParams(params, data.filters ?? {});
 
       // Pass the explanation through the URL so the browse page can display it
       if (data.explanation) {

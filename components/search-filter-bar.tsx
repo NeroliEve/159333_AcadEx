@@ -1,11 +1,20 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PillButton } from "@/components/ui/pill-button";
+import {
+  FILTER_PARAM_KEYS,
+  buildClearFiltersHref,
+  buildRemoveFilterHref,
+  buildSearchFilterHref,
+  buildStartOverHref,
+  getValidListingSort,
+} from "@/lib/browse-search";
 import type { CourseOption, StudyAreaOption, UniversityOption } from "@/lib/marketplace";
 
 type SearchFilterBarProps = {
@@ -17,10 +26,32 @@ type SearchFilterBarProps = {
 const PRICE_MIN = 0;
 const PRICE_MAX = 500;
 
+const CONDITION_LABELS: Record<string, string> = {
+  fair: "Fair",
+  good: "Good",
+  like_new: "Like new",
+  new: "New",
+  poor: "Poor",
+};
+
+const LISTING_TYPE_LABELS: Record<string, string> = {
+  sale_only: "For sale",
+  sale_or_trade: "Sale or trade",
+  trade_only: "Trade only",
+};
+
+const SORT_LABELS: Record<string, string> = {
+  newest: "Newest",
+  price_asc: "Price: low to high",
+  price_desc: "Price: high to low",
+};
+
 export function SearchFilterBar({ courses, studyAreas, universities }: SearchFilterBarProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const currentQueryString = searchParams.toString();
   const formRef = useRef<HTMLFormElement>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const [minPrice, setMinPrice] = useState(
     searchParams.get("minPrice") ? Number(searchParams.get("minPrice")) : PRICE_MIN,
@@ -28,55 +59,96 @@ export function SearchFilterBar({ courses, studyAreas, universities }: SearchFil
   const [maxPrice, setMaxPrice] = useState(
     searchParams.get("maxPrice") ? Number(searchParams.get("maxPrice")) : PRICE_MAX,
   );
+  const currentSort = getValidListingSort(searchParams.get("sort"));
+
+  useEffect(() => {
+    setMinPrice(searchParams.get("minPrice") ? Number(searchParams.get("minPrice")) : PRICE_MIN);
+    setMaxPrice(searchParams.get("maxPrice") ? Number(searchParams.get("maxPrice")) : PRICE_MAX);
+  }, [searchParams]);
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
-    const params = new URLSearchParams();
 
-    const q = formData.get("q") as string;
-    const condition = formData.get("condition") as string;
-    const courseId = formData.get("courseId") as string;
-    const listingType = formData.get("listingType") as string;
-    const studyAreaId = formData.get("studyAreaId") as string;
-    const universityId = formData.get("universityId") as string;
-
-    if (q) params.set("q", q);
-    if (condition) params.set("condition", condition);
-    if (courseId) params.set("courseId", courseId);
-    if (listingType) params.set("listingType", listingType);
-    if (studyAreaId) params.set("studyAreaId", studyAreaId);
-    if (universityId) params.set("universityId", universityId);
-    if (minPrice > PRICE_MIN) params.set("minPrice", String(minPrice));
-    if (maxPrice < PRICE_MAX) params.set("maxPrice", String(maxPrice));
-
-    router.push(`/browse?${params.toString()}`);
+    router.push(buildSearchFilterHref(new URLSearchParams(currentQueryString), {
+      condition: formData.get("condition") as string,
+      courseId: formData.get("courseId") as string,
+      listingType: formData.get("listingType") as string,
+      maxPrice: maxPrice < PRICE_MAX ? String(maxPrice) : "",
+      minPrice: minPrice > PRICE_MIN ? String(minPrice) : "",
+      q: formData.get("q") as string,
+      sort: currentSort,
+      studyAreaId: formData.get("studyAreaId") as string,
+      universityId: formData.get("universityId") as string,
+    }));
   }
 
   function handleClear() {
     formRef.current?.reset();
     setMinPrice(PRICE_MIN);
     setMaxPrice(PRICE_MAX);
-    router.push("/browse");
+    router.push(buildClearFiltersHref(new URLSearchParams(currentQueryString)));
   }
 
   const hasFilters =
-    searchParams.has("q") ||
-    searchParams.has("condition") ||
-    searchParams.has("courseId") ||
-    searchParams.has("listingType") ||
-    searchParams.has("studyAreaId") ||
-    searchParams.has("universityId") ||
+    FILTER_PARAM_KEYS.some((key) => searchParams.has(key)) ||
+    currentSort !== "newest" ||
     minPrice > PRICE_MIN ||
     maxPrice < PRICE_MAX;
 
+  const activeFilters = [
+    ...FILTER_PARAM_KEYS.map((key) => {
+      const value = searchParams.get(key);
+      if (!value) return null;
+
+      const label = getFilterLabel(key, value, { courses, studyAreas, universities });
+      return {
+        href: buildRemoveFilterHref(new URLSearchParams(currentQueryString), key),
+        key,
+        label,
+      };
+    }),
+    currentSort !== "newest"
+      ? {
+          href: buildRemoveFilterHref(new URLSearchParams(currentQueryString), "sort"),
+          key: "sort",
+          label: SORT_LABELS[currentSort],
+        }
+      : null,
+  ].filter((item): item is { href: string; key: string; label: string } => item !== null);
+
   return (
     <form
+      key={currentQueryString}
       ref={formRef}
       onSubmit={handleSubmit}
       className="rounded-xl border border-border/70 bg-card p-4"
     >
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {activeFilters.length > 0 ? (
+        <div className="mb-4 flex flex-wrap gap-2">
+          {activeFilters.map((filter) => (
+            <Link
+              key={`${filter.key}-${filter.label}`}
+              href={filter.href}
+              className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-secondary px-3 py-1 text-xs font-medium text-secondary-foreground transition hover:border-primary/30 hover:text-primary"
+            >
+              {filter.label}
+              <span aria-hidden="true">x</span>
+            </Link>
+          ))}
+        </div>
+      ) : null}
+
+      <button
+        type="button"
+        onClick={() => setFiltersOpen((open) => !open)}
+        className="mb-4 inline-flex h-9 items-center rounded-md border border-border px-3 text-sm font-medium md:hidden"
+        aria-expanded={filtersOpen}
+      >
+        Filters{activeFilters.length > 0 ? ` (${activeFilters.length})` : ""}
+      </button>
+
+      <div className={`${filtersOpen ? "grid" : "hidden"} gap-4 sm:grid-cols-2 md:grid lg:grid-cols-4`}>
         <div className="grid gap-2 sm:col-span-2 lg:col-span-4">
           <Label htmlFor="q">Search</Label>
           <Input
@@ -226,8 +298,49 @@ export function SearchFilterBar({ courses, studyAreas, universities }: SearchFil
             Clear filters
           </button>
         )}
+        {searchParams.has("mode") || searchParams.has("q") ? (
+          <Link
+            href={buildStartOverHref()}
+            className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+          >
+            Start over
+          </Link>
+        ) : null}
         <PillButton type="submit">Search</PillButton>
       </div>
     </form>
   );
+}
+
+function getFilterLabel(
+  key: (typeof FILTER_PARAM_KEYS)[number],
+  value: string,
+  options: Pick<SearchFilterBarProps, "courses" | "studyAreas" | "universities">,
+) {
+  switch (key) {
+    case "q":
+      return `Search: ${value}`;
+    case "condition":
+      return CONDITION_LABELS[value] ?? value;
+    case "courseId": {
+      const course = options.courses.find((entry) => String(entry.id) === value);
+      return course ? `Course: ${course.course_code}` : `Course: ${value}`;
+    }
+    case "listingType":
+      return LISTING_TYPE_LABELS[value] ?? value;
+    case "studyAreaId": {
+      const area = options.studyAreas.find((entry) => String(entry.id) === value);
+      return area ? `Area: ${area.name}` : `Area: ${value}`;
+    }
+    case "universityId": {
+      const university = options.universities.find((entry) => String(entry.id) === value);
+      return university ? `University: ${university.name}` : `University: ${value}`;
+    }
+    case "minPrice":
+      return `From $${value}`;
+    case "maxPrice":
+      return `Up to $${value}`;
+    case "sellerName":
+      return `Seller: ${value}`;
+  }
 }

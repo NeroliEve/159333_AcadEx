@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { EmptyState } from "@/components/empty-state";
 import { ListingCard } from "@/components/listing-card";
@@ -10,6 +10,12 @@ import { SearchFilterBar } from "@/components/search-filter-bar";
 import { Card, CardContent } from "@/components/ui/card";
 import { PillButton } from "@/components/ui/pill-button";
 import type { ApiResponse } from "@/lib/api";
+import {
+  buildSearchFilterHref,
+  getBrowseSearchContext,
+  getValidListingSort,
+  type BrowseSearchContext,
+} from "@/lib/browse-search";
 import type { BrowseListingsData } from "@/lib/marketplace";
 
 type BrowseListingsPanelProps = {
@@ -17,6 +23,7 @@ type BrowseListingsPanelProps = {
   initialData?: BrowseListingsData | null;
   initialError?: string | null;
   initialQueryString?: string;
+  searchContext?: BrowseSearchContext;
 };
 
 function BrowseListingsSkeleton() {
@@ -85,10 +92,18 @@ export function BrowseListingsPanel({
   initialData = null,
   initialError = null,
   initialQueryString,
+  searchContext,
 }: BrowseListingsPanelProps) {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const queryString = searchParams.toString();
   const normalizedQueryString = normalizeBrowseQueryString(queryString);
+  const currentSearchContext = getBrowseSearchContext(new URLSearchParams(queryString));
+  const displayedSearchContext = currentSearchContext.label
+    ? currentSearchContext
+    : searchContext;
+  const currentAiExplanation = searchParams.get("_ai") ?? aiExplanation;
+  const currentSort = getValidListingSort(searchParams.get("sort"));
   const [data, setData] = useState<BrowseListingsData | null>(initialData);
   const [error, setError] = useState<string | null>(initialError);
   const [loading, setLoading] = useState(!initialData && !initialError);
@@ -170,12 +185,12 @@ export function BrowseListingsPanel({
         </Card>
       ) : null}
 
-      {aiExplanation ? (
+      {currentAiExplanation ? (
         <div className="flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4">
           <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
             Claude
           </span>
-          <p className="text-sm text-foreground">{aiExplanation}</p>
+          <p className="text-sm text-foreground">{currentAiExplanation}</p>
         </div>
       ) : null}
 
@@ -211,16 +226,37 @@ export function BrowseListingsPanel({
           <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
             <div className="space-y-2">
               <h2 className="text-2xl font-semibold tracking-tight">
-                Latest books
+                {displayedSearchContext?.label ?? "Latest books"}
               </h2>
               <p className="text-sm text-muted-foreground">
-                Current listings from the Acadex marketplace.
+                {data.listings.length} {data.listings.length === 1 ? "listing" : "listings"} shown.
               </p>
             </div>
 
-            <PillButton asChild className="sm:self-start">
-              <Link href={data.createHref}>{data.createLabel}</Link>
-            </PillButton>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:self-start">
+              <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                Sort
+                <select
+                  value={currentSort}
+                  onChange={(event) => {
+                    router.push(
+                      buildSearchFilterHref(new URLSearchParams(queryString), {
+                        sort: event.target.value,
+                      }),
+                    );
+                  }}
+                  className="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  <option value="newest">Newest</option>
+                  <option value="price_asc">Price: low to high</option>
+                  <option value="price_desc">Price: high to low</option>
+                </select>
+              </label>
+
+              <PillButton asChild>
+                <Link href={data.createHref}>{data.createLabel}</Link>
+              </PillButton>
+            </div>
           </div>
 
           {loading ? (

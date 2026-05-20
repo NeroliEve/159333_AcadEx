@@ -4,6 +4,7 @@ import { AiSearchBar } from "@/components/ai-search-bar";
 import { BrowseListingsPanel } from "@/components/browse-listings-panel";
 import { EmptyState } from "@/components/empty-state";
 import { isMarketplaceSuspended } from "@/lib/admin";
+import { getBrowseSearchContext } from "@/lib/browse-search";
 import {
   getCourseOptions,
   getListingsFeed,
@@ -74,6 +75,7 @@ async function BrowseContent({ searchParams }: BrowsePageProps) {
   const params = await searchParams;
   const aiExplanation = getFirstSearchParam(params, "_ai") || undefined;
   const initialSearchParams = toUrlSearchParams(params);
+  const searchContext = getBrowseSearchContext(initialSearchParams);
   const { profile, user } = await getViewerContext();
   const filters = getListingsFeedFilters(initialSearchParams);
   const [{ listings, error }, courses, universities, studyAreas, savedIds] =
@@ -122,6 +124,7 @@ async function BrowseContent({ searchParams }: BrowsePageProps) {
         initialData={initialData}
         initialError={error}
         initialQueryString={initialSearchParams.toString()}
+        searchContext={searchContext}
       />
     </>
   );

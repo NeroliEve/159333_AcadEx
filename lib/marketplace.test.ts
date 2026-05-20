@@ -22,6 +22,7 @@ vi.mock("@/lib/blocks", () => ({
 
 class MockQuery {
   private filters = new Map<string, unknown>();
+  readonly orderCalls: Array<{ column: string; options?: unknown }> = [];
 
   constructor(private readonly result: unknown) {}
 
@@ -62,7 +63,8 @@ class MockQuery {
     return this;
   }
 
-  order() {
+  order(column: string, options?: unknown) {
+    this.orderCalls.push({ column, options });
     return this;
   }
 
@@ -179,6 +181,7 @@ describe("browse query helpers", () => {
         minPrice: "10",
         q: "biology",
         sellerName: "Alex",
+        sort: "price_asc",
         studyAreaId: "3",
         universityId: "5",
       }),
@@ -192,9 +195,75 @@ describe("browse query helpers", () => {
       minPrice: 10,
       q: "biology",
       sellerName: "Alex",
+      sort: "price_asc",
       studyAreaId: 3,
       universityId: 5,
     });
+  });
+
+  it("falls back to newest sorting for unsupported sort params", async () => {
+    const { getListingsFeedFilters } = await import("@/lib/marketplace");
+
+    expect(getListingsFeedFilters(new URLSearchParams("sort=random")).sort).toBe("newest");
+    expect(getListingsFeedFilters(new URLSearchParams()).sort).toBe("newest");
+  });
+
+  it("orders listings by price ascending with null prices last", async () => {
+    const listingsQuery = new MockQuery({ data: [], error: null });
+    const supabase = {
+      auth: {
+        getUser: mockGetUser,
+      },
+      from: vi.fn((table: string) => {
+        if (table === "listings") {
+          return listingsQuery;
+        }
+
+        throw new Error(`Unexpected table ${table}`);
+      }),
+    };
+
+    mockCreateClient.mockResolvedValue(supabase);
+
+    const { getListingsFeed } = await import("@/lib/marketplace");
+
+    await getListingsFeed("authenticated", { sort: "price_asc" }, 24, {
+      viewerId: "viewer-1",
+    });
+
+    expect(listingsQuery.orderCalls).toEqual([
+      { column: "price", options: { ascending: true, nullsFirst: false } },
+      { column: "created_at", options: { ascending: false } },
+    ]);
+  });
+
+  it("orders listings by price descending with null prices last", async () => {
+    const listingsQuery = new MockQuery({ data: [], error: null });
+    const supabase = {
+      auth: {
+        getUser: mockGetUser,
+      },
+      from: vi.fn((table: string) => {
+        if (table === "listings") {
+          return listingsQuery;
+        }
+
+        throw new Error(`Unexpected table ${table}`);
+      }),
+    };
+
+    mockCreateClient.mockResolvedValue(supabase);
+
+    const { getListingsFeed } = await import("@/lib/marketplace");
+
+    await getListingsFeed("authenticated", { sort: "price_desc" }, 24, {
+      viewerId: "viewer-1",
+    });
+
+    expect(listingsQuery.orderCalls).toEqual([
+      { column: "price", options: { ascending: false, nullsFirst: false } },
+      { column: "created_at", options: { ascending: false } },
+    ]);
   });
 
   it("lets client browse refreshes skip static filter metadata", async () => {
