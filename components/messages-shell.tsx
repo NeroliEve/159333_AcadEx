@@ -58,6 +58,7 @@ function MessagesSidebar() {
   const [isLoading, setIsLoading] = useState(
     summaries.length === 0 && archivedSummaries.length === 0,
   );
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -65,6 +66,7 @@ function MessagesSidebar() {
 
     async function loadSummaries() {
       try {
+        setLoadError(null);
         const response = await fetch("/api/messages", { cache: "no-store" });
         const payload = (await response.json()) as ApiResponse<{
           archivedSummaries: ConversationSummary[];
@@ -78,10 +80,12 @@ function MessagesSidebar() {
           setSummaries(payload.data.summaries);
           setIsLoading(false);
         } else {
+          setLoadError("Could not load conversations. Please try again.");
           setIsLoading(false);
         }
       } catch {
         if (!cancelled) {
+          setLoadError("Could not load conversations. Please try again.");
           setIsLoading(false);
         }
       }
@@ -176,13 +180,21 @@ function MessagesSidebar() {
         <div className="max-h-[70vh] overflow-y-auto">
           {isLoading ? (
             <div className="space-y-3 p-5">
-              <p className="text-sm text-muted-foreground">Loading conversations</p>
+              <p className="text-sm text-muted-foreground">Loading conversations...</p>
               {Array.from({ length: 4 }).map((_, index) => (
                 <div
                   key={index}
                   className="h-16 animate-pulse rounded-lg bg-muted/50"
                 />
               ))}
+            </div>
+          ) : null}
+          {!isLoading && loadError ? (
+            <div className="p-5 text-sm text-destructive">{loadError}</div>
+          ) : null}
+          {!isLoading && !loadError && summaries.length === 0 && archivedSummaries.length === 0 ? (
+            <div className="p-5 text-sm text-muted-foreground">
+              No conversations yet.
             </div>
           ) : null}
           {summaries.map(renderSummary)}

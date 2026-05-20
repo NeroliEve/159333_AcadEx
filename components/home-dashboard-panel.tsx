@@ -105,18 +105,14 @@ export function HomeDashboardPanel() {
         if (cancelled) return;
 
         if (!response.ok || payload.status === "error") {
-          setError(
-            payload.status === "error"
-              ? payload.message
-              : "Could not load the home dashboard.",
-          );
+          setError("Could not load dashboard. Please try again.");
           return;
         }
 
         setData(payload.data);
       } catch {
         if (!cancelled) {
-          setError("Could not reach the home dashboard endpoint.");
+          setError("Could not load dashboard. Please try again.");
         }
       } finally {
         if (!cancelled) {
@@ -133,7 +129,12 @@ export function HomeDashboardPanel() {
   }, []);
 
   if (loading && !data) {
-    return <HomeDashboardSkeleton />;
+    return (
+      <div className="space-y-3" aria-live="polite" aria-busy="true">
+        <p className="text-sm text-muted-foreground">Loading dashboard...</p>
+        <HomeDashboardSkeleton />
+      </div>
+    );
   }
 
   if (error) {
@@ -148,7 +149,17 @@ export function HomeDashboardPanel() {
     );
   }
 
-  if (!data) return null;
+  if (!data) {
+    return (
+      <EmptyState
+        actionHref="/home"
+        actionLabel="Refresh dashboard"
+        description="Unable to load this section right now."
+        eyebrow="Home"
+        title="Dashboard is unavailable"
+      />
+    );
+  }
 
   if (!data.isSignedIn) {
     return (

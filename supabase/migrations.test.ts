@@ -28,8 +28,9 @@ describe("Supabase migrations", () => {
     );
     expect(migrationSql).toMatch(/grant update \([^)]+\) on table public\.profiles to authenticated/i);
     expect(migrationSql).not.toMatch(
-      /grant update \([^)]*\b(role|is_verified|account_status|suspended_at|suspended_by)\b[^)]*\) on table public\.profiles to authenticated/i,
+      /grant update \([^)]*\b(role|account_status|suspended_at|suspended_by)\b[^)]*\) on table public\.profiles to authenticated/i,
     );
+    expect(migrationSql).toMatch(/drop column if exists is_verified/i);
     expect(migrationSql).toMatch(
       /drop policy if exists "profiles_update_self_or_admin" on public\.profiles/i,
     );

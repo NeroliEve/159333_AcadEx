@@ -32,11 +32,16 @@ function SavedListingsFallback() {
   return (
     <section className="flex flex-col gap-10">
       <div className="space-y-2">
-        <div className="h-4 w-24 animate-pulse rounded bg-muted" />
-        <div className="h-8 w-56 animate-pulse rounded bg-muted" />
-        <div className="h-4 w-64 animate-pulse rounded bg-muted" />
+        <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">
+          Profile
+        </p>
+        <h1 className="text-3xl font-semibold tracking-tight">Saved listings</h1>
+        <p className="text-sm text-muted-foreground">
+          Listings you&apos;ve hearted for later.
+        </p>
       </div>
 
+      <p className="text-sm text-muted-foreground">Loading saved listings...</p>
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
         {Array.from({ length: 3 }).map((_, index) => (
           <div

@@ -21,8 +21,28 @@ type DecorativeAssetProps = {
 function HeaderFallback() {
   return (
     <header className="border-b border-border bg-background">
-      <div className="h-16 w-full animate-pulse bg-muted/40" />
+      <div className="mx-auto flex h-16 w-full max-w-7xl items-center px-4 sm:px-6">
+        <p className="text-sm font-semibold tracking-tight">Acadex</p>
+      </div>
     </header>
+  );
+}
+
+function LandingContentFallback() {
+  return (
+    <main className="relative z-10 mx-auto flex w-full max-w-7xl flex-col gap-10 px-4 py-8 sm:px-6 sm:py-14">
+      <section className="relative isolate mx-auto flex min-h-[520px] w-full max-w-7xl items-center justify-center overflow-hidden text-center">
+        <div className="relative z-10 mx-auto flex w-full max-w-3xl flex-col items-center gap-6">
+          <h1 className="max-w-3xl text-balance text-4xl font-bold tracking-tight text-foreground sm:text-5xl md:text-6xl">
+            The student marketplace for textbooks and study books
+          </h1>
+          <p className="max-w-3xl text-base leading-7 text-foreground/80 sm:text-lg">
+            Loading Acadex...
+          </p>
+          <div className="h-10 w-40 animate-pulse rounded-full bg-muted" />
+        </div>
+      </section>
+    </main>
   );
 }
 
@@ -177,7 +197,7 @@ export default async function Home() {
           <SiteHeader />
         </Suspense>
 
-        <Suspense fallback={<div className="mx-auto w-full max-w-6xl px-6 py-10 animate-pulse" />}>
+        <Suspense fallback={<LandingContentFallback />}>
           <LandingContent />
         </Suspense>
       </div>

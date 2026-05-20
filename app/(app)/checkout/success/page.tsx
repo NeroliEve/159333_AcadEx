@@ -77,7 +77,7 @@ async function CheckoutSuccessContent({
 function CheckoutSuccessFallback() {
   return (
     <section className="mx-auto max-w-2xl space-y-4 rounded-xl border border-border/70 bg-card p-8">
-      <p className="text-sm text-muted-foreground">Loading payment status</p>
+      <p className="text-sm text-muted-foreground">Loading payment status...</p>
       <div className="h-4 w-32 animate-pulse rounded bg-muted" />
       <div className="h-9 w-64 animate-pulse rounded bg-muted" />
       <div className="h-4 w-full animate-pulse rounded bg-muted" />

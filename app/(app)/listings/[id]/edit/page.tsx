@@ -69,8 +69,13 @@ function EditListingPageFallback() {
   return (
     <section className="flex flex-col gap-10">
       <div className="space-y-2">
-        <div className="h-4 w-28 animate-pulse rounded bg-muted" />
-        <div className="h-10 w-64 animate-pulse rounded bg-muted" />
+        <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">
+          Edit listing
+        </p>
+        <h1 className="text-3xl font-semibold tracking-tight">
+          Update your listing
+        </h1>
+        <p className="text-sm text-muted-foreground">Loading listing editor...</p>
       </div>
       <div className="h-[720px] animate-pulse rounded-2xl border border-border/70 bg-muted/40" />
     </section>

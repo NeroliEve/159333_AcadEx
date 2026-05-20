@@ -248,7 +248,7 @@ function ProfileTransactionsFallback() {
   return (
     <section className="flex flex-col gap-10">
       <div className="space-y-2">
-        <p className="text-sm text-muted-foreground">Loading transactions</p>
+        <p className="text-sm text-muted-foreground">Loading transactions...</p>
         <div className="h-4 w-24 animate-pulse rounded bg-muted" />
         <div className="h-8 w-56 animate-pulse rounded bg-muted" />
         <div className="h-4 w-72 animate-pulse rounded bg-muted" />

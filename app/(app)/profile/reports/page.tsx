@@ -29,9 +29,15 @@ function MyReportsFallback() {
   return (
     <section className="flex flex-col gap-8">
       <div className="space-y-2">
-        <div className="h-4 w-24 animate-pulse rounded bg-muted" />
-        <div className="h-8 w-48 animate-pulse rounded bg-muted" />
+        <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">
+          Profile
+        </p>
+        <h1 className="text-3xl font-semibold tracking-tight">My reports</h1>
+        <p className="text-sm text-muted-foreground">
+          Reports you&apos;ve submitted, with their current status. Admins review every report.
+        </p>
       </div>
+      <p className="text-sm text-muted-foreground">Loading reports...</p>
       <div className="space-y-3">
         {Array.from({ length: 3 }).map((_, i) => (
           <div key={i} className="h-32 animate-pulse rounded-xl border border-border/70 bg-muted/40" />

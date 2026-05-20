@@ -27,7 +27,6 @@ type ProfileSummary = Pick<
   | "id"
   | "email"
   | "first_name"
-  | "is_verified"
   | "last_name"
   | "role"
   | "suspended_at"
@@ -135,7 +134,7 @@ const LISTING_CARD_SELECT = `
   show_seller_university,
   created_at,
   course:courses!listings_course_id_fkey(id, course_code, course_name, university, university_id),
-  seller:profiles!listings_seller_id_fkey(id, avatar_url, degree_id, first_name, is_verified, last_name, university, university_id, username, year_level),
+  seller:profiles!listings_seller_id_fkey(id, avatar_url, degree_id, first_name, last_name, university, university_id, username, year_level),
   study_area:study_areas!listings_study_area_id_fkey(id, name, slug)
 `;
 
@@ -243,7 +242,10 @@ async function attachListingImages(
 // ─── Viewer ───────────────────────────────────────────────────────────────────
 
 function stripListingInternalFields(listings: ListingCardRow[]): ListingCardBase[] {
-  return listings.map(({ seller_id: _sellerId, ...listing }) => listing);
+  return listings.map(({ seller_id: _sellerId, ...listing }) => {
+    void _sellerId;
+    return listing;
+  });
 }
 
 async function loadViewerContext(): Promise<{
@@ -262,7 +264,7 @@ async function loadViewerContext(): Promise<{
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "account_status, avatar_url, bio, degree_id, id, email, first_name, is_verified, last_name, role, suspended_at, transactions_seen_at, university, university_id, username, year_level",
+      "account_status, avatar_url, bio, degree_id, id, email, first_name, last_name, role, suspended_at, transactions_seen_at, university, university_id, username, year_level",
     )
     .eq("id", user.id)
     .maybeSingle();
@@ -684,7 +686,7 @@ export async function getPublicProfile(username: string, options: {
   const { data: profileData, error: profileError } = await supabase
     .from("profiles")
     .select(
-      "account_status, avatar_url, bio, degree_id, id, email, first_name, is_verified, last_name, role, suspended_at, transactions_seen_at, university, university_id, username, year_level",
+      "account_status, avatar_url, bio, degree_id, id, email, first_name, last_name, role, suspended_at, transactions_seen_at, university, university_id, username, year_level",
     )
     .eq("username", username)
     .maybeSingle();

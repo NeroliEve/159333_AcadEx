@@ -2,14 +2,12 @@ import { Card, CardContent } from "@/components/ui/card";
 
 type ProfileBannerProps = {
   email?: string | null;
-  isVerified?: boolean;
   name: string;
   university?: string | null;
 };
 
 export function ProfileBanner({
   email,
-  isVerified,
   name,
   university,
 }: ProfileBannerProps) {
@@ -33,12 +31,6 @@ export function ProfileBanner({
             <p className="text-muted-foreground">Account email</p>
             <p className="font-medium text-foreground">
               {email || "Email unavailable"}
-            </p>
-          </div>
-          <div>
-            <p className="text-muted-foreground">Verification</p>
-            <p className="font-medium text-foreground">
-              {isVerified ? "Verified student" : "Verification pending"}
             </p>
           </div>
         </div>

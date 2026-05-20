@@ -118,7 +118,6 @@ const emptyOverview: AdminOverviewStats = {
   hiddenListings: 0,
   pendingReports: 0,
   suspendedUsers: 0,
-  unverifiedUsers: 0,
 };
 
 const emptyAuditLogs: AdminAuditRecord[] = [];
@@ -327,7 +326,7 @@ export function AdminModerationPanel({
         setLoadedTabs((current) => new Set(current).add(activeTab));
       } catch {
         if (!cancelled) {
-          setLoadError("Could not reach the admin workspace endpoint.");
+          setLoadError("Unable to load this section right now.");
         }
       } finally {
         if (!cancelled) {
@@ -433,10 +432,6 @@ export function AdminModerationPanel({
     });
   }, [userQuery, userRoleFilter, userStatusFilter, users]);
 
-  const verificationUsers = useMemo(
-    () => users.filter((user) => !user.is_verified),
-    [users],
-  );
   const managedUser = useMemo(
     () => users.find((user) => user.id === managedUserId) ?? null,
     [managedUserId, users],
@@ -555,8 +550,7 @@ export function AdminModerationPanel({
       (baselineUser.bio ?? "") !== (mergedUser.bio ?? "") ||
       baselineUser.university_id !== mergedUser.university_id ||
       baselineUser.role !== mergedUser.role ||
-      baselineUser.account_status !== mergedUser.account_status ||
-      baselineUser.is_verified !== mergedUser.is_verified;
+      baselineUser.account_status !== mergedUser.account_status;
 
     if (!hasProfileChanges) {
       setFeedback({ text: "No changes to save.", type: "error" });
@@ -577,12 +571,11 @@ export function AdminModerationPanel({
 
     if (
       (baselineUser.role !== mergedUser.role ||
-        baselineUser.account_status !== mergedUser.account_status ||
-        baselineUser.is_verified !== mergedUser.is_verified) &&
+        baselineUser.account_status !== mergedUser.account_status) &&
       !notes
     ) {
       setFeedback({
-        text: "A moderation note is required to change roles, verification, or account status.",
+        text: "A moderation note is required to change roles or account status.",
         type: "error",
       });
       return;
@@ -596,7 +589,6 @@ export function AdminModerationPanel({
           accountStatus: mergedUser.account_status,
           bio: mergedUser.bio ?? "",
           firstName: mergedUser.first_name,
-          isVerified: mergedUser.is_verified,
           lastName: mergedUser.last_name,
           notes,
           role: mergedUser.role,
@@ -770,7 +762,7 @@ export function AdminModerationPanel({
 
       {activeTab === "overview" ? (
         <div className="space-y-8">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <Card className="border-border/70">
               <CardHeader>
                 <CardTitle>Pending reports</CardTitle>
@@ -785,14 +777,6 @@ export function AdminModerationPanel({
               </CardHeader>
               <CardContent className="text-3xl font-semibold">
                 {overviewData.suspendedUsers}
-              </CardContent>
-            </Card>
-            <Card className="border-border/70">
-              <CardHeader>
-                <CardTitle>Unverified users</CardTitle>
-              </CardHeader>
-              <CardContent className="text-3xl font-semibold">
-                {overviewData.unverifiedUsers}
               </CardContent>
             </Card>
             <Card className="border-border/70">
@@ -959,13 +943,6 @@ export function AdminModerationPanel({
                       >
                         {user.account_status}
                       </span>
-                      <span
-                        className={getBadgeClassName(
-                          user.is_verified ? "success" : "default",
-                        )}
-                      >
-                        {user.is_verified ? "verified" : "unverified"}
-                      </span>
                     </div>
                   </div>
                 </div>
@@ -993,8 +970,7 @@ export function AdminModerationPanel({
         const baselineUser = userBaselinesById.get(managedUser.id) ?? managedUser;
         const noteRequired =
           baselineUser.role !== managedUser.role ||
-          baselineUser.account_status !== managedUser.account_status ||
-          baselineUser.is_verified !== managedUser.is_verified;
+          baselineUser.account_status !== managedUser.account_status;
 
         return (
           <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/45 px-4 py-8">
@@ -1032,13 +1008,6 @@ export function AdminModerationPanel({
                       >
                         {managedUser.account_status}
                       </span>
-                      <span
-                        className={getBadgeClassName(
-                          managedUser.is_verified ? "success" : "default",
-                        )}
-                      >
-                        {managedUser.is_verified ? "verified" : "unverified"}
-                      </span>
                     </div>
                   </div>
                 </div>
@@ -1048,7 +1017,7 @@ export function AdminModerationPanel({
               </div>
 
               <div className="grid gap-6 px-6 py-6">
-                <div className="grid gap-4 sm:grid-cols-3">
+                <div className="grid gap-4 sm:grid-cols-2">
                   <div className="grid gap-2">
                     <Label>Role</Label>
                     <select
@@ -1088,25 +1057,6 @@ export function AdminModerationPanel({
                     >
                       <option value="active">Active</option>
                       <option value="suspended">Suspended</option>
-                    </select>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>Verification</Label>
-                    <select
-                      className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
-                      value={managedUser.is_verified ? "verified" : "unverified"}
-                      onChange={(event) =>
-                        setUsers((current) =>
-                          current.map((entry) =>
-                            entry.id === managedUser.id
-                              ? { ...entry, is_verified: event.target.value === "verified" }
-                              : entry,
-                          ),
-                        )
-                      }
-                    >
-                      <option value="verified">Verified</option>
-                      <option value="unverified">Unverified</option>
                     </select>
                   </div>
                 </div>
@@ -1208,7 +1158,7 @@ export function AdminModerationPanel({
                   <div className="grid gap-2">
                     <Label>Moderation note</Label>
                     <Textarea
-                      placeholder="Required for role, verification, and suspension changes."
+                      placeholder="Required for role and suspension changes."
                       value={userNotes[managedUser.id] ?? ""}
                       onChange={(event) =>
                         setUserNotes((current) => ({
@@ -1220,7 +1170,7 @@ export function AdminModerationPanel({
                   </div>
                 ) : (
                   <div className="rounded-lg border border-dashed border-border/70 px-4 py-3 text-sm text-muted-foreground">
-                    Add a moderation note only if you change role, verification, or account status.
+                    Add a moderation note only if you change role or account status.
                   </div>
                 )}
 
@@ -1229,20 +1179,6 @@ export function AdminModerationPanel({
                     Updated {formatDateTime(managedUser.updated_at)}
                   </p>
                   <div className="flex flex-wrap gap-2">
-                    <PillButton
-                      type="button"
-                      variant="secondary"
-                      disabled={pendingKey === `user-${managedUser.id}`}
-                      onClick={() =>
-                        saveUser(
-                          managedUser.id,
-                          { is_verified: !managedUser.is_verified },
-                          { closeOnSuccess: true },
-                        )
-                      }
-                    >
-                      {managedUser.is_verified ? "Unverify" : "Verify"}
-                    </PillButton>
                     <PillButton
                       type="button"
                       disabled={pendingKey === `user-${managedUser.id}`}
@@ -1257,53 +1193,6 @@ export function AdminModerationPanel({
           </div>
         );
       })() : null}
-
-      {activeTab === "verification" ? (
-        <div className="grid gap-4">
-          {verificationUsers.map((user) => (
-            <Card key={user.id} className="border-border/70">
-              <CardContent className="space-y-4 p-6">
-                <div className="space-y-1">
-                  <p className="text-lg font-semibold">{formatPersonName(user)}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {user.email ?? "Email unavailable"}
-                  </p>
-                </div>
-                <Textarea
-                  placeholder="Add the verification reason or evidence reviewed."
-                  value={userNotes[user.id] ?? ""}
-                  onChange={(event) =>
-                    setUserNotes((current) => ({
-                      ...current,
-                      [user.id]: event.target.value,
-                    }))
-                  }
-                />
-                <div className="flex justify-end">
-                  <PillButton
-                    type="button"
-                    disabled={pendingKey === `user-${user.id}`}
-                    onClick={() =>
-                      void saveUser(user.id, {
-                        is_verified: true,
-                      })
-                    }
-                  >
-                    Verify account
-                  </PillButton>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-          {verificationUsers.length === 0 ? (
-            <Card className="border-border/70">
-              <CardContent className="p-6 text-sm text-muted-foreground">
-                No unverified users are currently queued.
-              </CardContent>
-            </Card>
-          ) : null}
-        </div>
-      ) : null}
 
       {activeTab === "listings" ? (
         <div className="space-y-6">
@@ -1690,6 +1579,19 @@ export function AdminModerationPanel({
                 </CardContent>
               </Card>
             ))}
+            {isActiveTabLoading ? (
+              <Card className="border-border/70">
+                <CardContent className="p-6 text-sm text-muted-foreground">
+                  Loading reports...
+                </CardContent>
+              </Card>
+            ) : filteredReports.length === 0 ? (
+              <Card className="border-border/70">
+                <CardContent className="p-6 text-sm text-muted-foreground">
+                  No reports to review.
+                </CardContent>
+              </Card>
+            ) : null}
           </div>
         </div>
       ) : null}
@@ -1721,6 +1623,19 @@ export function AdminModerationPanel({
               </CardContent>
             </Card>
           ))}
+          {isActiveTabLoading ? (
+            <Card className="border-border/70">
+              <CardContent className="p-6 text-sm text-muted-foreground">
+                Loading audit logs...
+              </CardContent>
+            </Card>
+          ) : auditLogs.length === 0 ? (
+            <Card className="border-border/70">
+              <CardContent className="p-6 text-sm text-muted-foreground">
+                No account activity yet.
+              </CardContent>
+            </Card>
+          ) : null}
         </div>
       ) : null}
 

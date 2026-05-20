@@ -221,13 +221,14 @@ export function AdminStatsPanel() {
           setData(json);
         }
       })
-      .catch(() => setError("Failed to load statistics."))
+      .catch(() => setError("Unable to load this section right now."))
       .finally(() => setLoading(false));
   }, []);
 
   if (loading) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-4" aria-live="polite" aria-busy="true">
+        <p className="text-sm text-muted-foreground">Loading dashboard...</p>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="h-28 animate-pulse rounded-xl border border-border/70 bg-muted/40" />
@@ -245,12 +246,22 @@ export function AdminStatsPanel() {
   if (error) {
     return (
       <div className="rounded-xl border border-border/70 bg-muted/40 p-8 text-center">
-        <p className="text-sm text-destructive">{error}</p>
+        <p className="text-sm text-destructive">
+          Unable to load this section right now.
+        </p>
       </div>
     );
   }
 
-  if (!data) return null;
+  if (!data) {
+    return (
+      <div className="rounded-xl border border-border/70 bg-muted/40 p-8 text-center">
+        <p className="text-sm text-muted-foreground">
+          No account activity yet.
+        </p>
+      </div>
+    );
+  }
 
   const { summary, byMonth, byStudyArea, byListingType, topBooks, byYearLevel } = data;
 

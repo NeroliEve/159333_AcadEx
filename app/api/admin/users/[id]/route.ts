@@ -9,7 +9,7 @@ import {
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const USER_RETURN_SELECT =
-  "account_status, avatar_url, bio, email, first_name, id, is_verified, last_name, role, suspended_at, university, university_id, updated_at, username";
+  "account_status, avatar_url, bio, email, first_name, id, last_name, role, suspended_at, university, university_id, updated_at, username";
 
 type UserResponse = {
   message?: string;
@@ -58,7 +58,6 @@ export async function PATCH(
       body.accountStatus === "active" || body.accountStatus === "suspended"
         ? body.accountStatus
         : null;
-    const isVerified = typeof body.isVerified === "boolean" ? body.isVerified : null;
     const universityId = parseUniversityId(body.universityId);
 
     if (!firstName || !lastName || !username) {
@@ -68,16 +67,16 @@ export async function PATCH(
       );
     }
 
-    if (role === null || accountStatus === null || isVerified === null) {
+    if (role === null || accountStatus === null) {
       return NextResponse.json<UserResponse>(
-        { message: "Provide a valid role, verification state, and account status.", status: "error" },
+        { message: "Provide a valid role and account status.", status: "error" },
         { status: 400 },
       );
     }
 
     const { data: currentUser, error: currentUserError } = await supabase
       .from("profiles")
-      .select("account_status, bio, first_name, id, is_verified, last_name, role, username, university_id")
+      .select("account_status, bio, first_name, id, last_name, role, username, university_id")
       .eq("id", id)
       .maybeSingle();
 
@@ -96,7 +95,6 @@ export async function PATCH(
     }
 
     const roleChanged = currentUser.role !== role;
-    const verificationChanged = currentUser.is_verified !== isVerified;
     const suspensionChanged = currentUser.account_status !== accountStatus;
     const activeAdminWouldBeLost =
       currentUser.role === "admin" &&
@@ -106,10 +104,6 @@ export async function PATCH(
     try {
       if (roleChanged) {
         requireModerationNote(notes, "change user roles");
-      }
-
-      if (verificationChanged) {
-        requireModerationNote(notes, "change verification");
       }
 
       if (suspensionChanged) {
@@ -145,7 +139,6 @@ export async function PATCH(
         account_status: accountStatus,
         bio: bio || null,
         first_name: firstName,
-        is_verified: isVerified,
         last_name: lastName,
         role,
         suspended_at: accountStatus === "suspended" ? new Date().toISOString() : null,
@@ -168,9 +161,8 @@ export async function PATCH(
 
     const actionFragments = [
       roleChanged ? "role" : null,
-      verificationChanged ? "verification" : null,
       suspensionChanged ? "suspension" : null,
-      !roleChanged && !verificationChanged && !suspensionChanged ? "profile" : null,
+      !roleChanged && !suspensionChanged ? "profile" : null,
     ].filter(Boolean);
 
     let message = "User updated.";

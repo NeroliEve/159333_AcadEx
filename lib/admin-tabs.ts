@@ -2,7 +2,6 @@ export const adminTabs = [
   { id: "overview", label: "Overview" },
   { id: "users", label: "Users" },
   { id: "listings", label: "Listings" },
-  { id: "verification", label: "Verification" },
   { id: "reports", label: "Reports" },
   { id: "audit", label: "Audit" },
   { id: "catalog", label: "Catalog" },

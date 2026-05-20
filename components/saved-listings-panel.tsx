@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { EmptyState } from "@/components/empty-state";
 import { ListingCard } from "@/components/listing-card";
 import type { ApiResponse } from "@/lib/api";
 import type { ListingCardData, ViewerProfile } from "@/lib/marketplace";
@@ -39,18 +40,14 @@ export function SavedListingsPanel() {
         if (cancelled) return;
 
         if (!response.ok || payload.status === "error") {
-          setError(
-            payload.status === "error"
-              ? payload.message
-              : "Could not load saved listings.",
-          );
+          setError("Could not load saved listings. Please try again.");
           return;
         }
 
         setData(payload.data);
       } catch {
         if (!cancelled) {
-          setError("Could not reach the saved listings endpoint.");
+          setError("Could not load saved listings. Please try again.");
         }
       }
     }
@@ -63,18 +60,35 @@ export function SavedListingsPanel() {
   }, []);
 
   if (error) {
-    return <p className="text-sm text-destructive">{error}</p>;
+    return (
+      <EmptyState
+        actionHref="/profile/saved"
+        actionLabel="Refresh saved listings"
+        description={error}
+        eyebrow="Saved"
+        title="Saved listings are unavailable"
+      />
+    );
   }
 
   if (!data) {
-    return <SavedListingsSkeleton />;
+    return (
+      <div className="space-y-3" aria-live="polite" aria-busy="true">
+        <p className="text-sm text-muted-foreground">Loading saved listings...</p>
+        <SavedListingsSkeleton />
+      </div>
+    );
   }
 
   if (data.listings.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground">
-        You haven&apos;t saved any listings yet. Tap the heart on any listing to save it.
-      </p>
+      <EmptyState
+        actionHref="/browse"
+        actionLabel="Browse listings"
+        description="Tap the heart on any listing to save it for later."
+        eyebrow="Saved"
+        title="No saved items yet"
+      />
     );
   }
 

@@ -264,9 +264,7 @@ async function ListingDetailContent({
                 ) : (
                   <p className="font-medium">{sellerName}</p>
                 )}
-                <p className="text-muted-foreground">
-                  {listing.seller?.is_verified ? "Verified student" : "Student seller"}
-                </p>
+                <p className="text-muted-foreground">Student seller</p>
                 {sellerUniversity ? (
                   <p className="text-muted-foreground">{sellerUniversity}</p>
                 ) : null}
@@ -364,9 +362,11 @@ function ListingDetailFallback() {
   return (
     <section className="space-y-8">
       <div className="space-y-3">
-        <div className="h-4 w-28 animate-pulse rounded bg-muted" />
-        <div className="h-10 w-72 animate-pulse rounded bg-muted" />
-        <div className="h-4 w-56 animate-pulse rounded bg-muted" />
+        <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">Listing details</p>
+        <h1 className="text-3xl font-semibold tracking-tight">Loading listing...</h1>
+        <p className="text-sm text-muted-foreground">
+          Loading seller, book details, and request options.
+        </p>
       </div>
       <div className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
         <div className="overflow-hidden rounded-2xl border border-border/70">

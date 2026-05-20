@@ -28,7 +28,12 @@ async function SignUpContent() {
 }
 
 function SignUpContentFallback() {
-  return <div className="h-96 w-full max-w-md animate-pulse rounded-2xl border border-border/70 bg-muted/40" />;
+  return (
+    <div className="w-full max-w-lg space-y-4">
+      <p className="text-sm text-muted-foreground">Loading account setup...</p>
+      <div className="h-96 animate-pulse rounded-2xl border border-border/70 bg-muted/40" />
+    </div>
+  );
 }
 
 export default function Page() {

@@ -6,12 +6,8 @@ import { hasEnvVars } from "@/lib/utils";
 
 function HomeDashboardFallback() {
   return (
-    <section className="flex flex-col gap-10">
-      <div className="space-y-2">
-        <div className="h-4 w-24 animate-pulse rounded bg-muted" />
-        <div className="h-8 w-64 animate-pulse rounded bg-muted" />
-        <div className="h-4 w-96 max-w-full animate-pulse rounded bg-muted" />
-      </div>
+    <div className="flex flex-col gap-10" aria-live="polite" aria-busy="true">
+      <p className="text-sm text-muted-foreground">Loading dashboard...</p>
       <div className="grid gap-4 md:grid-cols-4">
         {Array.from({ length: 4 }).map((_, index) => (
           <div
@@ -28,7 +24,7 @@ function HomeDashboardFallback() {
           />
         ))}
       </div>
-    </section>
+    </div>
   );
 }
 

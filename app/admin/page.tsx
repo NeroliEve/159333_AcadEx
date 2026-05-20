@@ -26,8 +26,7 @@ async function AdminContent() {
             Admin moderation
           </h1>
           <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-            Oversee listings, users, verification, reports, audit history,
-            and the shared catalog.
+            Oversee listings, users, reports, audit history, and the shared catalog.
           </p>
         </div>
       </div>
@@ -41,11 +40,20 @@ function AdminContentFallback() {
   return (
     <section className="flex flex-col gap-10">
       <div className="space-y-2">
-        <div className="h-4 w-20 animate-pulse rounded bg-muted" />
-        <div className="h-8 w-56 animate-pulse rounded bg-muted" />
-        <div className="h-4 w-80 animate-pulse rounded bg-muted" />
+        <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">
+          Admin
+        </p>
+        <div className="space-y-2">
+          <h1 className="text-3xl font-semibold tracking-tight">
+            Admin moderation
+          </h1>
+          <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
+            Oversee listings, users, reports, audit history, and the shared catalog.
+          </p>
+        </div>
       </div>
 
+      <p className="text-sm text-muted-foreground">Loading admin dashboard...</p>
       <div className="h-72 animate-pulse rounded-2xl border border-border/70 bg-muted/40" />
       <div className="h-96 animate-pulse rounded-2xl border border-border/70 bg-muted/40" />
     </section>

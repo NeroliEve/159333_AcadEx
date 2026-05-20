@@ -21,8 +21,13 @@ async function ProfileRedirect() {
 function ProfileRedirectFallback() {
   return (
     <section className="flex flex-col gap-4">
-      <div className="h-4 w-24 animate-pulse rounded bg-muted" />
-      <div className="h-8 w-40 animate-pulse rounded bg-muted" />
+      <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">
+        Profile
+      </p>
+      <h1 className="text-3xl font-semibold tracking-tight">Loading profile...</h1>
+      <p className="text-sm text-muted-foreground">
+        Opening your public profile or account editor.
+      </p>
     </section>
   );
 }

@@ -195,9 +195,7 @@ export function ListingCard({
                   ) : (
                     <p className="truncate font-medium">{sellerName}</p>
                   )}
-                  <p className="truncate text-xs">
-                    {listing.seller?.is_verified ? "Verified student" : "Student seller"}
-                  </p>
+                  <p className="truncate text-xs">Student seller</p>
                 </div>
               </div>
             </div>

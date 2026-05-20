@@ -11,7 +11,6 @@ export type ViewerAccessProfile = Pick<
   | "email"
   | "first_name"
   | "id"
-  | "is_verified"
   | "last_name"
   | "role"
   | "suspended_at"
@@ -46,7 +45,6 @@ type AdminUserBase = Pick<
   | "email"
   | "first_name"
   | "id"
-  | "is_verified"
   | "last_name"
   | "role"
   | "suspended_at"
@@ -118,7 +116,6 @@ export type AdminOverviewStats = {
   hiddenListings: number;
   pendingReports: number;
   suspendedUsers: number;
-  unverifiedUsers: number;
 };
 
 export type AdminWorkspaceData = {
@@ -135,9 +132,9 @@ export type AdminOverviewData = {
 };
 
 const VIEWER_PROFILE_SELECT =
-  "account_status, avatar_url, bio, email, first_name, id, is_verified, last_name, role, suspended_at, transactions_seen_at, university, university_id, username";
+  "account_status, avatar_url, bio, email, first_name, id, last_name, role, suspended_at, transactions_seen_at, university, university_id, username";
 const ADMIN_USER_SELECT =
-  "account_status, avatar_url, bio, email, first_name, id, is_verified, last_name, role, suspended_at, university, university_id, updated_at, username";
+  "account_status, avatar_url, bio, email, first_name, id, last_name, role, suspended_at, university, university_id, updated_at, username";
 const ADMIN_LISTING_SELECT = `
   id,
   condition,
@@ -290,7 +287,6 @@ export async function getAdminWorkspaceData(
     { data: reports, error: reportsError },
     { data: auditLogs, error: auditLogsError },
     { count: suspendedUsersCount, error: suspendedUsersError },
-    { count: unverifiedUsersCount, error: unverifiedUsersError },
     { count: pendingReportsCount, error: pendingReportsError },
     { count: hiddenListingsCount, error: hiddenListingsError },
     { count: activeAdminsCount, error: activeAdminsError },
@@ -320,10 +316,6 @@ export async function getAdminWorkspaceData(
       .select("id", { count: "exact", head: true })
       .eq("account_status", "suspended"),
     supabase
-      .from("profiles")
-      .select("id", { count: "exact", head: true })
-      .eq("is_verified", false),
-    supabase
       .from("reports")
       .select("id", { count: "exact", head: true })
       .eq("status", "pending"),
@@ -344,7 +336,6 @@ export async function getAdminWorkspaceData(
     reportsError,
     auditLogsError,
     suspendedUsersError,
-    unverifiedUsersError,
     pendingReportsError,
     hiddenListingsError,
     activeAdminsError,
@@ -367,7 +358,6 @@ export async function getAdminWorkspaceData(
       hiddenListings: hiddenListingsCount ?? 0,
       pendingReports: pendingReportsCount ?? 0,
       suspendedUsers: suspendedUsersCount ?? 0,
-      unverifiedUsers: unverifiedUsersCount ?? 0,
     },
     reports: reportsWithContext,
     users: (users ?? []) as unknown as AdminUserRecord[],
@@ -421,7 +411,6 @@ export async function getAdminOverviewData(
   const [
     { data: newestPendingReports, error: reportsError },
     { count: suspendedUsersCount, error: suspendedUsersError },
-    { count: unverifiedUsersCount, error: unverifiedUsersError },
     { count: pendingReportsCount, error: pendingReportsError },
     { count: hiddenListingsCount, error: hiddenListingsError },
     { count: activeAdminsCount, error: activeAdminsError },
@@ -436,10 +425,6 @@ export async function getAdminOverviewData(
       .from("profiles")
       .select("id", { count: "exact", head: true })
       .eq("account_status", "suspended"),
-    supabase
-      .from("profiles")
-      .select("id", { count: "exact", head: true })
-      .eq("is_verified", false),
     supabase
       .from("reports")
       .select("id", { count: "exact", head: true })
@@ -458,7 +443,6 @@ export async function getAdminOverviewData(
   const firstError = [
     reportsError,
     suspendedUsersError,
-    unverifiedUsersError,
     pendingReportsError,
     hiddenListingsError,
     activeAdminsError,
@@ -475,7 +459,6 @@ export async function getAdminOverviewData(
       hiddenListings: hiddenListingsCount ?? 0,
       pendingReports: pendingReportsCount ?? 0,
       suspendedUsers: suspendedUsersCount ?? 0,
-      unverifiedUsers: unverifiedUsersCount ?? 0,
     },
   };
 }

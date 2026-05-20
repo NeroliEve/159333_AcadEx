@@ -2,10 +2,15 @@ export default function HomeLoading() {
   return (
     <section className="space-y-8">
       <div className="space-y-3">
-        <p className="text-sm text-muted-foreground">Loading listings</p>
-        <div className="h-4 w-20 animate-pulse rounded bg-muted" />
-        <div className="h-10 w-80 animate-pulse rounded bg-muted" />
-        <div className="h-4 w-96 animate-pulse rounded bg-muted" />
+        <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">
+          Home
+        </p>
+        <h1 className="text-3xl font-semibold tracking-tight">
+          Your Acadex dashboard
+        </h1>
+        <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+          Loading dashboard...
+        </p>
       </div>
 
       <div className="h-40 animate-pulse rounded-2xl border border-border/70 bg-muted/50" />

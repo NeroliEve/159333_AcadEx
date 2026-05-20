@@ -13,9 +13,6 @@ create index if not exists profiles_admin_updated_idx
 create index if not exists profiles_role_status_idx
   on public.profiles (role, account_status);
 
-create index if not exists profiles_verified_idx
-  on public.profiles (is_verified);
-
 create index if not exists reports_status_created_idx
   on public.reports (status, created_at desc);
 

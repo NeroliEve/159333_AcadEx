@@ -10,7 +10,6 @@ type ConversationParticipant = Pick<
   | "email"
   | "first_name"
   | "id"
-  | "is_verified"
   | "last_name"
   | "university"
   | "username"
@@ -89,7 +88,6 @@ const CONVERSATION_PARTICIPANT_SELECT = `
   avatar_url,
   email,
   first_name,
-  is_verified,
   last_name,
   university,
   username

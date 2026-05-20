@@ -29,6 +29,6 @@ describe("AdminModerationPanel user change tracking", () => {
     expect(match?.[1]).toContain("university_id");
     expect(match?.[1]).toContain("role");
     expect(match?.[1]).toContain("account_status");
-    expect(match?.[1]).toContain("is_verified");
+    expect(match?.[1]).not.toContain("is_verified");
   });
 });

@@ -20,7 +20,6 @@ const adminTabs = [
   "overview",
   "users",
   "listings",
-  "verification",
   "reports",
   "audit",
   "catalog",
@@ -55,7 +54,6 @@ export async function GET(request: Request) {
       case "overview":
         return NextResponse.json(apiSuccess(await getAdminOverviewData(supabase)));
       case "users":
-      case "verification":
         return NextResponse.json(apiSuccess({ users: await getAdminUsersData(supabase) }));
       case "listings":
         return NextResponse.json(apiSuccess({ listings: await getAdminListingsData(supabase) }));

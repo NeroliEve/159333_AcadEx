@@ -385,7 +385,6 @@ export type Database = {
           email: string | null
           first_name: string
           id: string
-          is_verified: boolean
           last_name: string
           role: Database["public"]["Enums"]["profile_role"]
           suspended_at: string | null
@@ -406,7 +405,6 @@ export type Database = {
           email?: string | null
           first_name: string
           id: string
-          is_verified?: boolean
           last_name: string
           role?: Database["public"]["Enums"]["profile_role"]
           suspended_at?: string | null
@@ -427,7 +425,6 @@ export type Database = {
           email?: string | null
           first_name?: string
           id?: string
-          is_verified?: boolean
           last_name?: string
           role?: Database["public"]["Enums"]["profile_role"]
           suspended_at?: string | null

@@ -35,7 +35,7 @@ export default function Page({
           <CardTitle className="text-2xl">Authentication error</CardTitle>
         </CardHeader>
         <CardContent>
-          <Suspense>
+          <Suspense fallback={<p className="text-sm text-muted-foreground">Loading error details...</p>}>
             <ErrorContent searchParams={searchParams} />
           </Suspense>
         </CardContent>

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { EmptyState } from "@/components/empty-state";
 import type { ApiResponse } from "@/lib/api";
 import type { MyReportRow } from "@/lib/reports-server";
 
@@ -84,16 +85,14 @@ export function MyReportsPanel() {
         if (cancelled) return;
 
         if (!response.ok || payload.status === "error") {
-          setError(
-            payload.status === "error" ? payload.message : "Could not load reports.",
-          );
+          setError("Could not load reports. Please try again.");
           return;
         }
 
         setReports(payload.data.reports);
       } catch {
         if (!cancelled) {
-          setError("Could not reach the reports endpoint.");
+          setError("Could not load reports. Please try again.");
         }
       }
     }
@@ -106,17 +105,30 @@ export function MyReportsPanel() {
   }, []);
 
   if (error) {
-    return <p className="text-sm text-destructive">{error}</p>;
+    return (
+      <EmptyState
+        actionHref="/profile/reports"
+        actionLabel="Refresh reports"
+        description={error}
+        eyebrow="Reports"
+        title="Reports are unavailable"
+      />
+    );
   }
 
   if (!reports) {
-    return <MyReportsSkeleton />;
+    return (
+      <div className="space-y-3" aria-live="polite" aria-busy="true">
+        <p className="text-sm text-muted-foreground">Loading reports...</p>
+        <MyReportsSkeleton />
+      </div>
+    );
   }
 
   if (reports.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-border/70 bg-muted/40 p-8 text-center text-sm text-muted-foreground">
-        You haven&apos;t filed any reports.
+        No reports submitted yet.
       </div>
     );
   }

@@ -1040,7 +1040,6 @@ async function createDemoUsers(supabase, users) {
       email: user.email,
       first_name: user.first_name,
       id: authUser.id,
-      is_verified: false,
       last_name: user.last_name,
       role: "user",
       university_id: user.university_id,

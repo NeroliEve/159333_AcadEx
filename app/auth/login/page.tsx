@@ -22,7 +22,12 @@ async function LoginContent() {
 }
 
 function LoginContentFallback() {
-  return <div className="h-80 w-full max-w-md animate-pulse rounded-2xl border border-border/70 bg-muted/40" />;
+  return (
+    <div className="w-full max-w-md space-y-4">
+      <p className="text-sm text-muted-foreground">Loading login...</p>
+      <div className="h-80 animate-pulse rounded-2xl border border-border/70 bg-muted/40" />
+    </div>
+  );
 }
 
 export default function Page() {

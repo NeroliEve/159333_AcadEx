@@ -9,7 +9,7 @@ describe("listing manage menu saved-listing access", () => {
   it("lets managed listing cards pass saved state into the dropdown", () => {
     const listingCard = source("components/listing-card.tsx");
 
-    expect(listingCard).toMatch(/<ListingManageMenu(?:(?!\/>).)*initialSaved={isSaved}/s);
+    expect(listingCard).toMatch(/<ListingManageMenu(?:(?!\/>)[\s\S])*initialSaved={isSaved}/);
   });
 
   it("includes a favorite action in the manage dropdown", () => {

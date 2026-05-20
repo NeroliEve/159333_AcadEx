@@ -86,8 +86,15 @@ function CreateListingPageFallback() {
   return (
     <section className="space-y-8">
       <div className="space-y-3">
-        <div className="h-4 w-28 animate-pulse rounded bg-muted" />
-        <div className="h-10 w-64 animate-pulse rounded bg-muted" />
+        <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">
+          Create listing
+        </p>
+        <h1 className="text-3xl font-semibold tracking-tight">
+          Post a book for sale
+        </h1>
+        <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+          Loading listing form...
+        </p>
         <div className="h-4 w-96 max-w-full animate-pulse rounded bg-muted" />
       </div>
       <div className="h-[640px] animate-pulse rounded-2xl border border-border/70 bg-muted/40" />

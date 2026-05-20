@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { EmptyState } from "@/components/empty-state";
 import { FakeWithdrawalForm } from "@/components/fake-withdrawal-form";
 import type { ApiResponse } from "@/lib/api";
 import type { WalletTransactionData } from "@/lib/wallet";
@@ -50,14 +51,14 @@ export function WalletPanel() {
         if (cancelled) return;
 
         if (!response.ok || payload.status === "error") {
-          setError(payload.status === "error" ? payload.message : "Could not load wallet.");
+          setError("Could not load wallet. Please try again.");
           return;
         }
 
         setData(payload.data);
       } catch {
         if (!cancelled) {
-          setError("Could not reach the wallet endpoint.");
+          setError("Could not load wallet. Please try again.");
         }
       }
     }
@@ -70,11 +71,24 @@ export function WalletPanel() {
   }, []);
 
   if (error) {
-    return <p className="text-sm text-destructive">{error}</p>;
+    return (
+      <EmptyState
+        actionHref="/profile/wallet"
+        actionLabel="Refresh wallet"
+        description={error}
+        eyebrow="Wallet"
+        title="Wallet is unavailable"
+      />
+    );
   }
 
   if (!data) {
-    return <WalletPanelSkeleton />;
+    return (
+      <div className="space-y-3" aria-live="polite" aria-busy="true">
+        <p className="text-sm text-muted-foreground">Loading account settings...</p>
+        <WalletPanelSkeleton />
+      </div>
+    );
   }
 
   return (

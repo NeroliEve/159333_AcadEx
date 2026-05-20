@@ -120,9 +120,7 @@ export function BrowseListingsPanel({
         lastLoadedQueryRef.current = normalizedQueryString;
 
         if (!response.ok || payload.status === "error") {
-          setError(
-            payload.status === "error" ? payload.message : "Could not load listings.",
-          );
+          setError("Could not load listings. Please try again.");
           return;
         }
 
@@ -130,7 +128,7 @@ export function BrowseListingsPanel({
       } catch {
         if (!cancelled) {
           lastLoadedQueryRef.current = normalizedQueryString;
-          setError("Could not reach the browse endpoint.");
+          setError("Could not load listings. Please try again.");
         }
       } finally {
         if (!cancelled) {
@@ -191,7 +189,12 @@ export function BrowseListingsPanel({
         <div className="h-24 animate-pulse rounded-xl border border-border/70 bg-muted/50" />
       )}
 
-      {loading && !data ? <BrowseListingsSkeleton /> : null}
+      {loading && !data ? (
+        <div className="space-y-3" aria-live="polite" aria-busy="true">
+          <p className="text-sm text-muted-foreground">Loading listings...</p>
+          <BrowseListingsSkeleton />
+        </div>
+      ) : null}
 
       {error ? (
         <EmptyState

@@ -35,7 +35,7 @@ function MessagesIndexFallback() {
   return (
     <section className="space-y-6">
       <div className="space-y-2">
-        <p className="text-sm text-muted-foreground">Loading messages</p>
+        <p className="text-sm text-muted-foreground">Loading messages...</p>
         <div className="h-4 w-24 animate-pulse rounded bg-muted" />
         <div className="h-8 w-56 animate-pulse rounded bg-muted" />
       </div>
