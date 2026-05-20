@@ -20,7 +20,7 @@ export async function GET() {
 
     const transactions = await getMyTransactions(user.id);
     const reviewableTxIds = [...transactions.buying, ...transactions.selling]
-      .filter((tx) => canReviewTransactionStatus(tx.status, tx.reservation_confirmed_at))
+      .filter((tx) => !tx.counterparty_blocked && canReviewTransactionStatus(tx.status, tx.reservation_confirmed_at))
       .map((tx) => tx.id);
     const reviewEntries = await Promise.all(
       reviewableTxIds.map(async (txId) => [

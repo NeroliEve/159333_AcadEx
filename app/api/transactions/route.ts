@@ -4,6 +4,7 @@ import {
   getMarketplaceSuspendedResponse,
   getViewerAccessContext,
 } from "@/lib/admin";
+import { isBlockedBetween } from "@/lib/blocks";
 import {
   BUY_REQUEST_DECLINE_LIMIT,
   validateTradeRequestMessage,
@@ -46,6 +47,9 @@ export async function POST(request: Request) {
   }
   if (listing.status !== "available" || listing.archived_at) {
     return NextResponse.json({ error: "This listing is no longer available." }, { status: 400 });
+  }
+  if (await isBlockedBetween(userId, listing.seller_id)) {
+    return NextResponse.json({ error: "You cannot request this listing." }, { status: 403 });
   }
 
   const requestType = rawRequestType ?? (offeredListingId ? "trade" : "buy");

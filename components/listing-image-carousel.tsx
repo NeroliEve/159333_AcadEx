@@ -48,7 +48,7 @@ export function ListingImageCarousel({
       <Link
         aria-label={`View details for ${title}`}
         href={href}
-        className="block h-full w-full"
+        className="relative block h-full w-full"
       >
         {currentImageUrl ? (
           <Image

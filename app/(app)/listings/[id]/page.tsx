@@ -66,10 +66,13 @@ async function ListingDetailContent({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [{ user, profile }, { listing, error }] = await Promise.all([
-    getViewerContext(),
-    getListingById(id),
-  ]);
+  const { user, profile } = await getViewerContext();
+  const isSuspended = isMarketplaceSuspended(profile);
+  const isAdmin = profile?.role === "admin" && !isSuspended;
+  const { listing, error } = await getListingById(id, {
+    bypassBlock: isAdmin,
+    viewerId: user?.id,
+  });
 
   if (error || !listing) notFound();
 
@@ -78,9 +81,7 @@ async function ListingDetailContent({
     : null;
 
   const sellerName = getProfileDisplayName(listing.seller);
-  const isSuspended = isMarketplaceSuspended(profile);
   const isOwner = user?.id === listing.seller_id;
-  const isAdmin = profile?.role === "admin" && !isSuspended;
   const isArchived = listing.status === "archived" || !!listing.archived_at;
 
   if (isArchived) {

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getBlockedCounterpartyIds, isBlockedBetween } from "@/lib/blocks";
 import type { TableRow } from "@/lib/supabase/database.types";
 import { hasEnvVars } from "@/lib/utils";
 export { MAX_MESSAGE_LENGTH } from "@/lib/message-constants";
@@ -320,15 +321,7 @@ export async function getMyConversationSummaries(
 
   if (error || !data || data.length === 0) return [];
 
-  // Hide conversations with anyone the viewer has blocked OR who has blocked the viewer
-  const { data: blocks } = await supabase
-    .from("user_blocks")
-    .select("blocker_id, blocked_id")
-    .or(`blocker_id.eq.${viewerId},blocked_id.eq.${viewerId}`);
-
-  const blockedCounterparties = new Set<string>(
-    (blocks ?? []).map((row) => (row.blocker_id === viewerId ? row.blocked_id : row.blocker_id)),
-  );
+  const blockedCounterparties = new Set(await getBlockedCounterpartyIds(viewerId));
 
   const filteredRows = (data as unknown as ConversationRow[]).filter((conv) => {
     const otherId = conv.buyer_id === viewerId ? conv.seller_id : conv.buyer_id;
@@ -392,15 +385,7 @@ export async function getUnreadMessageCount(
 
   if (error || !data || data.length === 0) return 0;
 
-  // Skip conversations with blocked users (either direction)
-  const { data: blocks } = await supabase
-    .from("user_blocks")
-    .select("blocker_id, blocked_id")
-    .or(`blocker_id.eq.${viewerId},blocked_id.eq.${viewerId}`);
-
-  const blockedCounterparties = new Set<string>(
-    (blocks ?? []).map((row) => (row.blocker_id === viewerId ? row.blocked_id : row.blocker_id)),
-  );
+  const blockedCounterparties = new Set(await getBlockedCounterpartyIds(viewerId));
 
   const conversationIds = data
     .filter((conv) => {
@@ -442,6 +427,18 @@ export async function getConversationDetail(
   if (error) return { conversation: null, error: error.message };
   if (!data) return { conversation: null, error: null };
 
+  const conversationRow = data as unknown as ConversationRow;
+  if (conversationRow.buyer_id !== viewerId && conversationRow.seller_id !== viewerId) {
+    return { conversation: null, error: null };
+  }
+
+  const otherPartyId = conversationRow.buyer_id === viewerId
+    ? conversationRow.seller_id
+    : conversationRow.buyer_id;
+  if (await isBlockedBetween(viewerId, otherPartyId)) {
+    return { conversation: null, error: null };
+  }
+
   const { data: messageData, error: messageError } = await supabase
     .from("messages")
     .select(MESSAGE_SELECT)
@@ -458,7 +455,7 @@ export async function getConversationDetail(
   );
 
   const summary = toConversationSummary(
-    data as unknown as ConversationRow,
+    conversationRow,
     viewerId,
     latestByConversation,
     unreadCounts,

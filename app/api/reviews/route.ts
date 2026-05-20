@@ -4,6 +4,7 @@ import {
   getMarketplaceSuspendedResponse,
   getViewerAccessContext,
 } from "@/lib/admin";
+import { isBlockedBetween } from "@/lib/blocks";
 import { canReviewTransactionStatus } from "@/lib/exchange-flow";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -51,6 +52,15 @@ export async function POST(request: Request) {
   }
   if (userId !== transaction.buyer_id && userId !== transaction.seller_id) {
     return NextResponse.json({ error: "You are not part of this transaction." }, { status: 403 });
+  }
+  const expectedRevieweeId = userId === transaction.buyer_id
+    ? transaction.seller_id
+    : transaction.buyer_id;
+  if (revieweeId !== expectedRevieweeId) {
+    return NextResponse.json({ error: "You can only review the other user in this transaction." }, { status: 403 });
+  }
+  if (await isBlockedBetween(userId, revieweeId)) {
+    return NextResponse.json({ error: "You can no longer review this user." }, { status: 403 });
   }
 
   // Upsert with the service role after validating the user/transaction above.

@@ -17,13 +17,18 @@ export async function GET(
 ) {
   try {
     const { username } = await params;
-    const [{ profile, error }, { profile: viewer }] = await Promise.all([
-      getPublicProfile(username),
-      getViewerContext(),
-    ]);
+    const { profile: viewer } = await getViewerContext();
+    const { blockedMe, profile, error } = await getPublicProfile(username, {
+      bypassBlock: viewer?.role === "admin",
+      viewerId: viewer?.id,
+    });
 
     if (error) {
       return NextResponse.json(apiError(error), { status: 500 });
+    }
+
+    if (blockedMe) {
+      return NextResponse.json(apiError("Profile unavailable."), { status: 403 });
     }
 
     if (!profile) {
@@ -33,7 +38,7 @@ export async function GET(
     const isOwnProfile = viewer?.id === profile.id;
     const [ratingSummary, reviews, savedIds, blockedIds] = await Promise.all([
       getSellerRatingSummary(profile.id),
-      getSellerReviews(profile.id),
+      getSellerReviews(profile.id, viewer?.id),
       viewer ? getSavedListingIds(viewer.id) : Promise.resolve([]),
       viewer && !isOwnProfile ? getBlockedUserIds(viewer.id) : Promise.resolve([]),
     ]);

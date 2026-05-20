@@ -56,18 +56,19 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const [{ profile, userId }, { listing, error }] = await Promise.all([
-      getViewerAccessContext(),
-      getListingById(id),
-    ]);
+    const { profile, userId } = await getViewerAccessContext();
+    const isSuspended = profile?.account_status === "suspended";
+    const isAdmin = profile?.role === "admin" && !isSuspended;
+    const { listing, error } = await getListingById(id, {
+      bypassBlock: isAdmin,
+      viewerId: userId,
+    });
 
     if (error || !listing) {
       return NextResponse.json(apiError(error ?? "Listing not found."), { status: 404 });
     }
 
-    const isSuspended = profile?.account_status === "suspended";
     const isOwner = userId === listing.seller_id;
-    const isAdmin = profile?.role === "admin" && !isSuspended;
     const isArchived = listing.status === "archived" || !!listing.archived_at;
 
     if (isArchived) {

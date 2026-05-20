@@ -32,4 +32,10 @@ describe("mobile responsiveness guardrails", () => {
   it("allows report modals to scroll within short mobile viewports", () => {
     expect(source("components/report-button.tsx")).toContain("max-h-[85vh] w-full max-w-md overflow-y-auto");
   });
+
+  it("keeps fill images inside positioned listing image links", () => {
+    const carousel = source("components/listing-image-carousel.tsx");
+
+    expect(carousel).toContain('className="relative block h-full w-full"');
+  });
 });

@@ -1,10 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockGetViewerAccessContext = vi.fn();
+const mockIsBlockedBetween = vi.fn();
 
 vi.mock("@/lib/admin", () => ({
   getMarketplaceSuspendedResponse: vi.fn(),
   getViewerAccessContext: mockGetViewerAccessContext,
+}));
+
+vi.mock("@/lib/blocks", () => ({
+  isBlockedBetween: mockIsBlockedBetween,
 }));
 
 type ListingRow = {
@@ -159,6 +164,9 @@ describe("POST /api/transactions", () => {
 
   beforeEach(() => {
     mockGetViewerAccessContext.mockReset();
+    mockIsBlockedBetween.mockReset();
+    mockIsBlockedBetween.mockResolvedValue(false);
+    vi.resetModules();
   });
 
   it("creates a message-only trade request for a trade-only listing", async () => {
@@ -266,6 +274,28 @@ describe("POST /api/transactions", () => {
     }));
 
     expect(response.status).toBe(409);
+    expect(supabase.inserts).toEqual([]);
+  });
+
+  it("rejects requests when the seller has blocked the buyer", async () => {
+    const supabase = createMockSupabase({
+      existingTransaction: null,
+      listings: { "listing-sale": saleListing },
+    });
+    mockGetViewerAccessContext.mockResolvedValue({
+      profile: { account_status: "active" },
+      supabase,
+      userId: "buyer-1",
+    });
+    mockIsBlockedBetween.mockResolvedValue(true);
+
+    const { POST } = await import("@/app/api/transactions/route");
+    const response = await POST(postTransaction({
+      listingId: "listing-sale",
+      requestMessage: "Can I buy this now?",
+    }));
+
+    expect(response.status).toBe(403);
     expect(supabase.inserts).toEqual([]);
   });
 

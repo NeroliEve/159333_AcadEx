@@ -4,6 +4,7 @@ import {
   getMarketplaceSuspendedResponse,
   getViewerAccessContext,
 } from "@/lib/admin";
+import { isBlockedBetween } from "@/lib/blocks";
 
 type ReadRouteContext = {
   params: Promise<{ id: string }>;
@@ -29,7 +30,7 @@ export async function POST(
   const { id } = await context.params;
   const { data: conversation } = await supabase
     .from("conversations")
-    .select("id")
+    .select("id, buyer_id, seller_id")
     .eq("id", id)
     .maybeSingle();
 
@@ -37,6 +38,20 @@ export async function POST(
     return NextResponse.json(
       { error: "Conversation not found." },
       { status: 404 },
+    );
+  }
+  if (conversation.buyer_id !== userId && conversation.seller_id !== userId) {
+    return NextResponse.json(
+      { error: "Conversation not found." },
+      { status: 404 },
+    );
+  }
+
+  const otherPartyId = conversation.buyer_id === userId ? conversation.seller_id : conversation.buyer_id;
+  if (await isBlockedBetween(userId, otherPartyId)) {
+    return NextResponse.json(
+      { error: "Conversation unavailable." },
+      { status: 403 },
     );
   }
 

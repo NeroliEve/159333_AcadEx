@@ -4,6 +4,7 @@ import {
   getMarketplaceSuspendedResponse,
   getViewerAccessContext,
 } from "@/lib/admin";
+import { isBlockedBetween } from "@/lib/blocks";
 import { canCancelAcceptedTransaction } from "@/lib/exchange-flow";
 import { getCompletedListingArchiveUpdate, getListingStatusUpdate } from "@/lib/listing-archive";
 import { canCompleteTransaction, canRequestSellerPayment } from "@/lib/payments";
@@ -60,6 +61,10 @@ export async function PATCH(
 
   if (!isBuyer && !isSeller) {
     return NextResponse.json({ error: "You are not part of this transaction." }, { status: 403 });
+  }
+  const otherPartyId = isBuyer ? transaction.seller_id : transaction.buyer_id;
+  if (await isBlockedBetween(userId, otherPartyId)) {
+    return NextResponse.json({ error: "This transaction is unavailable." }, { status: 403 });
   }
 
   if ((action === "accept" || action === "complete") && !isSeller) {

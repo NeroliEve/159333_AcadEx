@@ -107,6 +107,7 @@ export function ListingCard({
               <ListingManageMenu
                 listingId={listing.id}
                 currentStatus={listing.status}
+                initialSaved={isSaved}
               />
             </div>
           ) : viewerId && canUseMarketplace ? (

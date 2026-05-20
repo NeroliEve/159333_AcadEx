@@ -52,16 +52,21 @@ function TransactionRow({
   const isSeller = tx.seller_id === viewerId;
   const isTrade = tx.request_type === "trade";
   const otherParty = isSeller ? tx.buyer : tx.seller;
-  const otherName = otherParty
+  const otherName = tx.counterparty_blocked
+    ? "Acadex user"
+    : otherParty
     ? `${otherParty.first_name} ${otherParty.last_name}`.trim() || otherParty.username
     : "Unknown";
+  const listingTitle = tx.counterparty_blocked && !tx.listing
+    ? "Listing unavailable"
+    : tx.listing?.title ?? "Listing";
 
   return (
     <div className="space-y-3 rounded-xl border border-border/70 bg-card p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-start gap-4">
           <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border/70 bg-secondary">
-            {tx.listing?.primary_image_url ? (
+            {!tx.counterparty_blocked && tx.listing?.primary_image_url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 alt={tx.listing.title}
@@ -74,12 +79,16 @@ function TransactionRow({
           </div>
 
           <div className="space-y-1">
-            <Link
-              href={`/listings/${tx.listing_id}`}
-              className="text-sm font-semibold leading-tight underline underline-offset-2 transition-colors hover:text-foreground"
-            >
-              {tx.listing?.title ?? "Listing"}
-            </Link>
+            {tx.listing && !tx.counterparty_blocked ? (
+              <Link
+                href={`/listings/${tx.listing_id}`}
+                className="text-sm font-semibold leading-tight underline underline-offset-2 transition-colors hover:text-foreground"
+              >
+                {listingTitle}
+              </Link>
+            ) : (
+              <p className="text-sm font-semibold leading-tight">{listingTitle}</p>
+            )}
             <p className="text-xs text-muted-foreground">
               {isSeller ? `Buyer: ${otherName}` : `Seller: ${otherName}`}
             </p>
@@ -131,17 +140,21 @@ function TransactionRow({
             <p className="text-xs font-medium uppercase tracking-wider text-primary">
               {isSeller ? "Offered in trade" : "You offered"}
             </p>
-            <Link
-              href={`/listings/${tx.offered_listing.id}`}
-              className="text-sm font-medium underline underline-offset-2 transition-colors hover:text-foreground"
-            >
-              {tx.offered_listing.title}
-            </Link>
+            {tx.counterparty_blocked ? (
+              <p className="text-sm font-medium">{tx.offered_listing.title}</p>
+            ) : (
+              <Link
+                href={`/listings/${tx.offered_listing.id}`}
+                className="text-sm font-medium underline underline-offset-2 transition-colors hover:text-foreground"
+              >
+                {tx.offered_listing.title}
+              </Link>
+            )}
           </div>
         </div>
       ) : null}
 
-      {tx.conversation_id && !isSuspended ? (
+      {tx.conversation_id && !isSuspended && !tx.counterparty_blocked ? (
         <div className="flex">
           <Link
             href={`/messages/${tx.conversation_id}`}

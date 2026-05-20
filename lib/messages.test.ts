@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockCreateClient = vi.fn();
+const mockGetBlockedCounterpartyIds = vi.fn();
+const mockIsBlockedBetween = vi.fn();
 
 vi.mock("@/lib/utils", () => ({
   hasEnvVars: true,
@@ -8,6 +10,11 @@ vi.mock("@/lib/utils", () => ({
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: mockCreateClient,
+}));
+
+vi.mock("@/lib/blocks", () => ({
+  getBlockedCounterpartyIds: mockGetBlockedCounterpartyIds,
+  isBlockedBetween: mockIsBlockedBetween,
 }));
 
 type QueryCall = {
@@ -77,6 +84,10 @@ describe("getMyConversationSummaries", () => {
   beforeEach(() => {
     calls.length = 0;
     mockCreateClient.mockReset();
+    mockGetBlockedCounterpartyIds.mockReset();
+    mockGetBlockedCounterpartyIds.mockResolvedValue([]);
+    mockIsBlockedBetween.mockReset();
+    mockIsBlockedBetween.mockResolvedValue(false);
     vi.resetModules();
   });
 
@@ -134,10 +145,6 @@ describe("getMyConversationSummaries", () => {
       from: vi.fn((table: string) => {
         if (table === "conversations") {
           return new MockQuery(table, { data: [conversation], error: null }, calls);
-        }
-
-        if (table === "user_blocks") {
-          return new MockQuery(table, { data: [], error: null }, calls);
         }
 
         if (table === "messages") {

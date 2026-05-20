@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getMarketplaceSuspendedResponse, getViewerAccessContext } from "@/lib/admin";
+import { isBlockedBetween } from "@/lib/blocks";
 import { getCheckoutEligibility, nzdToMinorUnits } from "@/lib/payments";
 import { getStripe } from "@/lib/stripe";
 
@@ -35,6 +36,7 @@ export async function POST(request: Request) {
       payment_requested_at,
       request_type,
       reservation_confirmed_at,
+      seller_id,
       status,
       listing:listings!transactions_listing_id_fkey(id, title)
     `)
@@ -43,6 +45,9 @@ export async function POST(request: Request) {
 
   if (!transaction) {
     return NextResponse.json({ error: "Transaction not found." }, { status: 404 });
+  }
+  if (await isBlockedBetween(userId, transaction.buyer_id === userId ? transaction.seller_id : transaction.buyer_id)) {
+    return NextResponse.json({ error: "This transaction is unavailable." }, { status: 403 });
   }
 
   const eligibility = getCheckoutEligibility(transaction, userId);

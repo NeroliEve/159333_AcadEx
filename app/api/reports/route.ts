@@ -4,6 +4,7 @@ import {
   getMarketplaceSuspendedResponse,
   getViewerAccessContext,
 } from "@/lib/admin";
+import { isBlockedBetween } from "@/lib/blocks";
 import { REPORT_REASONS, isValidReportReason } from "@/lib/reports";
 
 type ReportBody = {
@@ -53,12 +54,18 @@ export async function POST(request: Request) {
     if (data.seller_id === userId) {
       return NextResponse.json({ error: "You can't report your own listing." }, { status: 400 });
     }
+    if (await isBlockedBetween(userId, data.seller_id)) {
+      return NextResponse.json({ error: "Listing not found." }, { status: 404 });
+    }
   } else if (targetKind === "user") {
     if (targetId === userId) {
       return NextResponse.json({ error: "You can't report yourself." }, { status: 400 });
     }
     const { data } = await supabase.from("profiles").select("id").eq("id", targetId).maybeSingle();
     if (!data) return NextResponse.json({ error: "User not found." }, { status: 404 });
+    if (await isBlockedBetween(userId, targetId)) {
+      return NextResponse.json({ error: "User not found." }, { status: 404 });
+    }
   } else if (targetKind === "message") {
     const { data } = await supabase.from("messages").select("sender_id").eq("id", targetId).maybeSingle();
     if (!data) return NextResponse.json({ error: "Message not found." }, { status: 404 });

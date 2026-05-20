@@ -128,7 +128,7 @@ export default async function BrowsePage({ searchParams }: BrowsePageProps) {
         </div>
       </div>
 
-      <AiSearchBar />
+      {user ? <AiSearchBar /> : null}
 
       <Suspense fallback={<BrowseContentFallback />}>
         <BrowseListingsPanel

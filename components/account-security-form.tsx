@@ -46,7 +46,6 @@ function getPasswordErrorMessage(error: unknown) {
 export function AccountSecurityForm({ email }: AccountSecurityFormProps) {
   const router = useRouter();
   const [currentEmail, setCurrentEmail] = useState(email);
-  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
   const [nextEmail, setNextEmail] = useState(email);
   const [emailMessage, setEmailMessage] = useState<FormMessage | null>(null);
   const [passwordMessage, setPasswordMessage] = useState<FormMessage | null>(null);
@@ -63,7 +62,6 @@ export function AccountSecurityForm({ email }: AccountSecurityFormProps) {
   useEffect(() => {
     setCurrentEmail(email);
     setNextEmail(email);
-    setPendingEmail(null);
   }, [email]);
 
   useEffect(() => {
@@ -138,29 +136,27 @@ export function AccountSecurityForm({ email }: AccountSecurityFormProps) {
     setIsEmailSubmitting(true);
 
     try {
-      const supabase = createClient();
-      const { data, error } = await supabase.auth.updateUser({ email: trimmedEmail });
+      const response = await fetch("/api/account/email", {
+        body: JSON.stringify({ email: trimmedEmail }),
+        headers: { "Content-Type": "application/json" },
+        method: "PATCH",
+      });
+      const result = (await response.json()) as {
+        email?: string;
+        message?: string;
+        status: "error" | "success";
+      };
 
-      if (error) {
-        throw error;
+      if (!response.ok || result.status === "error") {
+        throw new Error(result.message ?? "Could not update email.");
       }
 
-      const updatedEmail = data.user?.email?.trim();
-
-      if (updatedEmail && normalizeEmail(updatedEmail) === normalizeEmail(trimmedEmail)) {
-        setCurrentEmail(updatedEmail);
-        setNextEmail(updatedEmail);
-        setPendingEmail(null);
-        setEmailMessage(null);
-        setToastMessage("Email updated successfully.");
-        router.refresh();
-      } else {
-        setPendingEmail(trimmedEmail);
-        setEmailMessage(null);
-        setToastMessage(
-          "Check your current and new email inboxes to confirm this change.",
-        );
-      }
+      const updatedEmail = result.email?.trim() || trimmedEmail;
+      setCurrentEmail(updatedEmail);
+      setNextEmail(updatedEmail);
+      setEmailMessage(null);
+      setToastMessage(result.message ?? "Email updated successfully.");
+      router.refresh();
     } catch (error: unknown) {
       setEmailMessage({
         text: error instanceof Error ? error.message : "Could not update email.",
@@ -258,12 +254,6 @@ export function AccountSecurityForm({ email }: AccountSecurityFormProps) {
             <p className="text-sm text-muted-foreground">
               Current email: <span className="font-medium text-foreground">{currentEmail}</span>
             </p>
-            {pendingEmail && (
-              <p className="text-sm text-muted-foreground">
-                Pending confirmation:{" "}
-                <span className="font-medium text-foreground">{pendingEmail}</span>
-              </p>
-            )}
           </div>
 
           {emailMessage?.type === "error" && (
@@ -285,11 +275,6 @@ export function AccountSecurityForm({ email }: AccountSecurityFormProps) {
               required
             />
           </div>
-
-          <p className="text-sm text-muted-foreground">
-            Email changes may require confirmation from both your current and new
-            addresses before they take effect.
-          </p>
 
           <div className="flex justify-end border-t border-border/70 pt-4">
             <PillButton type="submit" disabled={isEmailSubmitting}>

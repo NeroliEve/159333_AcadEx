@@ -35,7 +35,10 @@ async function EditListingPageContent({
   }
 
   const [{ listing, error }, courses, studyAreas] = await Promise.all([
-    getListingById(id),
+    getListingById(id, {
+      bypassBlock: profile?.role === "admin",
+      viewerId: user.id,
+    }),
     getCourseOptions(),
     getStudyAreaOptions(),
   ]);

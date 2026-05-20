@@ -48,7 +48,7 @@ function ReviewCard({ review }: { review: ReviewData }) {
   const reviewer = review.reviewer;
   const reviewerName = reviewer
     ? `${reviewer.first_name ?? ""} ${reviewer.last_name ?? ""}`.trim() || reviewer.username
-    : "Anonymous";
+    : "Acadex user";
   const roleLabel =
     review.reviewer_role === "buyer" ? "Bought from this user" : "Sold to this user";
 

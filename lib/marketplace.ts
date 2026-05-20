@@ -2,6 +2,7 @@ import type { User } from "@supabase/supabase-js";
 import { cache } from "react";
 
 import { hasEnvVars } from "@/lib/utils";
+import { getBlockedCounterpartyIds, getBlockRelationship, isBlockedBetween } from "@/lib/blocks";
 import { createClient } from "@/lib/supabase/server";
 import type {
   PublicEnum,
@@ -87,6 +88,10 @@ type ListingCardBase = Pick<
   study_area: StudyAreaSummary | null;
 };
 
+type ListingCardRow = ListingCardBase & {
+  seller_id?: string | null;
+};
+
 export type ListingCardData = ListingCardBase & {
   images: ListingImageData[];
 };
@@ -126,6 +131,7 @@ const LISTING_CARD_SELECT = `
   status,
   archived_at,
   primary_image_url,
+  seller_id,
   show_seller_university,
   created_at,
   course:courses!listings_course_id_fkey(id, course_code, course_name, university, university_id),
@@ -151,6 +157,7 @@ const LISTING_CARD_SELECT_ANON = `
   status,
   archived_at,
   primary_image_url,
+  seller_id,
   show_seller_university,
   created_at,
   course:courses!listings_course_id_fkey(id, course_code, course_name, university, university_id),
@@ -234,6 +241,10 @@ async function attachListingImages(
 }
 
 // ─── Viewer ───────────────────────────────────────────────────────────────────
+
+function stripListingInternalFields(listings: ListingCardRow[]): ListingCardBase[] {
+  return listings.map(({ seller_id: _sellerId, ...listing }) => listing);
+}
 
 async function loadViewerContext(): Promise<{
   profile: ViewerProfile | null;
@@ -359,14 +370,7 @@ export async function getListingsFeed(
     viewerId = user?.id ?? null;
   }
 
-  let blockedIds: string[] = [];
-  if (viewerId) {
-    const { data: blocks } = await supabase
-      .from("user_blocks")
-      .select("blocked_id")
-      .eq("blocker_id", viewerId);
-    blockedIds = (blocks ?? []).map((row) => row.blocked_id);
-  }
+  const blockedIds = viewerId ? await getBlockedCounterpartyIds(viewerId) : [];
 
   async function runListingsQuery(includeVisibility = true) {
     let query = supabase
@@ -458,9 +462,13 @@ export async function getListingsFeed(
 
   if (error) return { error: error.message, listings: [] };
 
+  const visibleRows = ((data ?? []) as ListingCardRow[]).filter(
+    (listing) => !blockedIds.includes(listing.seller_id ?? ""),
+  );
+
   return {
     error: null,
-    listings: await attachListingImages(supabase, (data ?? []) as ListingCardBase[]),
+    listings: await attachListingImages(supabase, stripListingInternalFields(visibleRows)),
   };
 }
 
@@ -542,7 +550,7 @@ export async function getMyListings(userId: string): Promise<ListingCardData[]> 
     data = legacyResult.data;
   }
 
-  return attachListingImages(supabase, (data ?? []) as ListingCardBase[]);
+  return attachListingImages(supabase, stripListingInternalFields((data ?? []) as ListingCardRow[]));
 }
 
 // Listings owned by the user that are still available to offer in a trade.
@@ -578,7 +586,10 @@ export async function getMyAvailableListings(
   }>;
 }
 
-export async function getListingById(id: string): Promise<{
+export async function getListingById(id: string, options: {
+  bypassBlock?: boolean;
+  viewerId?: string | null;
+} = {}): Promise<{
   listing: ListingDetailData | null;
   error: string | null;
 }> {
@@ -608,6 +619,16 @@ export async function getListingById(id: string): Promise<{
   if (error) return { listing: null, error: error.message };
   if (!data) return { listing: null, error: null };
 
+  const listingData = data as Omit<ListingDetailData, "images">;
+  if (
+    options.viewerId &&
+    !options.bypassBlock &&
+    options.viewerId !== listingData.seller_id &&
+    await isBlockedBetween(options.viewerId, listingData.seller_id)
+  ) {
+    return { listing: null, error: null };
+  }
+
   const { data: images, error: imagesError } = await supabase
     .from("listing_images")
     .select("id, image_url, is_primary, sort_order")
@@ -618,7 +639,7 @@ export async function getListingById(id: string): Promise<{
 
   return {
     listing: {
-      ...(data as Omit<ListingDetailData, "images">),
+      ...listingData,
       images: (images ?? []) as ListingImageData[],
     },
     error: null,
@@ -645,7 +666,12 @@ export async function getListingTransactionParticipantIds(listingId: string): Pr
   return [...participantIds];
 }
 
-export async function getPublicProfile(username: string): Promise<{
+export async function getPublicProfile(username: string, options: {
+  bypassBlock?: boolean;
+  viewerId?: string | null;
+} = {}): Promise<{
+  blockedByMe?: boolean;
+  blockedMe?: boolean;
   profile: PublicProfile | null;
   error: string | null;
 }> {
@@ -665,6 +691,21 @@ export async function getPublicProfile(username: string): Promise<{
 
   if (profileError) return { profile: null, error: profileError.message };
   if (!profileData) return { profile: null, error: null };
+
+  let blockedByMe = false;
+  let blockedMe = false;
+  if (
+    options.viewerId &&
+    !options.bypassBlock &&
+    options.viewerId !== profileData.id
+  ) {
+    const relationship = await getBlockRelationship(options.viewerId, profileData.id);
+    blockedByMe = relationship.blockedByMe;
+    blockedMe = relationship.blockedMe;
+    if (blockedMe) {
+      return { blockedByMe, blockedMe, profile: null, error: null };
+    }
+  }
 
   const listingsResult = await supabase
     .from("listings")
@@ -691,10 +732,12 @@ export async function getPublicProfile(username: string): Promise<{
 
   const listings = await attachListingImages(
     supabase,
-    (listingsData ?? []) as ListingCardBase[],
+    stripListingInternalFields((listingsData ?? []) as ListingCardRow[]),
   );
 
   return {
+    blockedByMe,
+    blockedMe,
     profile: {
       ...profileData,
       listings,
@@ -810,6 +853,7 @@ export type TransactionData = {
   listing: Pick<TableRow<"listings">, "id" | "title" | "primary_image_url" | "price" | "condition"> | null;
   offered_listing: Pick<TableRow<"listings">, "id" | "title" | "primary_image_url" | "price" | "condition"> | null;
   buyer: Pick<TableRow<"profiles">, "id" | "first_name" | "last_name" | "username" | "avatar_url"> | null;
+  counterparty_blocked?: boolean;
   seller: Pick<TableRow<"profiles">, "id" | "first_name" | "last_name" | "username" | "avatar_url"> | null;
 };
 
@@ -850,9 +894,26 @@ export async function getMyTransactions(userId: string): Promise<{
       .order("created_at", { ascending: false }),
   ]);
 
+  const blockedCounterparties = new Set(await getBlockedCounterpartyIds(userId));
+  const sanitizeTransaction = (tx: TransactionData): TransactionData => {
+    const otherId = tx.seller_id === userId ? tx.buyer_id : tx.seller_id;
+    if (!blockedCounterparties.has(otherId)) {
+      return { ...tx, counterparty_blocked: false };
+    }
+
+    return {
+      ...tx,
+      buyer: tx.buyer_id === otherId ? null : tx.buyer,
+      counterparty_blocked: true,
+      listing: tx.seller_id === otherId ? null : tx.listing,
+      offered_listing: tx.buyer_id === otherId ? null : tx.offered_listing,
+      seller: tx.seller_id === otherId ? null : tx.seller,
+    };
+  };
+
   return {
-    buying: ((buying ?? []) as unknown as TransactionData[]).filter(isTransactionHistoryEntry),
-    selling: ((selling ?? []) as unknown as TransactionData[]).filter(isTransactionHistoryEntry),
+    buying: ((buying ?? []) as unknown as TransactionData[]).filter(isTransactionHistoryEntry).map(sanitizeTransaction),
+    selling: ((selling ?? []) as unknown as TransactionData[]).filter(isTransactionHistoryEntry).map(sanitizeTransaction),
   };
 }
 
@@ -971,7 +1032,7 @@ export type SellerRatingSummary = {
 };
 
 // All reviews where this user is the reviewee — used on their public profile
-export async function getSellerReviews(revieweeId: string): Promise<ReviewData[]> {
+export async function getSellerReviews(revieweeId: string, viewerId?: string | null): Promise<ReviewData[]> {
   if (!hasEnvVars) return [];
 
   const supabase = await createClient();
@@ -981,7 +1042,15 @@ export async function getSellerReviews(revieweeId: string): Promise<ReviewData[]
     .eq("reviewee_id", revieweeId)
     .order("created_at", { ascending: false });
 
-  return (data ?? []) as unknown as ReviewData[];
+  const reviews = (data ?? []) as unknown as ReviewData[];
+  if (!viewerId) return reviews;
+
+  const blockedCounterparties = new Set(await getBlockedCounterpartyIds(viewerId));
+  return reviews.map((review) =>
+    blockedCounterparties.has(review.reviewer_id)
+      ? { ...review, reviewer: null }
+      : review,
+  );
 }
 
 // Average rating + count for the profile header badge
@@ -1057,11 +1126,17 @@ export async function getSavedListings(userId: string): Promise<ListingCardData[
   }
 
   const listings = ((data ?? []) as unknown[])
-    .map((row) => (row as unknown as { listing: ListingCardBase | null }).listing)
-    .filter((l): l is ListingCardBase => l !== null)
+    .map((row) => (row as unknown as { listing: ListingCardRow | null }).listing)
+    .filter((l): l is ListingCardRow => l !== null)
     .filter((listing) => listing.status !== "archived" && !listing.archived_at);
 
-  return attachListingImages(supabase, listings);
+  const blockedCounterparties = new Set(await getBlockedCounterpartyIds(userId));
+  return attachListingImages(
+    supabase,
+    stripListingInternalFields(
+      listings.filter((listing) => !blockedCounterparties.has(listing.seller_id ?? "")),
+    ),
+  );
 }
 
 // ─── Formatters ───────────────────────────────────────────────────────────────

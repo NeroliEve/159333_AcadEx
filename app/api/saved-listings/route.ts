@@ -4,6 +4,7 @@ import {
   getMarketplaceSuspendedResponse,
   getViewerAccessContext,
 } from "@/lib/admin";
+import { isBlockedBetween } from "@/lib/blocks";
 
 export async function POST(request: Request) {
   const { profile, supabase, userId } = await getViewerAccessContext();
@@ -14,6 +15,19 @@ export async function POST(request: Request) {
 
   const { listingId } = await request.json();
   if (!listingId) return NextResponse.json({ error: "Missing listingId." }, { status: 400 });
+
+  const { data: listing } = await supabase
+    .from("listings")
+    .select("seller_id")
+    .eq("id", listingId)
+    .maybeSingle();
+
+  if (!listing) {
+    return NextResponse.json({ error: "Listing not found." }, { status: 404 });
+  }
+  if (await isBlockedBetween(userId, listing.seller_id)) {
+    return NextResponse.json({ error: "Listing not found." }, { status: 404 });
+  }
 
   const { error } = await supabase
     .from("saved_listings")

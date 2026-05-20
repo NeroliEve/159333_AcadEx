@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 
 import { hasEnvVars } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/server";
 import {
   getCourseOptions,
   getListingsFeed,
@@ -34,6 +35,18 @@ export async function POST(request: Request) {
       return NextResponse.json<AiSearchResponse>(
         { explanation: "", filters: {}, message: "Supabase environment variables are missing.", status: "error" },
         { status: 500 },
+      );
+    }
+
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json<AiSearchResponse>(
+        { explanation: "", filters: {}, message: "You must be logged in to use AI search.", status: "error" },
+        { status: 401 },
       );
     }
 
@@ -185,7 +198,7 @@ Rules:
     }
 
     // Step 2: run the actual search so Claude can write an accurate explanation
-    const { listings } = await getListingsFeed("anonymous", {
+    const { listings } = await getListingsFeed("authenticated", {
       q: filters.q,
       universityId: filters.universityId ? Number(filters.universityId) : undefined,
       courseId: filters.courseId ? Number(filters.courseId) : undefined,
@@ -195,7 +208,7 @@ Rules:
       minPrice: filters.minPrice ? Number(filters.minPrice) : undefined,
       maxPrice: filters.maxPrice ? Number(filters.maxPrice) : undefined,
       sellerName: filters.sellerName,
-    });
+    }, 24, { viewerId: user.id });
 
     // Step 3: send real results back → Claude writes a friendly one-sentence explanation
     const secondResponse = await client.messages.create({

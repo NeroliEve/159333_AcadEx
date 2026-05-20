@@ -26,15 +26,16 @@ type Props = {
 
 async function ProfileContent({ params }: Props) {
   const { username } = await params;
-  const [{ profile, error }, { profile: viewer }] = await Promise.all([
-    getPublicProfile(username),
-    getViewerContext(),
-  ]);
+  const { profile: viewer } = await getViewerContext();
+  const { blockedMe, profile, error } = await getPublicProfile(username, {
+    bypassBlock: viewer?.role === "admin",
+    viewerId: viewer?.id,
+  });
 
   const [ratingSummary, reviews, savedIds] = profile
     ? await Promise.all([
         getSellerRatingSummary(profile.id),
-        getSellerReviews(profile.id),
+        getSellerReviews(profile.id, viewer?.id),
         viewer ? getSavedListingIds(viewer.id) : Promise.resolve([]),
       ])
     : [null, [], []];
@@ -46,6 +47,18 @@ async function ProfileContent({ params }: Props) {
         eyebrow="Profile"
         title="Could not load profile"
         description="There was a problem loading this profile. Please try again later."
+        actionHref="/home"
+        actionLabel="Back to home"
+      />
+    );
+  }
+
+  if (blockedMe) {
+    return (
+      <EmptyState
+        eyebrow="Profile"
+        title="Profile unavailable"
+        description="This profile is not available to view."
         actionHref="/home"
         actionLabel="Back to home"
       />

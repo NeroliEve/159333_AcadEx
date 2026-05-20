@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import type { TableRow } from "@/lib/supabase/database.types";
+export { isBlockedBetween } from "@/lib/blocks";
 
 export type MyReportRow = Pick<
   TableRow<"reports">,
@@ -70,13 +71,3 @@ export async function getBlockedUsers(userId: string): Promise<
   }>;
 }
 
-export async function isBlockedBetween(viewerId: string, otherId: string): Promise<boolean> {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("user_blocks")
-    .select("blocker_id")
-    .or(`and(blocker_id.eq.${viewerId},blocked_id.eq.${otherId}),and(blocker_id.eq.${otherId},blocked_id.eq.${viewerId})`)
-    .limit(1);
-
-  return (data ?? []).length > 0;
-}

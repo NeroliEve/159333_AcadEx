@@ -4,6 +4,7 @@ import {
   getMarketplaceSuspendedResponse,
   getViewerAccessContext,
 } from "@/lib/admin";
+import { isBlockedBetween } from "@/lib/blocks";
 import { canSendConversationMessage } from "@/lib/exchange-flow";
 import { MAX_MESSAGE_LENGTH, MESSAGE_SELECT } from "@/lib/messages";
 
@@ -93,17 +94,8 @@ export async function POST(
     );
   }
 
-  // Block check: if either party has blocked the other, refuse new messages
   const otherPartyId = conversation.buyer_id === userId ? conversation.seller_id : conversation.buyer_id;
-  const { data: blocks } = await supabase
-    .from("user_blocks")
-    .select("blocker_id")
-    .or(
-      `and(blocker_id.eq.${userId},blocked_id.eq.${otherPartyId}),and(blocker_id.eq.${otherPartyId},blocked_id.eq.${userId})`,
-    )
-    .limit(1);
-
-  if ((blocks ?? []).length > 0) {
+  if (await isBlockedBetween(userId, otherPartyId)) {
     return NextResponse.json(
       { error: "You can no longer message this user." },
       { status: 403 },
