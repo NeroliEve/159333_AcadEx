@@ -21,7 +21,6 @@ import {
   type ProfileAvatarIntent,
 } from "@/lib/profile-form-state";
 import { YEAR_LEVEL_OPTIONS } from "@/lib/profile-validation";
-import { createClient } from "@/lib/supabase/client";
 
 type EditProfileFormProps = {
   degrees: DegreeOption[];
@@ -30,10 +29,42 @@ type EditProfileFormProps = {
   universities: UniversityOption[];
 };
 
+type StorageUploadResponse =
+  | {
+      files: {
+        path: string;
+        url: string;
+      }[];
+      status: "success";
+    }
+  | {
+      message: string;
+      status: "error";
+    };
+
 const MAX_AVATAR_SIZE_BYTES = 1024 * 1024;
 const UNSAVED_CHANGES_CONFIRM_MESSAGE =
   "You have unsaved profile changes. Leave without saving changes?";
 const removePictureDialogCopy = getRemoveProfilePictureDialogCopy();
+
+async function removeUploadedAvatar(path: string) {
+  if (!path) {
+    return;
+  }
+
+  try {
+    await fetch("/api/storage/uploads", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        bucket: "avatars",
+        paths: [path],
+      }),
+    });
+  } catch {
+    // Best-effort cleanup; keep the original form error visible.
+  }
+}
 
 export function EditProfileForm({
   degrees,
@@ -335,6 +366,7 @@ export function EditProfileForm({
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
+    let uploadedAvatarPath = "";
 
     setMessage(null);
     setIsSubmitting(true);
@@ -362,23 +394,29 @@ export function EditProfileForm({
           return;
         }
 
-        const supabase = createClient();
-        const extension = selectedAvatarFile.name.split(".").pop()?.toLowerCase() || "png";
-        const filePath = `${profile.id}/avatar-${crypto.randomUUID()}.${extension}`;
-        const { error: uploadError } = await supabase.storage
-          .from("avatars")
-          .upload(filePath, selectedAvatarFile, {
-            cacheControl: "3600",
-            contentType: selectedAvatarFile.type,
-          });
+        const uploadFormData = new FormData();
+        uploadFormData.append("bucket", "avatars");
+        uploadFormData.append("files", selectedAvatarFile);
 
-        if (uploadError) {
-          setMessage({ text: uploadError.message, type: "error" });
+        const uploadResponse = await fetch("/api/storage/uploads", {
+          method: "POST",
+          body: uploadFormData,
+        });
+        const uploadData = (await uploadResponse.json()) as StorageUploadResponse;
+
+        if (uploadData.status === "error") {
+          setMessage({ text: uploadData.message, type: "error" });
           return;
         }
 
-        const { data } = supabase.storage.from("avatars").getPublicUrl(filePath);
-        avatarUrl = data.publicUrl;
+        const uploadedFile = uploadData.files[0];
+        if (!uploadedFile) {
+          setMessage({ text: "Could not upload your profile picture.", type: "error" });
+          return;
+        }
+
+        uploadedAvatarPath = uploadedFile.path;
+        avatarUrl = uploadedFile.url;
       }
 
       const response = await fetch("/api/profile", {
@@ -399,6 +437,10 @@ export function EditProfileForm({
       const data = await response.json();
       setMessage({ text: data.message, type: data.status });
 
+      if (data.status === "error" && uploadedAvatarPath) {
+        await removeUploadedAvatar(uploadedAvatarPath);
+      }
+
       if (data.status === "success") {
         clearAvatarObjectUrl();
         resetAvatarInput();
@@ -409,6 +451,9 @@ export function EditProfileForm({
         router.refresh();
       }
     } catch {
+      if (uploadedAvatarPath) {
+        await removeUploadedAvatar(uploadedAvatarPath);
+      }
       setMessage({ text: "Could not reach the server.", type: "error" });
     } finally {
       setIsSubmitting(false);

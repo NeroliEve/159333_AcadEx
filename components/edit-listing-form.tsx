@@ -16,7 +16,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { CourseOption, ListingDetailData, ListingType, StudyAreaOption } from "@/lib/marketplace";
-import { createClient } from "@/lib/supabase/client";
 
 type EditListingFormProps = {
   listing: ListingDetailData;
@@ -43,6 +42,19 @@ type UpdateListingResponse = {
   status: "error" | "success";
 };
 
+type StorageUploadResponse =
+  | {
+      files: {
+        path: string;
+        url: string;
+      }[];
+      status: "success";
+    }
+  | {
+      message: string;
+      status: "error";
+    };
+
 type ListingImageSlot = {
   file?: File;
   id: string;
@@ -55,6 +67,25 @@ const MAX_LISTING_IMAGE_SIZE_BYTES = 2 * 1024 * 1024;
 function FieldError({ message }: { message?: string }) {
   if (!message) return null;
   return <p className="text-sm text-destructive">{message}</p>;
+}
+
+async function removeUploadedListingImages(paths: string[]) {
+  if (paths.length === 0) {
+    return;
+  }
+
+  try {
+    await fetch("/api/storage/uploads", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        bucket: "listing-images",
+        paths,
+      }),
+    });
+  } catch {
+    // Best-effort cleanup; keep the original form error visible.
+  }
 }
 
 function getInitialImageSlots(listing: ListingDetailData): ListingImageSlot[] {
@@ -159,8 +190,8 @@ export function EditListingForm({ listing, courses, studyAreas }: EditListingFor
     setIsSubmitting(true);
 
     try {
-      const supabase = createClient();
       const imageUrls: string[] = [];
+      const uploadFormData = new FormData();
 
       for (const slot of imageSlots) {
         if (!slot.file) {
@@ -168,37 +199,25 @@ export function EditListingForm({ listing, courses, studyAreas }: EditListingFor
           continue;
         }
 
-        const {
-          data: { user },
-          error: userError,
-        } = await supabase.auth.getUser();
+        uploadFormData.append("files", slot.file);
+      }
 
-        if (userError || !user) {
-          setState({ message: "You need to sign in before uploading listing images.", status: "error" });
+      if (uploadFormData.has("files")) {
+        uploadFormData.append("bucket", "listing-images");
+
+        const uploadResponse = await fetch("/api/storage/uploads", {
+          method: "POST",
+          body: uploadFormData,
+        });
+        const uploadData = (await uploadResponse.json()) as StorageUploadResponse;
+
+        if (uploadData.status === "error") {
+          setState({ message: uploadData.message, status: "error" });
           return;
         }
 
-        const extension = slot.file.name.split(".").pop()?.toLowerCase() || "jpg";
-        const filePath = `${user.id}/listing-${crypto.randomUUID()}.${extension}`;
-        const { error: uploadError } = await supabase.storage
-          .from("listing-images")
-          .upload(filePath, slot.file, {
-            cacheControl: "3600",
-            contentType: slot.file.type,
-          });
-
-        if (uploadError) {
-          if (uploadedImagePaths.length > 0) {
-            await supabase.storage.from("listing-images").remove(uploadedImagePaths);
-          }
-
-          setState({ message: uploadError.message, status: "error" });
-          return;
-        }
-
-        uploadedImagePaths.push(filePath);
-        const { data } = supabase.storage.from("listing-images").getPublicUrl(filePath);
-        imageUrls.push(data.publicUrl);
+        uploadedImagePaths.push(...uploadData.files.map((file) => file.path));
+        imageUrls.push(...uploadData.files.map((file) => file.url));
       }
 
       payload.imageUrls = imageUrls;
@@ -211,16 +230,14 @@ export function EditListingForm({ listing, courses, studyAreas }: EditListingFor
 
       const contentType = response.headers.get("content-type") ?? "";
       if (!contentType.includes("application/json")) {
-        if (uploadedImagePaths.length > 0) {
-          await supabase.storage.from("listing-images").remove(uploadedImagePaths);
-        }
+        await removeUploadedListingImages(uploadedImagePaths);
         setState({ message: "Acadex returned an invalid response.", status: "error" });
         return;
       }
 
       const data = (await response.json()) as UpdateListingResponse;
       if (data.status === "error" && uploadedImagePaths.length > 0) {
-        await supabase.storage.from("listing-images").remove(uploadedImagePaths);
+        await removeUploadedListingImages(uploadedImagePaths);
       }
 
       setState(data);
@@ -229,9 +246,7 @@ export function EditListingForm({ listing, courses, studyAreas }: EditListingFor
         startTransition(() => router.push("/home"));
       }
     } catch {
-      if (uploadedImagePaths.length > 0) {
-        await createClient().storage.from("listing-images").remove(uploadedImagePaths);
-      }
+      await removeUploadedListingImages(uploadedImagePaths);
       setState({ message: "Could not reach the server.", status: "error" });
     } finally {
       setIsSubmitting(false);
