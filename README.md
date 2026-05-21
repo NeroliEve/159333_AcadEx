@@ -136,10 +136,14 @@ Students can create listings for textbooks and academic materials. A listing can
 include:
 
 - title
+- author
+- edition
+- ISBN number
+- publisher
 - description
 - price
 - condition
-- material type
+- listing type (for sale, trade or sale, trade only)
 - course
 - study area
 - availability status
@@ -154,12 +158,13 @@ Acadex supports both standard search and AI-assisted search.
 
 Standard search allows users to search and filter by:
 
-- keyword
+- title or author (key words)
 - course
 - study area
 - price range
 - item condition
-- listing availability
+- university
+- listing type (sale, trade, sale or trade)
 
 AI-assisted search is intended to support more natural queries, such as searching
 for materials related to a course, topic, or academic need even when the wording
