@@ -38,4 +38,20 @@ describe("Supabase migrations", () => {
       /drop policy if exists "profiles_update_own" on public\.profiles/i,
     );
   });
+
+  it("allows public reads of non-deleted listings so sold listings can appear on profiles", () => {
+    const migrationsDir = path.join(process.cwd(), "supabase", "migrations");
+    const migrationSql = readdirSync(migrationsDir)
+      .filter((file) => file.endsWith(".sql"))
+      .map((file) => readFileSync(path.join(migrationsDir, file), "utf8"))
+      .join("\n")
+      .replace(/\s+/g, " ");
+
+    expect(migrationSql).toMatch(
+      /drop policy if exists "listings_select_anon_available" on public\.listings/i,
+    );
+    expect(migrationSql).toMatch(
+      /create policy "listings_select_public_non_deleted" on public\.listings for select to anon, authenticated using \(deleted_at is null\)/i,
+    );
+  });
 });

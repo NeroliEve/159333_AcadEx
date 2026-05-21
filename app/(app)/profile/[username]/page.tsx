@@ -207,6 +207,30 @@ async function ProfileContent({ params }: Props) {
           </div>
         )}
       </div>
+
+      {profile.previousListings.length > 0 ? (
+        <div className="space-y-6">
+          <div className="space-y-1">
+            <h2 className="text-xl font-semibold tracking-tight">Previous listings</h2>
+            <p className="text-sm text-muted-foreground">
+              Books previously listed by {displayName}.
+            </p>
+          </div>
+
+          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {profile.previousListings.map((listing) => (
+              <ListingCard
+                key={listing.id}
+                listing={listing}
+                viewerAccountStatus={viewer?.account_status}
+                viewerId={viewer?.id}
+                viewerRole={viewer?.role}
+                isSaved={(savedIds as string[]).includes(listing.id)}
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

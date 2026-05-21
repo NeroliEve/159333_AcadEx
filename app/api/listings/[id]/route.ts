@@ -5,11 +5,9 @@ import {
   getMarketplaceSuspendedResponse,
   getViewerAccessContext,
 } from "@/lib/admin";
-import { canViewArchivedListing } from "@/lib/listing-archive";
 import {
   getListingById,
   getListingRequestState,
-  getListingTransactionParticipantIds,
   getMyAvailableListings,
 } from "@/lib/marketplace";
 
@@ -69,21 +67,6 @@ export async function GET(
     }
 
     const isOwner = userId === listing.seller_id;
-    const isArchived = listing.status === "archived" || !!listing.archived_at;
-
-    if (isArchived) {
-      const participantIds = await getListingTransactionParticipantIds(id);
-      const canViewArchived = canViewArchivedListing({
-        isAdmin,
-        participantIds,
-        sellerId: listing.seller_id,
-        viewerId: userId,
-      });
-
-      if (!canViewArchived) {
-        return NextResponse.json(apiError("Listing not found."), { status: 404 });
-      }
-    }
 
     const canTrade =
       listing.listing_type === "trade_only" ||

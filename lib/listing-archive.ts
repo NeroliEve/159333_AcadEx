@@ -7,6 +7,13 @@ export type ListingStatusUpdate = {
   archived_at: string | null;
 };
 
+const listingStatusLabels: Record<ListingStatus, string> = {
+  available: "Available",
+  pending: "Pending",
+  sold: "Sold",
+  archived: "Sold",
+};
+
 const sellerStatusOptions: Record<ListingStatus, ListingStatus[]> = {
   available: ["pending", "archived"],
   pending: ["available", "archived"],
@@ -33,6 +40,10 @@ export function getListingStatusUpdate(
 
 export function getSellerListingStatusOptions(status: ListingStatus): ListingStatus[] {
   return sellerStatusOptions[status];
+}
+
+export function getListingStatusLabel(status: ListingStatus) {
+  return listingStatusLabels[status];
 }
 
 export function canViewArchivedListing({

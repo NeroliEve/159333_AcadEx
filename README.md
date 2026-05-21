@@ -18,6 +18,7 @@ The current app is built with:
 - Supabase Storage
 - Supabase Row Level Security
 - Supabase Realtime
+- Stripe Checkout test payments
 - AI-assisted listing search
 
 ## Current MVP
@@ -34,6 +35,8 @@ The repo currently supports:
 - saved listings / wishlist functionality
 - in-app messaging between buyers and sellers
 - transaction and exchange status tracking
+- Stripe checkout for paid sale transactions
+- seller wallet activity tracking for demo payments
 - rating and review functionality
 - user blocking and reporting
 - admin moderation tools for listings, users, and reports
@@ -42,7 +45,7 @@ The repo currently supports:
 
 The MVP is focused on validating the core exchange workflow: students can list
 academic materials, discover relevant listings, contact each other, and complete
-or manage exchanges through the platform.
+or manage transactions through the platform.
 
 ## Core Flow
 
@@ -77,14 +80,14 @@ flowchart LR
   FE --> DB["Supabase PostgreSQL"]
   FE --> ST["Supabase Storage"]
   FE --> RT["Supabase Realtime"]
-  FE --> AI["AI Search API"]
+  FE --> AI["AI Search API (Anthropic)"]
 
   AUTH --> P["profiles"]
   DB --> L["listings"]
   DB --> C["courses / degrees / study_areas / universities"]
   DB --> M["conversations / messages"]
-  DB --> T["transactions / exchanges"]
-  DB --> R["reviews / reports / admin_action_logs"]
+  DB --> T["transactions / wallet_transactions"]
+  DB --> R["reviews / reports / admin_action_logs / user_blocks"]
 
   ST --> LI["listing images"]
   ST --> AV["user avatars"]
@@ -183,9 +186,9 @@ This includes:
 
 - active listings
 - previous listings
-- ongoing exchanges
+- ongoing transactions
 - completed transactions
-- cancelled or inactive exchanges
+- cancelled or inactive transactions
 - review eligibility after completed transactions
 
 ### Admin Moderation
@@ -215,11 +218,12 @@ Acadex uses Supabase PostgreSQL as the main database. Core tables include:
 - `courses`
 - `conversations`
 - `messages`
-- `transactions` / `exchanges`
+- `transactions`
+- `wallet_transactions`
 - `reviews`
 - `reports`
 - `admin_action_logs`
-- `blocked_users`
+- `user_blocks`
 - `saved_listings`
 
 Reference tables such as `universities`, `degrees`, `study_areas`, and `courses`
@@ -228,43 +232,326 @@ are used to keep academic categorisation consistent across the platform.
 Row Level Security policies are used to control access to user data, listings,
 messages, reports, admin tools, and other protected records.
 
+## Entity Relationship Diagram
+
+The platform schema is centred on `profiles`, `listings`, messaging,
+transactions, reviews, reports, academic reference data, and demo wallet records.
+
+### Simplified ERD
+
+This view shows the main platform areas and their highest-level relationships.
+
+```mermaid
+erDiagram
+  PROFILES ||--o{ LISTINGS : sells
+  PROFILES ||--o{ SAVED_LISTINGS : saves
+  LISTINGS ||--o{ SAVED_LISTINGS : saved_as
+  LISTINGS ||--o{ LISTING_IMAGES : has
+
+  UNIVERSITIES ||--o{ PROFILES : has_students
+  UNIVERSITIES ||--o{ COURSES : offers
+  STUDY_AREAS ||--o{ DEGREES : groups
+  DEGREES ||--o{ PROFILES : selected_by
+  COURSES ||--o{ LISTINGS : matches
+  STUDY_AREAS ||--o{ LISTINGS : categorises
+
+  PROFILES ||--o{ CONVERSATIONS : participates
+  LISTINGS ||--o{ CONVERSATIONS : starts
+  CONVERSATIONS ||--o{ MESSAGES : contains
+  PROFILES ||--o{ MESSAGES : sends
+
+  CONVERSATIONS ||--o{ TRANSACTIONS : tracks
+  LISTINGS ||--o{ TRANSACTIONS : requested_or_offered
+  PROFILES ||--o{ TRANSACTIONS : buys_or_sells
+  TRANSACTIONS ||--o{ WALLET_TRANSACTIONS : creates
+  TRANSACTIONS ||--o{ REVIEWS : receives
+  PROFILES ||--o{ REVIEWS : writes_or_receives
+
+  PROFILES ||--o{ REPORTS : submits_or_reviews
+  LISTINGS ||--o{ REPORTS : may_be_reported
+  CONVERSATIONS ||--o{ REPORTS : may_be_reported
+  MESSAGES ||--o{ REPORTS : may_be_reported
+  PROFILES ||--o{ USER_BLOCKS : blocks
+  PROFILES ||--o{ ADMIN_ACTION_LOGS : performs
+```
+
+In the simplified diagram, `profiles` represents the people using the platform:
+students, sellers, buyers, and admins. Profiles create `listings`, save listings
+through `saved_listings`, participate in `conversations`, send `messages`, buy
+or sell through `transactions`, write or receive `reviews`, submit or review
+`reports`, block other users through `user_blocks`, and perform moderation
+actions recorded in `admin_action_logs`.
+
+Academic reference data is kept separate from marketplace activity.
+`universities`, `courses`, `study_areas`, and `degrees` describe where students
+study and how listings are categorised. Marketplace activity then connects those
+profiles and reference records to listing images, conversations, transaction
+status, Stripe-backed demo wallet records, reviews, reports, and safety actions.
+
+### Detailed ERD
+
+```mermaid
+erDiagram
+  PROFILES {
+    uuid id PK
+    text username
+    text email
+    text first_name
+    text last_name
+    enum role
+    enum account_status
+    int university_id FK
+    int degree_id FK
+    uuid suspended_by FK
+  }
+
+  UNIVERSITIES {
+    int id PK
+    text name
+    text slug
+    boolean is_active
+    uuid created_by FK
+  }
+
+  STUDY_AREAS {
+    int id PK
+    text name
+    text slug
+    boolean is_active
+  }
+
+  DEGREES {
+    int id PK
+    text name
+    text slug
+    int study_area_id FK
+    uuid created_by FK
+    boolean is_active
+  }
+
+  COURSES {
+    int id PK
+    text course_code
+    text course_name
+    text university
+    int university_id FK
+    uuid created_by FK
+  }
+
+  LISTINGS {
+    uuid id PK
+    uuid seller_id FK
+    int course_id FK
+    int study_area_id FK
+    text title
+    numeric price
+    enum condition
+    enum listing_type
+    enum status
+    timestamptz deleted_at
+    timestamptz archived_at
+  }
+
+  LISTING_IMAGES {
+    uuid id PK
+    uuid listing_id FK
+    text image_url
+    boolean is_primary
+    int sort_order
+  }
+
+  SAVED_LISTINGS {
+    uuid user_id FK
+    uuid listing_id FK
+    timestamptz created_at
+  }
+
+  CONVERSATIONS {
+    uuid id PK
+    uuid listing_id FK
+    uuid buyer_id FK
+    uuid seller_id FK
+    timestamptz last_message_at
+    timestamptz archived_at
+    timestamptz close_after
+  }
+
+  MESSAGES {
+    uuid id PK
+    uuid conversation_id FK
+    uuid sender_id FK
+    text content
+    boolean is_read
+    timestamptz created_at
+  }
+
+  TRANSACTIONS {
+    uuid id PK
+    uuid listing_id FK
+    uuid offered_listing_id FK
+    uuid conversation_id FK
+    uuid buyer_id FK
+    uuid seller_id FK
+    uuid payment_requested_by FK
+    enum request_type
+    enum status
+    enum payment_status
+    numeric agreed_price
+    timestamptz completed_at
+  }
+
+  WALLET_TRANSACTIONS {
+    uuid id PK
+    uuid seller_id FK
+    uuid transaction_id FK
+    numeric amount
+    enum type
+    enum status
+    text source_key
+  }
+
+  REVIEWS {
+    uuid id PK
+    uuid transaction_id FK
+    uuid reviewer_id FK
+    uuid reviewee_id FK
+    enum reviewer_role
+    int rating
+    text comment
+  }
+
+  REPORTS {
+    uuid id PK
+    uuid reporter_id FK
+    uuid reported_user_id FK
+    uuid reported_listing_id FK
+    uuid reported_conversation_id FK
+    uuid reported_message_id FK
+    uuid reviewed_by FK
+    enum report_type
+    enum status
+    text reason
+  }
+
+  ADMIN_ACTION_LOGS {
+    uuid id PK
+    uuid admin_id FK
+    text target_type
+    uuid target_id
+    text action_type
+    text notes
+  }
+
+  USER_BLOCKS {
+    uuid blocker_id FK
+    uuid blocked_id FK
+    timestamptz created_at
+  }
+
+  UNIVERSITIES ||--o{ PROFILES : has_students
+  UNIVERSITIES ||--o{ COURSES : offers
+  PROFILES ||--o{ UNIVERSITIES : creates
+  STUDY_AREAS ||--o{ DEGREES : groups
+  STUDY_AREAS ||--o{ LISTINGS : categorises
+  DEGREES ||--o{ PROFILES : selected_by
+  PROFILES ||--o{ PROFILES : suspends
+  PROFILES ||--o{ DEGREES : creates
+  PROFILES ||--o{ COURSES : creates
+
+  PROFILES ||--o{ LISTINGS : sells
+  COURSES ||--o{ LISTINGS : matches
+  LISTINGS ||--o{ LISTING_IMAGES : has
+  PROFILES ||--o{ SAVED_LISTINGS : saves
+  LISTINGS ||--o{ SAVED_LISTINGS : saved_as
+
+  PROFILES ||--o{ CONVERSATIONS : buys_in
+  PROFILES ||--o{ CONVERSATIONS : sells_in
+  LISTINGS ||--o{ CONVERSATIONS : starts
+  CONVERSATIONS ||--o{ MESSAGES : contains
+  PROFILES ||--o{ MESSAGES : sends
+
+  CONVERSATIONS ||--o{ TRANSACTIONS : tracks
+  LISTINGS ||--o{ TRANSACTIONS : requested_listing
+  LISTINGS ||--o{ TRANSACTIONS : offered_listing
+  PROFILES ||--o{ TRANSACTIONS : buys
+  PROFILES ||--o{ TRANSACTIONS : sells
+  PROFILES ||--o{ TRANSACTIONS : requests_payment
+  TRANSACTIONS ||--o{ WALLET_TRANSACTIONS : credits
+  PROFILES ||--o{ WALLET_TRANSACTIONS : earns
+
+  TRANSACTIONS ||--o{ REVIEWS : receives
+  PROFILES ||--o{ REVIEWS : writes
+  PROFILES ||--o{ REVIEWS : is_reviewed
+
+  PROFILES ||--o{ REPORTS : submits
+  PROFILES ||--o{ REPORTS : is_reported
+  PROFILES ||--o{ REPORTS : reviews
+  LISTINGS ||--o{ REPORTS : is_reported
+  CONVERSATIONS ||--o{ REPORTS : is_reported
+  MESSAGES ||--o{ REPORTS : is_reported
+
+  PROFILES ||--o{ ADMIN_ACTION_LOGS : performs
+  PROFILES ||--o{ USER_BLOCKS : blocks
+  PROFILES ||--o{ USER_BLOCKS : is_blocked
+```
+
+The detailed diagram expands the simplified view into the main tables and key
+foreign-key fields. `PK` marks a primary key, and `FK` marks a reference to
+another table.
+
+- `profiles` is the central user table. It stores identity, role, account
+  status, academic profile links, avatar metadata, and suspension details.
+- `universities`, `study_areas`, `degrees`, and `courses` are reference tables
+  used to keep student profiles and listing categories consistent.
+- `listings`, `listing_images`, and `saved_listings` make up the marketplace
+  catalogue: sellers own listings, listings can have images, and users can save
+  listings to a wishlist.
+- `conversations` and `messages` support buyer-seller chat. A conversation is
+  tied to a listing and has buyer and seller profile references; messages belong
+  to that conversation and record the sender.
+- `transactions` records buy or trade requests, reservation status, payment
+  status, completion state, and links back to the buyer, seller, listing,
+  optional offered trade listing, and conversation.
+- `wallet_transactions` records demo seller earnings and withdrawals that are
+  created from completed Stripe checkout flows.
+- `reviews` links completed transaction feedback to the reviewer and the user
+  being reviewed.
+- `reports`, `admin_action_logs`, and `user_blocks` cover safety and moderation:
+  users can report profiles, listings, conversations, or messages; admins can
+  review reports and log moderation actions; users can block other profiles.
+
 ## Local Development
 
 1. Install dependencies:
 
 ```bash
-pnpm install
+npm install
 ```
 
-2. Create a local environment file:
-
-```bash
-cp .env.example .env.local
-```
-
-Set the required values in `.env.local`:
+2. Create `.env.local` in the project root and set the required values:
 
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 ```
 
 Depending on the enabled features, the project may also require:
 
 ```bash
-OPENAI_API_KEY=
-NEXT_PUBLIC_SITE_URL=
+ANTHROPIC_API_KEY=
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
 ```
 
-The public Supabase URL and anon key are used by the frontend client. The service
-role key should only be used in secure server-side contexts and must not be
-exposed to the browser.
+The public Supabase URL and publishable key are used by the frontend client. The
+service role key, Anthropic key, and Stripe secrets should only be used in secure
+server-side contexts and must not be exposed to the browser.
 
 3. Start the development server:
 
 ```bash
-pnpm run dev
+npm run dev
 ```
 
 The app should then be available at:
@@ -332,7 +619,13 @@ For demo or testing purposes, create sample data for:
 - reviews
 
 Demo listings should cover multiple study areas and courses so that search,
-filtering, recommendations, and category pages can be tested properly.
+filtering, recommendations, and browse flows can be tested properly.
+
+The repo includes a demo seed script:
+
+```bash
+npm run seed:demo
+```
 
 Do not use real student data in demo environments.
 
@@ -341,25 +634,25 @@ Do not use real student data in demo environments.
 Run the linter:
 
 ```bash
-pnpm run lint
+npm run lint
 ```
 
 Run type checking:
 
 ```bash
-pnpm run typecheck
+npx tsc --noEmit
 ```
 
 Run tests:
 
 ```bash
-pnpm run test
+npm run test
 ```
 
 Create a production build:
 
 ```bash
-pnpm run build
+npm run build
 ```
 
 ## Deployment
@@ -370,10 +663,11 @@ Before deploying, configure the production environment variables:
 
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
-OPENAI_API_KEY=
-NEXT_PUBLIC_SITE_URL=
+ANTHROPIC_API_KEY=
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
 ```
 
 In Supabase, also confirm that the deployed site URL is added to the allowed

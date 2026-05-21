@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ListingImageCarousel } from "@/components/listing-image-carousel";
 import { ListingManageMenu } from "@/components/listing-manage-menu";
 import { SaveButton } from "@/components/save-button";
+import { getListingStatusLabel } from "@/lib/listing-archive";
 import { getVisibleSellerUniversity } from "@/lib/listing-visibility";
 import type { ListingCardData } from "@/lib/marketplace";
 
@@ -71,6 +72,7 @@ function statusBadgeClass(status: string) {
   switch (status) {
     case "pending": return "bg-yellow-100 text-yellow-800";
     case "sold":    return "bg-red-100 text-red-800";
+    case "archived": return "bg-red-100 text-red-800";
     default:        return "bg-gray-100 text-gray-600";
   }
 }
@@ -152,7 +154,7 @@ export function ListingCard({
               ) : null}
               {listing.status !== "available" ? (
                 <span className={`rounded-full px-2.5 py-1 font-medium ${statusBadgeClass(listing.status)}`}>
-                  {listing.status.charAt(0).toUpperCase() + listing.status.slice(1)}
+                  {getListingStatusLabel(listing.status)}
                 </span>
               ) : null}
             </div>

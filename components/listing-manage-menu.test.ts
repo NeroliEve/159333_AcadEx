@@ -17,4 +17,11 @@ describe("listing manage menu saved-listing access", () => {
 
     expect(listingManageMenu).toContain("SaveListingMenuItem");
   });
+
+  it("uses sold wording for archive-backed status options", () => {
+    const listingStatusButton = source("components/listing-status-button.tsx");
+
+    expect(listingStatusButton).toContain("getListingStatusLabel");
+    expect(listingStatusButton).not.toContain('archived: "Archived"');
+  });
 });

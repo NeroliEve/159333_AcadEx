@@ -21,13 +21,17 @@ vi.mock("@/lib/blocks", () => ({
 }));
 
 class MockQuery {
-  private filters = new Map<string, unknown>();
+  private filters: Array<
+    | { column: string; kind: "eq"; value: unknown }
+    | { column: string; kind: "in"; value: unknown[] }
+    | { column: string; kind: "is"; value: unknown }
+  > = [];
   readonly orderCalls: Array<{ column: string; options?: unknown }> = [];
 
   constructor(private readonly result: unknown) {}
 
   eq(column: string, value: unknown) {
-    this.filters.set(column, value);
+    this.filters.push({ column, kind: "eq", value });
     return this;
   }
 
@@ -35,11 +39,13 @@ class MockQuery {
     return this;
   }
 
-  in() {
+  in(column: string, value: unknown[]) {
+    this.filters.push({ column, kind: "in", value });
     return this;
   }
 
-  is() {
+  is(column: string, value: unknown) {
+    this.filters.push({ column, kind: "is", value });
     return this;
   }
 
@@ -52,7 +58,18 @@ class MockQuery {
   }
 
   maybeSingle() {
-    return Promise.resolve(this.result);
+    const result = this.materializeResult();
+    if (
+      result &&
+      typeof result === "object" &&
+      "data" in result &&
+      Array.isArray((result as { data: unknown }).data)
+    ) {
+      const { data, ...rest } = result as { data: unknown[] };
+      return Promise.resolve({ ...rest, data: data[0] ?? null });
+    }
+
+    return Promise.resolve(result);
   }
 
   not() {
@@ -76,7 +93,35 @@ class MockQuery {
     onfulfilled?: ((value: unknown) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
   ) {
-    return Promise.resolve(this.result).then(onfulfilled, onrejected);
+    return Promise.resolve(this.materializeResult()).then(onfulfilled, onrejected);
+  }
+
+  private materializeResult() {
+    if (
+      !this.result ||
+      typeof this.result !== "object" ||
+      !("data" in this.result) ||
+      !Array.isArray((this.result as { data: unknown }).data)
+    ) {
+      return this.result;
+    }
+
+    const { data, ...rest } = this.result as { data: Array<Record<string, unknown>> };
+    const filteredData = data.filter((row) =>
+      this.filters.every((filter) => {
+        if (filter.kind === "eq") {
+          return row[filter.column] === filter.value;
+        }
+
+        if (filter.kind === "in") {
+          return filter.value.includes(row[filter.column]);
+        }
+
+        return row[filter.column] === filter.value;
+      }),
+    );
+
+    return { ...rest, data: filteredData };
   }
 }
 
@@ -292,13 +337,17 @@ describe("getListingRequestState", () => {
           return new MockQuery({
             data: [
               {
+                buyer_id: "buyer-1",
                 conversation_id: "conversation-cancelled",
+                listing_id: "listing-1",
                 offered_listing_id: null,
                 request_type: "buy",
                 status: "cancelled",
               },
               {
+                buyer_id: "buyer-1",
                 conversation_id: "conversation-declined",
+                listing_id: "listing-1",
                 offered_listing_id: null,
                 request_type: "buy",
                 status: "declined",
@@ -498,6 +547,92 @@ describe("blocked profile and listing visibility", () => {
 
     expect(result.profile?.id).toBe("seller-1");
     expect(mockGetBlockRelationship).not.toHaveBeenCalled();
+  });
+
+  it("separates active listings from previous sold listings on public profiles", async () => {
+    const profile = {
+      account_status: "active",
+      avatar_url: null,
+      bio: "Textbooks",
+      degree_id: null,
+      email: "seller@example.com",
+      first_name: "Seller",
+      id: "seller-1",
+      last_name: "User",
+      role: "user",
+      suspended_at: null,
+      transactions_seen_at: null,
+      university: "Massey",
+      university_id: 1,
+      username: "seller",
+      year_level: null,
+    };
+    const listings = [
+      {
+        archived_at: null,
+        condition: "good",
+        created_at: "2026-05-02T00:00:00.000Z",
+        deleted_at: null,
+        id: "active-1",
+        listing_type: "sale_only",
+        price: 25,
+        primary_image_url: null,
+        seller_id: "seller-1",
+        status: "available",
+        title: "Active Book",
+      },
+      {
+        archived_at: "2026-05-03T00:00:00.000Z",
+        condition: "good",
+        created_at: "2026-05-01T00:00:00.000Z",
+        deleted_at: null,
+        id: "previous-1",
+        listing_type: "sale_only",
+        price: 20,
+        primary_image_url: null,
+        seller_id: "seller-1",
+        status: "archived",
+        title: "Sold Book",
+      },
+      {
+        archived_at: "2026-05-04T00:00:00.000Z",
+        condition: "fair",
+        created_at: "2026-04-30T00:00:00.000Z",
+        deleted_at: "2026-05-05T00:00:00.000Z",
+        id: "hidden-1",
+        listing_type: "sale_only",
+        price: 10,
+        primary_image_url: null,
+        seller_id: "seller-1",
+        status: "archived",
+        title: "Hidden Book",
+      },
+    ];
+    const supabase = {
+      from: vi.fn((table: string) => {
+        if (table === "profiles") {
+          return new MockQuery({ data: [profile], error: null });
+        }
+
+        if (table === "listings") {
+          return new MockQuery({ data: listings, error: null });
+        }
+
+        if (table === "listing_images") {
+          return new MockQuery({ data: [], error: null });
+        }
+
+        throw new Error(`Unexpected table ${table}`);
+      }),
+    };
+    mockCreateClient.mockResolvedValue(supabase);
+
+    const { getPublicProfile } = await import("@/lib/marketplace");
+
+    const result = await getPublicProfile("seller");
+
+    expect(result.profile?.listings.map((listing) => listing.id)).toEqual(["active-1"]);
+    expect(result.profile?.previousListings.map((listing) => listing.id)).toEqual(["previous-1"]);
   });
 
   it("anonymizes reviewers in a blocked relationship", async () => {

@@ -100,7 +100,7 @@ export type ListingCardData = ListingCardBase & {
 };
 
 export type ListingDetailData = ListingCardData &
-  Pick<TableRow<"listings">, "course_id" | "isbn" | "publisher" | "seller_id" | "study_area_id" | "wanted_trade_text"> & {
+  Pick<TableRow<"listings">, "course_id" | "deleted_at" | "isbn" | "publisher" | "seller_id" | "study_area_id" | "wanted_trade_text"> & {
     images: ListingImageData[];
   };
 
@@ -117,6 +117,7 @@ export type AdminDegree = DegreeSummary;
 
 export type PublicProfile = ProfileSummary & {
   listings: ListingCardData[];
+  previousListings: ListingCardData[];
 };
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -182,7 +183,7 @@ function getListingCardSelect(audience: ListingsFeedAudience, includeVisibility 
 
 function getListingDetailSelect(includeVisibility = true) {
   const cardSelect = includeVisibility ? LISTING_CARD_SELECT : LISTING_CARD_SELECT_LEGACY;
-  return `${cardSelect}, seller_id, course_id, isbn, publisher, study_area_id, wanted_trade_text`;
+  return `${cardSelect}, seller_id, course_id, deleted_at, isbn, publisher, study_area_id, wanted_trade_text`;
 }
 
 async function attachListingImages(
@@ -638,6 +639,8 @@ export async function getListingById(id: string, options: {
   if (!data) return { listing: null, error: null };
 
   const listingData = data as Omit<ListingDetailData, "images">;
+  if (listingData.deleted_at) return { listing: null, error: null };
+
   if (
     options.viewerId &&
     !options.bypassBlock &&
@@ -729,9 +732,7 @@ export async function getPublicProfile(username: string, options: {
     .from("listings")
     .select(LISTING_CARD_SELECT)
     .eq("seller_id", profileData.id)
-    .in("status", ["available", "pending"])
     .is("deleted_at", null)
-    .is("archived_at", null)
     .order("created_at", { ascending: false });
   let listingsData: unknown = listingsResult.data;
   const { error: listingsError } = listingsResult;
@@ -741,16 +742,22 @@ export async function getPublicProfile(username: string, options: {
       .from("listings")
       .select(LISTING_CARD_SELECT_LEGACY)
       .eq("seller_id", profileData.id)
-      .in("status", ["available", "pending"])
       .is("deleted_at", null)
-      .is("archived_at", null)
       .order("created_at", { ascending: false });
     listingsData = legacyListingsResult.data;
   }
 
-  const listings = await attachListingImages(
+  const profileListings = await attachListingImages(
     supabase,
     stripListingInternalFields((listingsData ?? []) as ListingCardRow[]),
+  );
+  const listings = profileListings.filter(
+    (listing) =>
+      (listing.status === "available" || listing.status === "pending") &&
+      !listing.archived_at,
+  );
+  const previousListings = profileListings.filter(
+    (listing) => listing.status === "archived" || !!listing.archived_at,
   );
 
   return {
@@ -759,6 +766,7 @@ export async function getPublicProfile(username: string, options: {
     profile: {
       ...profileData,
       listings,
+      previousListings,
     },
     error: null,
   };

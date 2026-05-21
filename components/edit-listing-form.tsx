@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
+import { LISTING_UPDATED_TOAST_STORAGE_KEY } from "@/components/route-toast";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -243,6 +244,19 @@ export function EditListingForm({ listing, courses, studyAreas }: EditListingFor
       setState(data);
 
       if (data.status === "success") {
+        try {
+          window.sessionStorage.setItem(
+            LISTING_UPDATED_TOAST_STORAGE_KEY,
+            JSON.stringify({
+              text: "Listing updated successfully.",
+              type: "success",
+            }),
+          );
+        } catch {
+          // If storage is unavailable, keep the redirect flow and skip the toast.
+        }
+
+        setState(null);
         startTransition(() => router.push("/home"));
       }
     } catch {
@@ -262,12 +276,8 @@ export function EditListingForm({ listing, courses, studyAreas }: EditListingFor
         <CardDescription>Update the details for this listing.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {state?.message ? (
-          <div className={`rounded-lg border px-4 py-3 text-sm ${
-            state.status === "success"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-900"
-              : "border-destructive/20 bg-destructive/5 text-destructive"
-          }`}>
+        {state?.message && state.status === "error" ? (
+          <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
             {state.message}
           </div>
         ) : null}

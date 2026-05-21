@@ -85,6 +85,7 @@ async function removeUploadedListingImages(paths: string[]) {
 export function CreateListingForm({ courses, profileUniversity, studyAreas }: CreateListingFormProps) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
+  const objectUrlsRef = useRef<Set<string>>(new Set());
   const [isRefreshing, startTransition] = useTransition();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [state, setState] = useState<CreateListingResponse | null>(null);
@@ -98,12 +99,24 @@ export function CreateListingForm({ courses, profileUniversity, studyAreas }: Cr
   }, []);
 
   useEffect(() => {
+    const objectUrls = objectUrlsRef.current;
+
+    return () => {
+      objectUrls.forEach((url) => URL.revokeObjectURL(url));
+      objectUrls.clear();
+    };
+  }, []);
+
+  useEffect(() => {
     if (state?.status === "success") {
       formRef.current?.reset();
       setListingType("sale_only");
       setSelectedImageFiles([]);
       setImagePreviewUrls((current) => {
-        current.forEach((url) => URL.revokeObjectURL(url));
+        current.forEach((url) => {
+          URL.revokeObjectURL(url);
+          objectUrlsRef.current.delete(url);
+        });
         return [];
       });
       startTransition(() => router.refresh());
@@ -147,7 +160,29 @@ export function CreateListingForm({ courses, profileUniversity, studyAreas }: Cr
     setState(null);
     setSelectedImageFiles(files);
     setImagePreviewUrls((current) => {
-      return [...current, ...incomingFiles.map((file) => URL.createObjectURL(file))];
+      const newPreviewUrls = incomingFiles.map((file) => {
+        const url = URL.createObjectURL(file);
+        objectUrlsRef.current.add(url);
+        return url;
+      });
+
+      return [...current, ...newPreviewUrls];
+    });
+  }
+
+  function removeSelectedImage(indexToRemove: number) {
+    setState(null);
+    setSelectedImageFiles((current) =>
+      current.filter((_, index) => index !== indexToRemove),
+    );
+    setImagePreviewUrls((current) => {
+      const removedUrl = current[indexToRemove];
+      if (removedUrl) {
+        URL.revokeObjectURL(removedUrl);
+        objectUrlsRef.current.delete(removedUrl);
+      }
+
+      return current.filter((_, index) => index !== indexToRemove);
     });
   }
 
@@ -391,7 +426,7 @@ export function CreateListingForm({ courses, profileUniversity, studyAreas }: Cr
                 {imagePreviewUrls.map((url, index) => (
                   <div
                     key={url}
-                    className="overflow-hidden rounded-lg border border-border/70 bg-muted"
+                    className="group relative overflow-hidden rounded-lg border border-border/70 bg-muted"
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
@@ -399,6 +434,13 @@ export function CreateListingForm({ courses, profileUniversity, studyAreas }: Cr
                       className="aspect-[4/3] w-full object-cover"
                       src={url}
                     />
+                    <button
+                      type="button"
+                      className="absolute right-2 top-2 rounded-full bg-background/95 px-2.5 py-1 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-background"
+                      onClick={() => removeSelectedImage(index)}
+                    >
+                      Remove
+                    </button>
                   </div>
                 ))}
 

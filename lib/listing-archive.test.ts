@@ -4,6 +4,7 @@ import {
   canViewArchivedListing,
   getCompletedListingArchiveUpdate,
   getListingStatusUpdate,
+  getListingStatusLabel,
   getSellerListingStatusOptions,
 } from "@/lib/listing-archive";
 
@@ -27,7 +28,12 @@ describe("listing archive rules", () => {
     });
   });
 
-  it("does not expose sold as a seller-managed status option", () => {
+  it("uses sold as the user-facing label for archive-backed listings", () => {
+    expect(getListingStatusLabel("archived")).toBe("Sold");
+    expect(getListingStatusLabel("available")).toBe("Available");
+  });
+
+  it("keeps archive-backed status options for seller-managed sold listings", () => {
     expect(getSellerListingStatusOptions("available")).toEqual(["pending", "archived"]);
     expect(getSellerListingStatusOptions("pending")).toEqual(["available", "archived"]);
     expect(getSellerListingStatusOptions("sold")).toEqual(["archived"]);

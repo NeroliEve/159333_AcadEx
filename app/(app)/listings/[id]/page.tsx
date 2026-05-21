@@ -10,14 +10,13 @@ import { RequestToBuyButton } from "@/components/request-to-buy-button";
 import { RequestToTradeButton } from "@/components/request-to-trade-button";
 import { Card, CardContent } from "@/components/ui/card";
 import { isMarketplaceSuspended } from "@/lib/admin";
-import { canViewArchivedListing } from "@/lib/listing-archive";
+import { getListingStatusLabel } from "@/lib/listing-archive";
 import { getVisibleSellerUniversity } from "@/lib/listing-visibility";
 import {
   formatListingCondition,
   formatPrice,
   getListingRequestState,
   getListingById,
-  getListingTransactionParticipantIds,
   getMyAvailableListings,
   getProfileDisplayName,
   getViewerContext,
@@ -82,19 +81,6 @@ async function ListingDetailContent({
 
   const sellerName = getProfileDisplayName(listing.seller);
   const isOwner = user?.id === listing.seller_id;
-  const isArchived = listing.status === "archived" || !!listing.archived_at;
-
-  if (isArchived) {
-    const participantIds = await getListingTransactionParticipantIds(id);
-    const canViewArchived = canViewArchivedListing({
-      isAdmin,
-      participantIds,
-      sellerId: listing.seller_id,
-      viewerId: user?.id,
-    });
-
-    if (!canViewArchived) notFound();
-  }
 
   const canManage = !isSuspended && (isOwner || isAdmin);
   const isTrade =
@@ -178,7 +164,7 @@ async function ListingDetailContent({
                   </span>
                 ) : null}
                 <span className="rounded-full bg-secondary px-2.5 py-1 capitalize text-secondary-foreground">
-                  {listing.status}
+                  {getListingStatusLabel(listing.status)}
                 </span>
               </div>
 

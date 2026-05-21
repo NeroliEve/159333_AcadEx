@@ -1,10 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 
 import { EmptyState } from "@/components/empty-state";
 import { ListingCard } from "@/components/listing-card";
+import {
+  LISTING_UPDATED_TOAST_STORAGE_KEY,
+  OneShotRouteToast,
+} from "@/components/route-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { PillButton } from "@/components/ui/pill-button";
 import type { ApiResponse } from "@/lib/api";
@@ -128,41 +133,37 @@ export function HomeDashboardPanel() {
     };
   }, []);
 
+  let content: ReactNode;
+
   if (loading && !data) {
-    return (
+    content = (
       <div className="space-y-3" aria-live="polite" aria-busy="true">
-        <p className="text-sm text-muted-foreground">Loading dashboard...</p>
-        <HomeDashboardSkeleton />
-      </div>
+          <p className="text-sm text-muted-foreground">Loading dashboard...</p>
+          <HomeDashboardSkeleton />
+        </div>
     );
-  }
-
-  if (error) {
-    return (
+  } else if (error) {
+    content = (
       <EmptyState
-        actionHref="/home"
-        actionLabel="Refresh dashboard"
-        description={error}
-        eyebrow="Home"
-        title="Dashboard is unavailable"
-      />
+          actionHref="/home"
+          actionLabel="Refresh dashboard"
+          description={error}
+          eyebrow="Home"
+          title="Dashboard is unavailable"
+        />
     );
-  }
-
-  if (!data) {
-    return (
+  } else if (!data) {
+    content = (
       <EmptyState
-        actionHref="/home"
-        actionLabel="Refresh dashboard"
-        description="Unable to load this section right now."
-        eyebrow="Home"
-        title="Dashboard is unavailable"
-      />
+          actionHref="/home"
+          actionLabel="Refresh dashboard"
+          description="Unable to load this section right now."
+          eyebrow="Home"
+          title="Dashboard is unavailable"
+        />
     );
-  }
-
-  if (!data.isSignedIn) {
-    return (
+  } else if (!data.isSignedIn) {
+    content = (
       <div className="space-y-8">
         <Card className="border-border/70 bg-[linear-gradient(135deg,hsl(var(--background)),hsl(var(--secondary)))]">
           <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
@@ -203,17 +204,16 @@ export function HomeDashboardPanel() {
         ) : null}
       </div>
     );
-  }
+  } else {
+    const recommendedIds = new Set(data.recommendedListings.map((listing) => listing.id));
+    const latestPreview = data.latestListings.filter(
+      (listing) => !recommendedIds.has(listing.id),
+    );
+    const visibleLatest = latestPreview.length > 0 ? latestPreview : data.latestListings;
 
-  const recommendedIds = new Set(data.recommendedListings.map((listing) => listing.id));
-  const latestPreview = data.latestListings.filter(
-    (listing) => !recommendedIds.has(listing.id),
-  );
-  const visibleLatest = latestPreview.length > 0 ? latestPreview : data.latestListings;
-
-  return (
-    <div className="space-y-10">
-      <section className="space-y-4">
+    content = (
+      <div className="space-y-10">
+        <section className="space-y-4">
         <div className="space-y-2">
           <h2 className="text-xl font-semibold tracking-tight">Quick actions</h2>
           <p className="text-sm text-muted-foreground">
@@ -247,9 +247,9 @@ export function HomeDashboardPanel() {
             description="Track buying and selling history."
           />
         </div>
-      </section>
+        </section>
 
-      <section className="space-y-5">
+        <section className="space-y-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div className="space-y-2">
             <h2 className="text-2xl font-semibold tracking-tight">
@@ -275,9 +275,9 @@ export function HomeDashboardPanel() {
             title="No recommendations yet"
           />
         )}
-      </section>
+        </section>
 
-      <section className="space-y-5">
+        <section className="space-y-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div className="space-y-2">
             <h2 className="text-2xl font-semibold tracking-tight">Latest books</h2>
@@ -301,7 +301,15 @@ export function HomeDashboardPanel() {
             title="Marketplace is empty"
           />
         )}
-      </section>
-    </div>
+        </section>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <OneShotRouteToast storageKey={LISTING_UPDATED_TOAST_STORAGE_KEY} />
+      {content}
+    </>
   );
 }
