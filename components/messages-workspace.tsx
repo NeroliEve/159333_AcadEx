@@ -451,6 +451,15 @@ export function MessagesWorkspace({
     transactionIsAccepted &&
     !transaction.payment_requested_at &&
     transaction.payment_status === "unpaid";
+  const sellerCanCompleteInPerson =
+    !!transaction &&
+    isSeller &&
+    !isTrade &&
+    transactionIsAccepted &&
+    (transaction.payment_status === "unpaid" || transaction.payment_status === "failed");
+  const completeButtonLabel = sellerCanCompleteInPerson
+    ? "Complete transaction (paid in person)"
+    : "Mark completed";
   const declinedNotice = transaction
     ? getDeclinedRequestNotice({ isBuyer, status: transaction.status })
     : null;
@@ -600,17 +609,18 @@ export function MessagesWorkspace({
                     ) : null}
                     {isSeller && !isTrade && transaction.payment_status !== "paid" && transaction.payment_requested_at ? (
                       <p className="text-xs text-muted-foreground">
-                        Waiting for buyer payment before completion.
+                        You can wait for app payment or complete this as paid in person.
                       </p>
                     ) : null}
                     {isSeller && canComplete ? (
                       <Button
+                        className={sellerCanCompleteInPerson ? "h-auto whitespace-normal py-2 text-center leading-tight" : undefined}
                         disabled={!!isActing}
                         onClick={() => void handleTransactionAction("complete")}
                         size="sm"
                         type="button"
                       >
-                        {isActing === "complete" ? "Completing..." : "Mark completed"}
+                        {isActing === "complete" ? "Completing..." : completeButtonLabel}
                       </Button>
                     ) : null}
                     {canCancel ? (

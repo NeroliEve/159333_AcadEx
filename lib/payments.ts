@@ -3,6 +3,7 @@ export type PaymentStatus =
   | "unpaid"
   | "checkout_pending"
   | "paid"
+  | "paid_in_person"
   | "failed";
 
 export type TransactionRequestType = "buy" | "trade";
@@ -74,7 +75,10 @@ export function getCheckoutEligibility(
     };
   }
 
-  if (transaction.payment_status === "paid") {
+  if (
+    transaction.payment_status === "paid" ||
+    transaction.payment_status === "paid_in_person"
+  ) {
     return {
       eligible: false,
       reason: "This transaction has already been paid.",
@@ -123,7 +127,10 @@ export function canRequestSellerPayment(
     };
   }
 
-  if (transaction.payment_status === "paid") {
+  if (
+    transaction.payment_status === "paid" ||
+    transaction.payment_status === "paid_in_person"
+  ) {
     return {
       eligible: false,
       reason: "This transaction has already been paid.",
@@ -145,5 +152,10 @@ export function canCompleteTransaction(transaction: {
   payment_status: PaymentStatus;
   request_type: TransactionRequestType;
 }) {
-  return transaction.request_type === "trade" || transaction.payment_status === "paid";
+  return (
+    transaction.request_type === "trade" ||
+    transaction.payment_status === "paid" ||
+    transaction.payment_status === "unpaid" ||
+    transaction.payment_status === "failed"
+  );
 }

@@ -32,7 +32,9 @@ function paymentStatusLabel(status: TransactionData["payment_status"]) {
     case "failed":
       return "Payment failed";
     case "paid":
-      return "Paid";
+      return "Paid through app";
+    case "paid_in_person":
+      return "Paid in person";
     case "unpaid":
       return "Awaiting payment";
     default:

@@ -158,11 +158,31 @@ describe("canCompleteTransaction", () => {
     ).toBe(true);
   });
 
-  it("blocks completed handover for unpaid sale transactions", () => {
+  it("allows completed handover for unpaid sale transactions", () => {
     expect(
       canCompleteTransaction({
         offered_listing_id: null,
         payment_status: "unpaid",
+        request_type: "buy",
+      }),
+    ).toBe(true);
+  });
+
+  it("allows completed handover for failed-payment sale transactions", () => {
+    expect(
+      canCompleteTransaction({
+        offered_listing_id: null,
+        payment_status: "failed",
+        request_type: "buy",
+      }),
+    ).toBe(true);
+  });
+
+  it("blocks completed handover while checkout is pending", () => {
+    expect(
+      canCompleteTransaction({
+        offered_listing_id: null,
+        payment_status: "checkout_pending",
         request_type: "buy",
       }),
     ).toBe(false);

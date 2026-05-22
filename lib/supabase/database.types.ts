@@ -942,6 +942,7 @@ export type Database = {
         | "unpaid"
         | "checkout_pending"
         | "paid"
+        | "paid_in_person"
         | "failed"
       transaction_request_type: "buy" | "trade"
       transaction_status: "pending" | "completed" | "cancelled" | "declined" | "mismatch"
@@ -1079,6 +1080,7 @@ export const Constants = {
         "unpaid",
         "checkout_pending",
         "paid",
+        "paid_in_person",
         "failed",
       ],
       transaction_status: ["pending", "completed", "cancelled", "declined", "mismatch"],
