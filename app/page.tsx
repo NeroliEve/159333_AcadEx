@@ -177,10 +177,27 @@ async function LandingContent() {
       </section>
 
       <section className="w-full">
-        <div className="mx-auto flex min-h-[420px] w-full max-w-6xl items-center justify-center rounded-2xl border border-border bg-card/40 px-4 py-10 drop-shadow-lg sm:min-h-[460px] sm:px-6">
-          <p className="text-center text-2xl font-bold tracking-tight text-foreground sm:text-4xl">
-            preview of platform goes here
-          </p>
+        <div className="mx-auto w-full max-w-6xl overflow-hidden rounded-2xl border border-border bg-card/40 p-2 drop-shadow-lg sm:p-3">
+          <div className="relative aspect-[3378/2099] w-full overflow-hidden rounded-xl bg-background">
+            <Image
+              src="/assets/acadex-preview-photo.png"
+              alt="Acadex platform preview"
+              fill
+              sizes="(min-width: 1280px) 1152px, calc(100vw - 32px)"
+              priority
+              unoptimized
+              className="object-contain dark:hidden"
+            />
+            <Image
+              src="/assets/acadex-preview-photo-dark.png"
+              alt="Acadex platform preview"
+              fill
+              sizes="(min-width: 1280px) 1152px, calc(100vw - 32px)"
+              priority
+              unoptimized
+              className="hidden object-contain dark:block"
+            />
+          </div>
         </div>
       </section>
     </main>
