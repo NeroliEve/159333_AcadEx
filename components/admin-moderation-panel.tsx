@@ -37,6 +37,7 @@ type AdminModerationPanelProps = {
   auditLogs?: AdminAuditRecord[];
   courses?: AdminCourse[];
   degrees?: AdminDegree[];
+  initialLoadedTabs?: AdminTab[];
   listings?: AdminListingRecord[];
   overview?: AdminOverviewStats;
   reports?: AdminReportRecord[];
@@ -105,7 +106,7 @@ function getAdminTabLoadingLabel(tab: AdminTab) {
     case "listings":
       return "Loading listings...";
     case "overview":
-      return "Loading reports...";
+      return "Loading overview...";
     case "reports":
       return "Loading reports...";
     case "users":
@@ -124,6 +125,7 @@ const emptyAuditLogs: AdminAuditRecord[] = [];
 const emptyCourses: AdminCourse[] = [];
 const emptyDegrees: AdminDegree[] = [];
 const emptyListings: AdminListingRecord[] = [];
+const emptyLoadedTabs: AdminTab[] = [];
 const emptyReports: AdminReportRecord[] = [];
 const emptyStudyAreas: StudyAreaOption[] = [];
 const emptyUniversities: UniversityOption[] = [];
@@ -150,6 +152,7 @@ export function AdminModerationPanel({
   auditLogs: initialAuditLogs = emptyAuditLogs,
   courses: initialCourses = emptyCourses,
   degrees: initialDegrees = emptyDegrees,
+  initialLoadedTabs = emptyLoadedTabs,
   listings: initialListings = emptyListings,
   overview: initialOverview = emptyOverview,
   reports: initialReports = emptyReports,
@@ -176,21 +179,7 @@ export function AdminModerationPanel({
   const [studyAreas, setStudyAreas] = useState(initialStudyAreas);
   const [universities, setUniversities] = useState(initialUniversities);
   const [loadedTabs, setLoadedTabs] = useState<Set<AdminTab>>(
-    () =>
-      new Set(
-        [
-          initialReports.length > 0 ? "overview" : null,
-          initialUsers.length > 0 ? "users" : null,
-          initialListings.length > 0 ? "listings" : null,
-          initialAuditLogs.length > 0 ? "audit" : null,
-          initialCourses.length > 0 ||
-          initialDegrees.length > 0 ||
-          initialStudyAreas.length > 0 ||
-          initialUniversities.length > 0
-            ? "catalog"
-            : null,
-        ].filter(Boolean) as AdminTab[],
-      ),
+    () => new Set(initialLoadedTabs),
   );
   const [loadingTab, setLoadingTab] = useState<AdminTab | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);

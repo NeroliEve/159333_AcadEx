@@ -87,7 +87,7 @@ export function DeleteListingButton({ listingId }: { listingId: string }) {
                 Delete listing?
               </h2>
               <p id="delete-listing-description" className="text-sm text-muted-foreground">
-                This will permanently remove the listing from the marketplace.
+                This will remove the listing from the marketplace while keeping related records intact.
               </p>
               {errorMessage ? (
                 <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">

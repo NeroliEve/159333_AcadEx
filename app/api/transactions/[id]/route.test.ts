@@ -228,4 +228,111 @@ describe("PATCH /api/transactions/[id]", () => {
     });
     expect(db.conversations["conversation-1"].close_after).toEqual(expect.any(String));
   });
+
+  it("completes an accepted unpaid buy as paid in person", async () => {
+    const db: MockDb = {
+      conversations: {
+        "conversation-1": {
+          id: "conversation-1",
+        },
+      },
+      listings: {
+        "listing-target": {
+          archived_at: null,
+          id: "listing-target",
+          seller_id: "seller-1",
+          status: "pending",
+        },
+      },
+      transactions: {
+        "transaction-1": {
+          buyer_id: "buyer-1",
+          conversation_id: "conversation-1",
+          id: "transaction-1",
+          listing_id: "listing-target",
+          offered_listing_id: null,
+          payment_status: "unpaid",
+          request_type: "buy",
+          reservation_confirmed_at: "2026-05-20T00:00:00.000Z",
+          seller_id: "seller-1",
+          status: "pending",
+        },
+      },
+    };
+    const viewerSupabase = createMockSupabase(db, { userId: "seller-1" });
+    const adminSupabase = createMockSupabase(db, { admin: true });
+
+    mockGetViewerAccessContext.mockResolvedValue({
+      profile: { account_status: "active" },
+      supabase: viewerSupabase,
+      userId: "seller-1",
+    });
+    mockCreateAdminClient.mockReturnValue(adminSupabase);
+
+    const { PATCH } = await import("@/app/api/transactions/[id]/route");
+    const response = await PATCH(patchTransaction("complete"), {
+      params: Promise.resolve({ id: "transaction-1" }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(db.transactions["transaction-1"]).toMatchObject({
+      payment_status: "paid_in_person",
+      seller_confirmed_completed: true,
+      status: "completed",
+    });
+    expect(db.listings["listing-target"]).toMatchObject({
+      archived_at: expect.any(String),
+      status: "archived",
+    });
+  });
+
+  it("rejects completing a buy while checkout is pending", async () => {
+    const db: MockDb = {
+      conversations: {},
+      listings: {
+        "listing-target": {
+          archived_at: null,
+          id: "listing-target",
+          seller_id: "seller-1",
+          status: "pending",
+        },
+      },
+      transactions: {
+        "transaction-1": {
+          buyer_id: "buyer-1",
+          conversation_id: null,
+          id: "transaction-1",
+          listing_id: "listing-target",
+          offered_listing_id: null,
+          payment_status: "checkout_pending",
+          request_type: "buy",
+          reservation_confirmed_at: "2026-05-20T00:00:00.000Z",
+          seller_id: "seller-1",
+          status: "pending",
+        },
+      },
+    };
+    const viewerSupabase = createMockSupabase(db, { userId: "seller-1" });
+
+    mockGetViewerAccessContext.mockResolvedValue({
+      profile: { account_status: "active" },
+      supabase: viewerSupabase,
+      userId: "seller-1",
+    });
+
+    const { PATCH } = await import("@/app/api/transactions/[id]/route");
+    const response = await PATCH(patchTransaction("complete"), {
+      params: Promise.resolve({ id: "transaction-1" }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(db.transactions["transaction-1"]).toMatchObject({
+      payment_status: "checkout_pending",
+      status: "pending",
+    });
+    expect(db.listings["listing-target"]).toMatchObject({
+      archived_at: null,
+      status: "pending",
+    });
+  });
 });

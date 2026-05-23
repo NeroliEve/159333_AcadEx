@@ -7,7 +7,11 @@ import {
 import { isBlockedBetween } from "@/lib/blocks";
 import { canCancelAcceptedTransaction } from "@/lib/exchange-flow";
 import { getCompletedListingArchiveUpdate, getListingStatusUpdate } from "@/lib/listing-archive";
-import { canCompleteTransaction, canRequestSellerPayment } from "@/lib/payments";
+import {
+  canCompleteTransaction,
+  canRequestSellerPayment,
+  type PaymentStatus,
+} from "@/lib/payments";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const CONVERSATION_CLOSE_HOURS = 24;
@@ -87,16 +91,16 @@ export async function PATCH(
     return NextResponse.json({ error: "This request has already been accepted." }, { status: 400 });
   }
 
-  if (action === "complete" && !canCompleteTransaction(transaction)) {
+  if (action === "complete" && !transaction.reservation_confirmed_at) {
     return NextResponse.json(
-      { error: "The buyer must complete Stripe payment before this sale can be marked completed." },
+      { error: "The seller must accept this request before it can be completed." },
       { status: 400 },
     );
   }
 
-  if (action === "complete" && !transaction.reservation_confirmed_at) {
+  if (action === "complete" && !canCompleteTransaction(transaction)) {
     return NextResponse.json(
-      { error: "The seller must accept this request before it can be completed." },
+      { error: "This transaction cannot be completed in its current payment state." },
       { status: 400 },
     );
   }
@@ -192,8 +196,17 @@ export async function PATCH(
   if (action === "complete") {
     const systemSupabase = getAdminSupabase();
     const closeConversation = getConversationCloseTimestamp(new Date(now));
+    const paymentStatusUpdate: { payment_status?: PaymentStatus } = {};
+    if (
+      transaction.request_type === "buy" &&
+      (transaction.payment_status === "unpaid" || transaction.payment_status === "failed")
+    ) {
+      paymentStatusUpdate.payment_status = "paid_in_person";
+    }
+
     const [{ error: txError }, { error: listingError }] = await Promise.all([
       supabase.from("transactions").update({
+        ...paymentStatusUpdate,
         status: "completed",
         seller_confirmed_completed: true,
         completed_at: now,

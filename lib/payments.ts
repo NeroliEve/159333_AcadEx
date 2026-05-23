@@ -151,7 +151,12 @@ export function canCompleteTransaction(transaction: {
   offered_listing_id: string | null;
   payment_status: PaymentStatus;
   request_type: TransactionRequestType;
+  reservation_confirmed_at: string | null;
+  status: string;
 }) {
+  if (transaction.status !== "pending") return false;
+  if (!transaction.reservation_confirmed_at) return false;
+
   return (
     transaction.request_type === "trade" ||
     transaction.payment_status === "paid" ||

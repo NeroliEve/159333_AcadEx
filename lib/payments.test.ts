@@ -148,10 +148,16 @@ describe("canRequestSellerPayment", () => {
 });
 
 describe("canCompleteTransaction", () => {
+  const acceptedPendingTransaction = {
+    offered_listing_id: null,
+    reservation_confirmed_at: "2026-05-14T00:00:00.000Z",
+    status: "pending",
+  };
+
   it("allows completed handover for paid sale transactions", () => {
     expect(
       canCompleteTransaction({
-        offered_listing_id: null,
+        ...acceptedPendingTransaction,
         payment_status: "paid",
         request_type: "buy",
       }),
@@ -161,7 +167,7 @@ describe("canCompleteTransaction", () => {
   it("allows completed handover for unpaid sale transactions", () => {
     expect(
       canCompleteTransaction({
-        offered_listing_id: null,
+        ...acceptedPendingTransaction,
         payment_status: "unpaid",
         request_type: "buy",
       }),
@@ -171,17 +177,39 @@ describe("canCompleteTransaction", () => {
   it("allows completed handover for failed-payment sale transactions", () => {
     expect(
       canCompleteTransaction({
-        offered_listing_id: null,
+        ...acceptedPendingTransaction,
         payment_status: "failed",
         request_type: "buy",
       }),
     ).toBe(true);
   });
 
+  it("blocks already completed unpaid sale transactions", () => {
+    expect(
+      canCompleteTransaction({
+        ...acceptedPendingTransaction,
+        payment_status: "unpaid",
+        request_type: "buy",
+        status: "completed",
+      }),
+    ).toBe(false);
+  });
+
+  it("blocks sale transactions before seller acceptance", () => {
+    expect(
+      canCompleteTransaction({
+        ...acceptedPendingTransaction,
+        payment_status: "unpaid",
+        request_type: "buy",
+        reservation_confirmed_at: null,
+      }),
+    ).toBe(false);
+  });
+
   it("blocks completed handover while checkout is pending", () => {
     expect(
       canCompleteTransaction({
-        offered_listing_id: null,
+        ...acceptedPendingTransaction,
         payment_status: "checkout_pending",
         request_type: "buy",
       }),
@@ -191,6 +219,7 @@ describe("canCompleteTransaction", () => {
   it("allows completed handover for trade transactions without payment", () => {
     expect(
       canCompleteTransaction({
+        ...acceptedPendingTransaction,
         offered_listing_id: "listing-2",
         payment_status: "not_required",
         request_type: "trade",
@@ -201,10 +230,21 @@ describe("canCompleteTransaction", () => {
   it("allows completed handover for message-only trade transactions without payment", () => {
     expect(
       canCompleteTransaction({
-        offered_listing_id: null,
+        ...acceptedPendingTransaction,
         payment_status: "not_required",
         request_type: "trade",
       }),
     ).toBe(true);
+  });
+
+  it("blocks completed trade transactions", () => {
+    expect(
+      canCompleteTransaction({
+        ...acceptedPendingTransaction,
+        payment_status: "not_required",
+        request_type: "trade",
+        status: "completed",
+      }),
+    ).toBe(false);
   });
 });

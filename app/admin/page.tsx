@@ -2,10 +2,60 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 
 import { AdminModerationPanel } from "@/components/admin-moderation-panel";
-import { getAdminContext } from "@/lib/admin";
+import {
+  getAdminAuditLogsData,
+  getAdminContext,
+  getAdminListingsData,
+  getAdminOverviewData,
+  getAdminReportsData,
+  getAdminUsersData,
+} from "@/lib/admin";
+import { parseAdminTab, type AdminTab } from "@/lib/admin-tabs";
+import {
+  getAdminCourses,
+  getAdminDegrees,
+  getStudyAreaOptions,
+  getUniversityOptions,
+} from "@/lib/marketplace";
 
-async function AdminContent() {
-  const { isAdmin, userId } = await getAdminContext();
+type AdminPageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+function getTabParam(params: Record<string, string | string[] | undefined>) {
+  const tab = params.tab;
+  return Array.isArray(tab) ? tab[0] : tab;
+}
+
+async function getInitialAdminTabData(
+  tab: AdminTab,
+  supabase: Awaited<ReturnType<typeof getAdminContext>>["supabase"],
+) {
+  switch (tab) {
+    case "audit":
+      return { auditLogs: await getAdminAuditLogsData(supabase) };
+    case "catalog": {
+      const [courses, degrees, studyAreas, universities] = await Promise.all([
+        getAdminCourses(),
+        getAdminDegrees(),
+        getStudyAreaOptions(),
+        getUniversityOptions(true),
+      ]);
+      return { courses, degrees, studyAreas, universities };
+    }
+    case "listings":
+      return { listings: await getAdminListingsData(supabase) };
+    case "overview":
+      return getAdminOverviewData(supabase);
+    case "reports":
+      return { reports: await getAdminReportsData(supabase) };
+    case "users":
+      return { users: await getAdminUsersData(supabase) };
+  }
+}
+
+async function AdminContent({ searchParams }: AdminPageProps) {
+  const { isAdmin, supabase, userId } = await getAdminContext();
 
   if (!userId) {
     redirect("/auth/login");
@@ -14,6 +64,10 @@ async function AdminContent() {
   if (!isAdmin) {
     redirect("/home");
   }
+
+  const params = await searchParams;
+  const initialTab = parseAdminTab(getTabParam(params));
+  const initialData = await getInitialAdminTabData(initialTab, supabase);
 
   return (
     <section className="flex flex-col gap-10">
@@ -31,7 +85,10 @@ async function AdminContent() {
         </div>
       </div>
 
-      <AdminModerationPanel />
+      <AdminModerationPanel
+        {...initialData}
+        initialLoadedTabs={[initialTab]}
+      />
     </section>
   );
 }
@@ -60,10 +117,10 @@ function AdminContentFallback() {
   );
 }
 
-export default function AdminPage() {
+export default function AdminPage({ searchParams }: AdminPageProps) {
   return (
     <Suspense fallback={<AdminContentFallback />}>
-      <AdminContent />
+      <AdminContent searchParams={searchParams} />
     </Suspense>
   );
 }

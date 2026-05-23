@@ -384,7 +384,7 @@ export async function DELETE(
 
     const { error } = await supabase
       .from("listings")
-      .delete()
+      .update({ deleted_at: new Date().toISOString() })
       .eq("id", id);
 
     if (error) {
@@ -395,7 +395,7 @@ export async function DELETE(
     }
 
     return NextResponse.json({
-      message: "Listing deleted successfully.",
+      message: "Listing removed from the marketplace.",
       status: "success",
     });
   } catch (error) {
