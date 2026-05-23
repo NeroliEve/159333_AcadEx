@@ -8,6 +8,7 @@ import { isBlockedBetween } from "@/lib/blocks";
 import { canCancelAcceptedTransaction } from "@/lib/exchange-flow";
 import { getCompletedListingArchiveUpdate, getListingStatusUpdate } from "@/lib/listing-archive";
 import { canCompleteTransaction, canRequestSellerPayment } from "@/lib/payments";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 const CONVERSATION_CLOSE_HOURS = 24;
 
@@ -116,8 +117,14 @@ export async function PATCH(
   const now = new Date().toISOString();
   const listingIds = [transaction.listing_id];
   if (transaction.offered_listing_id) listingIds.push(transaction.offered_listing_id);
+  let adminSupabase: ReturnType<typeof createAdminClient> | null = null;
+  const getAdminSupabase = () => {
+    adminSupabase ??= createAdminClient();
+    return adminSupabase;
+  };
 
   if (action === "accept") {
+    const systemSupabase = getAdminSupabase();
     const [{ error: txError }, { error: listingError }] = await Promise.all([
       supabase.from("transactions").update({
         payment_status: transaction.request_type === "trade" ? "not_required" : "unpaid",
@@ -127,7 +134,7 @@ export async function PATCH(
         reservation_confirmed_at: now,
         updated_at: now,
       }).eq("id", id),
-      supabase.from("listings").update(getListingStatusUpdate("pending", now)).in("id", listingIds),
+      systemSupabase.from("listings").update(getListingStatusUpdate("pending", now)).in("id", listingIds),
     ]);
 
     if (txError || listingError) {
@@ -135,7 +142,7 @@ export async function PATCH(
     }
 
     // Cancel all other pending requests competing for either listing
-    await supabase
+    await systemSupabase
       .from("transactions")
       .update({ status: "cancelled", cancelled_at: now, updated_at: now })
       .in("listing_id", listingIds)
@@ -143,7 +150,7 @@ export async function PATCH(
       .neq("id", id);
 
     if (transaction.offered_listing_id) {
-      await supabase
+      await systemSupabase
         .from("transactions")
         .update({ status: "cancelled", cancelled_at: now, updated_at: now })
         .eq("offered_listing_id", transaction.offered_listing_id)
@@ -183,6 +190,7 @@ export async function PATCH(
   }
 
   if (action === "complete") {
+    const systemSupabase = getAdminSupabase();
     const closeConversation = getConversationCloseTimestamp(new Date(now));
     const [{ error: txError }, { error: listingError }] = await Promise.all([
       supabase.from("transactions").update({
@@ -191,7 +199,7 @@ export async function PATCH(
         completed_at: now,
         updated_at: now,
       }).eq("id", id),
-      supabase.from("listings").update(getCompletedListingArchiveUpdate(now)).in("id", listingIds),
+      systemSupabase.from("listings").update(getCompletedListingArchiveUpdate(now)).in("id", listingIds),
       transaction.conversation_id
         ? supabase.from("conversations").update(closeConversation).eq("id", transaction.conversation_id)
         : Promise.resolve({ error: null }),
@@ -203,6 +211,7 @@ export async function PATCH(
   }
 
   if (action === "cancel") {
+    const systemSupabase = getAdminSupabase();
     const closeConversation = getConversationCloseTimestamp(new Date(now));
     const { error: txError } = await supabase
       .from("transactions")
@@ -215,7 +224,7 @@ export async function PATCH(
 
     // Only revert listings if the seller had already accepted (they were marked pending)
     if (transaction.reservation_confirmed_at) {
-      await supabase
+      await systemSupabase
         .from("listings")
         .update(getListingStatusUpdate("available", now))
         .in("id", listingIds);

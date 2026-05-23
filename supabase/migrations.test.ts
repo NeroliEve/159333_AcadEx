@@ -54,4 +54,17 @@ describe("Supabase migrations", () => {
       /create policy "listings_select_public_non_deleted" on public\.listings for select to anon, authenticated using \(deleted_at is null\)/i,
     );
   });
+
+  it("allows active admins to select hidden listings so they can restore them", () => {
+    const migrationsDir = path.join(process.cwd(), "supabase", "migrations");
+    const migrationSql = readdirSync(migrationsDir)
+      .filter((file) => file.endsWith(".sql"))
+      .map((file) => readFileSync(path.join(migrationsDir, file), "utf8"))
+      .join("\n")
+      .replace(/\s+/g, " ");
+
+    expect(migrationSql).toMatch(
+      /create policy "listings_select_active_admin_all" on public\.listings for select to authenticated using \(public\.is_active_admin\(\)\)/i,
+    );
+  });
 });
