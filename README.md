@@ -194,7 +194,7 @@ This includes:
 - ongoing transactions
 - completed transactions
 - cancelled or inactive transactions
-- review eligibility after completed transactions
+- review eligibility after completed or accepted-cancelled transactions
 
 ### Admin Moderation
 
@@ -525,7 +525,24 @@ another table.
   users can report profiles, listings, conversations, or messages; admins can
   review reports and log moderation actions; users can block other profiles.
 
-## Local Development
+## Running the Platform
+
+Acadex can be reviewed through the deployed Vercel site or by running the
+project locally.
+
+### Deployed Version
+
+The deployed platform is available at:
+
+```bash
+https://acadex-lilac.vercel.app
+```
+
+No local setup is required to use the deployed version.
+
+### Local Development
+
+To run the platform locally against the already configured backend:
 
 1. Install dependencies:
 
@@ -533,17 +550,13 @@ another table.
 npm install
 ```
 
-2. Create `.env.local` in the project root and set the required values:
+2. Create `.env.local` in the project root and insert the environment variable
+   values from the final report document:
 
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
-```
-
-Depending on the enabled features, the project may also require:
-
-```bash
 ANTHROPIC_API_KEY=
 STRIPE_SECRET_KEY=
 STRIPE_WEBHOOK_SECRET=
@@ -565,74 +578,12 @@ The app should then be available at:
 http://localhost:3000
 ```
 
-## Supabase Setup
+### Backend Configuration
 
-Before running the app, create or connect a Supabase project and configure:
-
-- authentication providers
-- database tables
-- row-level security policies
-- storage buckets
-- storage access policies
-- realtime settings where required
-- database functions and triggers where required
-
-Expected storage buckets may include:
-
-- `avatars`
-- `listing-images`
-
-Make sure the storage policies match the intended access rules. Public read
-access may be appropriate for listing images, but write access should be limited
-to authenticated users and ownership-aware policies.
-
-## Database Workflow
-
-If the project uses Supabase migrations, apply them through the Supabase CLI:
-
-```bash
-supabase db push
-```
-
-To pull the remote database schema into local migrations:
-
-```bash
-supabase db pull
-```
-
-To reset a local Supabase database:
-
-```bash
-supabase db reset
-```
-
-Reference data such as universities, degrees, study areas, and courses should be
-seeded before testing listing creation and search flows.
-
-## Demo Data
-
-For demo or testing purposes, create sample data for:
-
-- users
-- profiles
-- listings
-- listing images
-- conversations
-- messages
-- transactions
-- reports
-- reviews
-
-Demo listings should cover multiple study areas and courses so that search,
-filtering, recommendations, and browse flows can be tested properly.
-
-The repo includes a demo seed script:
-
-```bash
-npm run seed:demo
-```
-
-Do not use real student data in demo environments.
+The Supabase backend, database schema, Row Level Security policies, storage
+buckets, authentication settings, and production Vercel environment variables
+have already been configured for the submitted project. A new Supabase project
+does not need to be created for normal review or local testing.
 
 ## Verification
 
@@ -659,24 +610,6 @@ Create a production build:
 ```bash
 npm run build
 ```
-
-## Deployment
-
-Acadex can be deployed to Vercel or another Next.js-compatible hosting provider.
-
-Before deploying, configure the production environment variables:
-
-```bash
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
-ANTHROPIC_API_KEY=
-STRIPE_SECRET_KEY=
-STRIPE_WEBHOOK_SECRET=
-```
-
-In Supabase, also confirm that the deployed site URL is added to the allowed
-authentication redirect URLs.
 
 ## Notes
 
